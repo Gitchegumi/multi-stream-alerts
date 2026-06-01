@@ -48,11 +48,14 @@ Important deployment-specific values:
 ```env
 PUBLIC_BASE_URL=https://<your-alerts-domain>
 INGRESS_PUBLIC_BASE_URL=https://<your-alerts-domain>
+NEXTAUTH_URL=https://<your-alerts-domain>
 APP_DATA_PATH=/path/to/your/app/data
 ASSETS_PATH=/path/to/your/app/data/assets
 WEB_PORT=3000
 INGRESS_PORT=8080
 ```
+
+`NEXTAUTH_URL` must match the browser-facing origin used to open the dashboard. For reverse proxy deployments, use `https://<your-alerts-domain>`. For local-only testing without a proxy, use the local origin you are opening in the browser.
 
 Set `INITIAL_DISPLAY_KEY` to a long random value before first startup. The default `main` overlay profile uses that key. Additional default profile keys are generated at runtime in the database.
 
