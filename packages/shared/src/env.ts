@@ -48,3 +48,11 @@ export function parseIngressEnv(env: NodeJS.ProcessEnv) {
 export function parseWebEnv(env: NodeJS.ProcessEnv) {
   return webEnvSchema.parse(env);
 }
+
+export function parseBooleanEnv(value: string | undefined, defaultValue = false) {
+  return z
+    .enum(["true", "false"])
+    .optional()
+    .transform((parsedValue) => (parsedValue ? parsedValue === "true" : defaultValue))
+    .parse(value);
+}

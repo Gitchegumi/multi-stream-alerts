@@ -27,10 +27,12 @@ export function ManualAlertForm({ channelId }: { channelId: string }) {
     >
       <textarea
         className="input"
+        maxLength={500}
         rows={3}
         value={message}
         onChange={(event) => setMessage(event.target.value)}
       />
+      <span className="muted">{message.length}/500</span>
       <label>
         <input type="checkbox" checked={isPublic} onChange={(event) => setIsPublic(event.target.checked)} /> Public
         message

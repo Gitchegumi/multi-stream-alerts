@@ -27,7 +27,7 @@ export function parseKofiFormData(body: { data?: unknown }) {
     throw new Error("Missing Ko-fi data field");
   }
 
-  const parsed = kofiPayloadSchema.parse(JSON.parse(body.data));
+  const parsed = kofiPayloadSchema.parse(parseKofiJson(body.data));
   const type = typeMap[parsed.type] ?? "tip";
   const isPublic = parseKofiBoolean(parsed.is_public);
 
@@ -47,6 +47,14 @@ export function parseKofiFormData(body: { data?: unknown }) {
       rawPayload: parsed
     }
   };
+}
+
+function parseKofiJson(data: string) {
+  try {
+    return JSON.parse(data);
+  } catch {
+    throw new Error("Malformed Ko-fi data JSON");
+  }
 }
 
 function parseAmount(value: string | number | undefined) {

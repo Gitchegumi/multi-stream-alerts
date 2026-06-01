@@ -7,6 +7,7 @@ export function OverlayClient({ displayKey, profile }: { displayKey: string; pro
   const [activeAlert, setActiveAlert] = useState<AlertEvent | null>(null);
   const queueRef = useRef<AlertEvent[]>([]);
   const activeRef = useRef(false);
+  const timeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const source = new EventSource(`/api/events/stream?displayKey=${encodeURIComponent(displayKey)}`);
@@ -20,7 +21,12 @@ export function OverlayClient({ displayKey, profile }: { displayKey: string; pro
       source.close();
     };
 
-    return () => source.close();
+    return () => {
+      source.close();
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
+      }
+    };
   }, [displayKey]);
 
   function drainQueue() {
@@ -36,7 +42,7 @@ export function OverlayClient({ displayKey, profile }: { displayKey: string; pro
     activeRef.current = true;
     setActiveAlert(nextAlert);
 
-    window.setTimeout(() => {
+    timeoutRef.current = window.setTimeout(() => {
       setActiveAlert(null);
       activeRef.current = false;
       drainQueue();

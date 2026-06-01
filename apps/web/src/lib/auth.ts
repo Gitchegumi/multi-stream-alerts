@@ -1,6 +1,7 @@
 import type { NextAuthOptions, Profile } from "next-auth";
 import AuthentikProvider from "next-auth/providers/authentik";
 import { prisma } from "@multi-stream-alerts/database";
+import { parseBooleanEnv } from "@multi-stream-alerts/shared";
 
 type OidcProfile = Profile & {
   sub?: string;
@@ -54,15 +55,14 @@ export const authOptions: NextAuthOptions = {
           data: {
             authProvider: account.provider,
             authSubject,
-            displayName: oidcProfile?.name ?? existingUser.displayName,
-            role: email === process.env.INITIAL_ADMIN_EMAIL ? "admin" : existingUser.role
+            displayName: oidcProfile?.name ?? existingUser.displayName
           }
         });
         return true;
       }
 
       const isInitialAdmin = email === process.env.INITIAL_ADMIN_EMAIL;
-      if (!isInitialAdmin && process.env.ALLOW_AUTO_PROVISION !== "true") {
+      if (!isInitialAdmin && !parseBooleanEnv(process.env.ALLOW_AUTO_PROVISION)) {
         return false;
       }
 
@@ -79,6 +79,10 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
     async jwt({ token, account, profile }) {
+      if (token.userId && token.role) {
+        return token;
+      }
+
       const oidcProfile = profile as OidcProfile | undefined;
       const authSubject = oidcProfile?.sub ?? account?.providerAccountId;
 
