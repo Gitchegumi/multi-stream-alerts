@@ -18,7 +18,7 @@ It is built as a TypeScript monorepo with a Next.js dashboard/overlay app, a nar
 - Not public registration or public signup.
 - Not billing or creator onboarding.
 - Not username/password authentication inside the app.
-- Not dependent on Streamer.bot, StreamElements, Streamlabs, or Overlabels at runtime.
+- Not dependent on Streamer.bot, StreamElements, or Streamlabs at runtime.
 
 ## Architecture
 
