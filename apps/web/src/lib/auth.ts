@@ -112,8 +112,5 @@ export const authOptions: NextAuthOptions = {
       session.user.role = token.role;
       return session;
     }
-  },
-  pages: {
-    signIn: "/api/auth/signin"
   }
 };

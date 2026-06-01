@@ -6,7 +6,7 @@ export async function requireDashboardSession() {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
-    redirect("/api/auth/signin");
+    redirect("/api/auth/signin?callbackUrl=/dashboard");
   }
 
   return session;
