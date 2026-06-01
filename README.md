@@ -72,6 +72,14 @@ ALLOW_AUTO_PROVISION=false
 INITIAL_ADMIN_EMAIL=<your-admin-email>
 ```
 
+For Authentik, set `AUTH_OIDC_ISSUER` to the canonical application issuer without a trailing slash, for example:
+
+```env
+AUTH_OIDC_ISSUER=https://<your-authentik-domain>/application/o/<application-slug>
+```
+
+The discovery URL `AUTH_OIDC_ISSUER/.well-known/openid-configuration` must return `200 OK` directly. If Authentik or your reverse proxy redirects from `http` to `https`, from an IP address to a host name, or to a path with different slash formatting, NextAuth will fail sign-in with `expected 200 OK, got: 301 Moved Permanently`.
+
 The first admin is recognized by `INITIAL_ADMIN_EMAIL`. With `ALLOW_AUTO_PROVISION=false`, unknown OIDC users are denied dashboard access unless they already exist in the database.
 
 Roles:
