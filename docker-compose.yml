@@ -1,0 +1,87 @@
+services:
+  alerts-web:
+    build:
+      context: .
+      args:
+        SERVICE: web
+    container_name: alerts-web
+    env_file:
+      - .env
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    volumes:
+      - "${ASSETS_PATH}:/app/assets"
+    depends_on:
+      alerts-postgres:
+        condition: service_healthy
+      alerts-redis:
+        condition: service_healthy
+    command: ["sh", "-c", "pnpm prisma:migrate && pnpm --filter @multi-stream-alerts/web start"]
+    restart: unless-stopped
+
+  alerts-ingress:
+    build:
+      context: .
+      args:
+        SERVICE: ingress
+    container_name: alerts-ingress
+    env_file:
+      - .env
+    ports:
+      - "${INGRESS_PORT:-8080}:8080"
+    volumes:
+      - "${ASSETS_PATH}:/app/assets"
+    depends_on:
+      alerts-postgres:
+        condition: service_healthy
+      alerts-redis:
+        condition: service_healthy
+    command: ["sh", "-c", "pnpm --filter @multi-stream-alerts/ingress start"]
+    restart: unless-stopped
+
+  alerts-worker:
+    build:
+      context: .
+      args:
+        SERVICE: worker
+    container_name: alerts-worker
+    env_file:
+      - .env
+    volumes:
+      - "${ASSETS_PATH}:/app/assets"
+    depends_on:
+      alerts-postgres:
+        condition: service_healthy
+      alerts-redis:
+        condition: service_healthy
+    command: ["sh", "-c", "pnpm --filter @multi-stream-alerts/worker start"]
+    restart: unless-stopped
+
+  alerts-postgres:
+    image: postgres:17-alpine
+    container_name: alerts-postgres
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB}"
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    volumes:
+      - "${APP_DATA_PATH}/postgres:/var/lib/postgresql/data"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  alerts-redis:
+    image: redis:7-alpine
+    container_name: alerts-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - "${APP_DATA_PATH}/redis:/data"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
