@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  owner
+  editor
+  viewer
+}
+
+enum AlertPlatform {
+  kofi
+  twitch
+  youtube
+  tiktok
+  manual
+}
+
+enum AlertType {
+  tip
+  follow
+  subscription
+  resubscription
+  membership
+  superchat
+  supersticker
+  raid
+  cheer
+  gift
+  shop_order
+  commission
+  channel_point
+  stream_online
+  stream_offline
+  test
+}
+
+model User {
+  id             String              @id @default(cuid())
+  authProvider   String              @map("auth_provider")
+  authSubject    String              @map("auth_subject")
+  email          String              @unique
+  displayName    String?             @map("display_name")
+  role           UserRole            @default(viewer)
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  ownedChannels  Channel[]           @relation("ChannelOwner")
+  memberships    ChannelMembership[]
+
+  @@unique([authProvider, authSubject])
+  @@map("users")
+}
+
+model Channel {
+  id                  String              @id @default(cuid())
+  name                String
+  slug                String              @unique
+  ownerUserId         String?             @map("owner_user_id")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+  owner               User?               @relation("ChannelOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  memberships         ChannelMembership[]
+  alertEvents         AlertEvent[]
+  alertTemplates      AlertTemplate[]
+  overlayProfiles     OverlayProfile[]
+  integrationSettings IntegrationSetting[]
+  deduplicationKeys   DeduplicationKey[]
+
+  @@map("channels")
+}
+
+model ChannelMembership {
+  id        String   @id @default(cuid())
+  channelId String   @map("channel_id")
+  userId    String   @map("user_id")
+  role      UserRole
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+  @@map("channel_memberships")
+}
+
+model AlertEvent {
+  id             String        @id
+  channelId      String        @map("channel_id")
+  platform       AlertPlatform
+  type           AlertType
+  displayName    String        @map("display_name")
+  amount         Decimal?      @db.Decimal(12, 2)
+  currency       String?
+  message        String?
+  isPublic       Boolean?      @map("is_public")
+  tier           String?
+  quantity       Int?
+  rawEventId     String        @map("raw_event_id")
+  rawPayloadJson Json?         @map("raw_payload_json")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  channel        Channel       @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@index([channelId, createdAt])
+  @@index([platform, rawEventId])
+  @@map("alert_events")
+}
+
+model AlertTemplate {
+  id           String        @id @default(cuid())
+  channelId    String        @map("channel_id")
+  platform     AlertPlatform
+  type         AlertType
+  name         String
+  templateJson Json          @map("template_json")
+  isActive     Boolean       @default(true) @map("is_active")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  channel      Channel       @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, platform, type, name])
+  @@map("alert_templates")
+}
+
+model OverlayProfile {
+  id           String   @id @default(cuid())
+  channelId    String   @map("channel_id")
+  name         String
+  slug         String
+  displayKey   String   @unique @map("display_key")
+  isActive     Boolean  @default(true) @map("is_active")
+  settingsJson Json     @default("{}") @map("settings_json")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  channel      Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, slug])
+  @@map("overlay_profiles")
+}
+
+model IntegrationSetting {
+  id           String   @id @default(cuid())
+  channelId    String   @map("channel_id")
+  provider     String
+  settingsJson Json     @default("{}") @map("settings_json")
+  isEnabled    Boolean  @default(false) @map("is_enabled")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  channel      Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, provider])
+  @@map("integration_settings")
+}
+
+model DeduplicationKey {
+  id         String   @id @default(cuid())
+  provider   String
+  rawEventId String   @map("raw_event_id")
+  channelId  String   @map("channel_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  channel    Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, rawEventId, channelId])
+  @@map("deduplication_keys")
+}

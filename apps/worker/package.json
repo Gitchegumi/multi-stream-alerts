@@ -1,0 +1,22 @@
+{
+  "name": "@multi-stream-alerts/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "dev": "tsx watch src/worker.ts",
+    "lint": "tsc --noEmit",
+    "start": "tsx src/worker.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@multi-stream-alerts/database": "workspace:*",
+    "@multi-stream-alerts/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

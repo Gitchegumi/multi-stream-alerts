@@ -1,0 +1,19 @@
+{
+  "name": "multi-stream-alerts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A self-hosted alert and overlay system for creators who want to own their stream tools, data, and assets instead of depending on third-party platforms.",
+  "scripts": {
+    "build": "corepack pnpm -r build",
+    "dev": "corepack pnpm --filter @multi-stream-alerts/web dev",
+    "lint": "corepack pnpm -r lint",
+    "prisma:generate": "corepack pnpm --filter @multi-stream-alerts/database prisma:generate",
+    "prisma:migrate": "corepack pnpm --filter @multi-stream-alerts/database prisma:migrate",
+    "typecheck": "corepack pnpm -r typecheck"
+  },
+  "engines": {
+    "node": ">=20.11.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.4"
+}
