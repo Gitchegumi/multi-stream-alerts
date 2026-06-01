@@ -10,6 +10,8 @@ type OidcProfile = Profile & {
   preferred_username?: string;
 };
 
+const oidcIssuer = (process.env.AUTH_OIDC_ISSUER ?? "https://<your-oidc-provider>/<issuer-path>").replace(/\/+$/, "");
+
 export const authOptions: NextAuthOptions = {
   secret: process.env.AUTH_SECRET,
   session: { strategy: "jwt" },
@@ -17,7 +19,7 @@ export const authOptions: NextAuthOptions = {
     AuthentikProvider({
       id: "oidc",
       name: "OIDC",
-      issuer: process.env.AUTH_OIDC_ISSUER ?? "https://<your-oidc-provider>/<issuer-path>",
+      issuer: oidcIssuer,
       clientId: process.env.AUTH_OIDC_CLIENT_ID ?? "<your-oidc-client-id>",
       clientSecret: process.env.AUTH_OIDC_CLIENT_SECRET ?? "<your-oidc-client-secret>",
       authorization: { params: { scope: "openid email profile" } },
