@@ -201,3 +201,129 @@ textarea {
     transform: translateY(0) scale(1);
   }
 }
+
+.auth-shell {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.auth-card {
+  width: min(420px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 28px;
+  display: grid;
+  gap: 16px;
+}
+
+.auth-title {
+  margin: 0;
+  font-size: 28px;
+}
+
+.auth-form {
+  display: grid;
+  gap: 12px;
+}
+
+.auth-field {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.auth-field input {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-soft);
+  color: var(--text);
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.auth-field input[aria-invalid="true"] {
+  border-color: var(--danger);
+  outline-color: var(--danger);
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--line);
+}
+
+.button.primary {
+  background: var(--accent);
+  color: #101512;
+  font-weight: 700;
+  padding: 10px 14px;
+}
+
+.button.primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.button.secondary {
+  background: var(--panel-soft);
+  color: var(--text);
+  border: 1px solid var(--line);
+  padding: 10px 14px;
+  font-weight: 600;
+}
+
+.button.secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error {
+  color: var(--danger);
+  margin: 0;
+  font-size: 14px;
+}
+
+.small {
+  font-size: 13px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--line);
+}
+
+.pill-ok {
+  background: rgba(99, 210, 164, 0.16);
+  color: var(--accent);
+  border-color: rgba(99, 210, 164, 0.4);
+}
+
+.pill-warn {
+  background: rgba(255, 107, 107, 0.16);
+  color: var(--danger);
+  border-color: rgba(255, 107, 107, 0.4);
+}
+
+.pill-muted {
+  background: var(--panel-soft);
+  color: var(--muted);
+}

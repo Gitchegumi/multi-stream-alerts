@@ -6,8 +6,8 @@ It is built as a TypeScript monorepo with a Next.js dashboard/overlay app, a nar
 
 ## What This Is
 
-- A personal, self-hosted replacement path for StreamElements-style alerts.
-- A dashboard for trusted users authenticated through OIDC.
+- A self-hosted alert and overlay system for creators and small teams.
+- A dashboard for authenticated users, with role-based access.
 - Display-key protected overlay pages for OBS or Meld browser sources.
 - Provider adapters that normalize external events into one internal alert model.
 - Docker Compose friendly and intended to sit behind a reverse proxy.
@@ -15,9 +15,7 @@ It is built as a TypeScript monorepo with a Next.js dashboard/overlay app, a nar
 ## What This Is Not
 
 - Not a public SaaS product.
-- Not public registration or public signup.
 - Not billing or creator onboarding.
-- Not username/password authentication inside the app.
 - Not dependent on Streamer.bot, StreamElements, or Streamlabs at runtime.
 
 ## Architecture
@@ -84,10 +82,41 @@ The first admin is recognized by `INITIAL_ADMIN_EMAIL`. With `ALLOW_AUTO_PROVISI
 
 Roles:
 
-- `admin` can manage all channels.
-- `owner` can manage owned channels.
+- `admin` can manage the instance, users, invite codes, and every channel.
+- `owner` owns a channel and can manage its settings.
 - `editor` can edit assigned channel templates and overlays.
 - `viewer` can view assigned dashboard content.
+
+### Local Email & Password Registration
+
+GitchAlerts supports local email/password accounts in addition to OIDC. Local registration is gated by invite codes and is **off by default** — set `ENABLE_LOCAL_REGISTRATION=true` in `.env` to enable it.
+
+```env
+ENABLE_LOCAL_REGISTRATION=true
+PASSWORD_MIN_LENGTH=12
+```
+
+With local registration enabled, the sign-in page shows two paths: email/password and OIDC. The OIDC path is unchanged. New users can self-register at `/register` with an email, password, and a valid invite code.
+
+The first admin is still created by signing in through OIDC with the email in `INITIAL_ADMIN_EMAIL`. From there, that admin can mint invite codes at `/dashboard/admin/invites` for other users.
+
+#### Invite codes
+
+- Created by admins at `/dashboard/admin/invites`.
+- Each code has a role (defaults to `owner`), a `maxUses` count (default 1), and an optional `expiresAt` timestamp.
+- A code can be revoked at any time. Revoked or expired codes are rejected at registration.
+- Multi-use codes track per-user redemptions in `invite_code_redemptions` so a single user cannot burn a code's quota twice.
+- Codes use a Crockford-style alphabet that drops lookalike characters (no `0`, `O`, `1`, `I`, `L`).
+
+#### What the new user gets
+
+A successful local registration creates:
+
+- a `User` row with `authProvider="local"` and a bcrypt-hashed password (cost 12),
+- a personal `Channel` whose `ownerUserId` is the new user, and
+- a `ChannelMembership` granting the new user `owner` role on that channel.
+
+Users only see channels they are members of (or, for admins, every channel). Cross-user isolation is enforced by the existing `getAuthorizedChannels` and `canManageChannel` helpers; nothing in this change relaxes those checks.
 
 ## Route Protection
 
