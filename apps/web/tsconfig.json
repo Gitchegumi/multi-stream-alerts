@@ -3,7 +3,6 @@
   "compilerOptions": {
     "allowJs": false,
     "baseUrl": ".",
-    "ignoreDeprecations": "6.0",
     "incremental": true,
     "jsx": "preserve",
     "module": "ESNext",
