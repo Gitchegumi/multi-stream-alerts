@@ -1,14 +1,14 @@
-import { notFound } from "next/navigation";
-import { prisma } from "@multi-stream-alerts/database";
-import { OverlayClient } from "@/components/OverlayClient";
+import { notFound } from 'next/navigation';
+import { prisma } from '@multi-stream-alerts/database';
+import { OverlayClient } from '@/components/OverlayClient';
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
-const allowedProfiles = new Set(["main", "vertical", "test"]);
+const allowedProfiles = new Set(['main', 'vertical', 'test']);
 
 export default async function OverlayPage({
   params,
-  searchParams
+  searchParams,
 }: {
   params: Promise<{ profile: string }>;
   searchParams: Promise<{ displayKey?: string }>;

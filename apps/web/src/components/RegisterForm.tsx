@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { validateInviteCodeForCookie } from "@/lib/oidc-state";
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import { validateInviteCodeForCookie } from '@/lib/oidc-state';
 
 /**
  * Client-side form for the first step of registration: paste the invite
@@ -16,7 +16,7 @@ import { validateInviteCodeForCookie } from "@/lib/oidc-state";
  */
 export function RegisterForm() {
   const router = useRouter();
-  const [inviteCode, setInviteCode] = useState("");
+  const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -26,19 +26,23 @@ export function RegisterForm() {
 
     const validation = validateInviteCodeForCookie(inviteCode);
     if (!validation.ok) {
-      setError(validation.reason === "MISSING" ? "Invite code is required." : "Invite code is not in a valid format.");
+      setError(
+        validation.reason === 'MISSING'
+          ? 'Invite code is required.'
+          : 'Invite code is not in a valid format.',
+      );
       return;
     }
 
     startTransition(async () => {
-      const response = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ inviteCode: validation.inviteCode })
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ inviteCode: validation.inviteCode }),
       });
       if (!response.ok) {
         const data = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(data.message ?? "Could not save invite code.");
+        setError(data.message ?? 'Could not save invite code.');
         return;
       }
       router.refresh();
@@ -67,11 +71,11 @@ export function RegisterForm() {
         </p>
       )}
       <button type="submit" className="button primary" disabled={pending}>
-        {pending ? "Working…" : "Continue to sign in"}
+        {pending ? 'Working…' : 'Continue to sign in'}
       </button>
       <p className="muted small">
-        After you continue, you will be redirected to your identity provider. Your first successful sign-in
-        will create your account.
+        After you continue, you will be redirected to your identity provider. Your first successful
+        sign-in will create your account.
       </p>
     </form>
   );

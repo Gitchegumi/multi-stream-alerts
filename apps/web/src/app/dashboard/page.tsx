@@ -1,20 +1,46 @@
-import { ensureDefaultChannel, getAuthorizedChannels, prisma, toAlertEvent } from "@multi-stream-alerts/database";
-import { productName } from "@multi-stream-alerts/ui";
-import { ManualAlertForm } from "@/components/ManualAlertForm";
-import { requireDashboardSession } from "@/lib/session";
+import {
+  ensureDefaultChannel,
+  getAuthorizedChannels,
+  prisma,
+  toAlertEvent,
+} from '@multi-stream-alerts/database';
+import { productName } from '@multi-stream-alerts/ui';
+import { ManualAlertForm } from '@/components/ManualAlertForm';
+import { requireDashboardSession } from '@/lib/session';
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
-export default async function DashboardPage() {
+// Map a `?error=...` hint from a server-side redirect to a user-readable
+// notice. Unknown values get a generic message — the query param is a
+// hint, not user input, so we never echo the raw value.
+function errorNoticeFor(value: string | undefined): string | null {
+  if (!value) return null;
+  if (value === 'forbidden') return "You don't have access to that channel.";
+  return 'Something went wrong.';
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   const session = await requireDashboardSession();
   await ensureDefaultChannel();
   const channels = await getAuthorizedChannels(session.user.id, session.user.role);
   const selectedChannel = channels[0];
 
+  const { error: errorParam } = await searchParams;
+  const errorNotice = errorNoticeFor(errorParam);
+
   if (!selectedChannel) {
     return (
       <main className="dashboard-shell">
         <h1 className="dashboard-title">{productName}</h1>
+        {errorNotice ? (
+          <p className="error" role="alert" style={{ marginTop: 12 }}>
+            {errorNotice}
+          </p>
+        ) : null}
         <p className="muted">No channel access has been assigned for this account.</p>
       </main>
     );
@@ -22,26 +48,41 @@ export default async function DashboardPage() {
 
   const recentEvents = await prisma.alertEvent.findMany({
     where: { channelId: selectedChannel.id },
-    orderBy: { createdAt: "desc" },
-    take: 12
+    orderBy: { createdAt: 'desc' },
+    take: 12,
   });
 
-  const publicBaseUrl = process.env.PUBLIC_BASE_URL ?? "https://<your-alerts-domain>";
+  const publicBaseUrl = process.env.PUBLIC_BASE_URL ?? 'https://<your-alerts-domain>';
   const overlayUrls = selectedChannel.overlayProfiles.map((profile) => ({
     label: profile.name,
-    url: `${publicBaseUrl}/overlay/${profile.slug}?displayKey=${encodeURIComponent(profile.displayKey)}`
+    url: `${publicBaseUrl}/overlay/${profile.slug}?displayKey=${encodeURIComponent(profile.displayKey)}`,
   }));
 
   return (
     <main className="dashboard-shell">
+      {errorNotice ? (
+        <p className="error" role="alert" style={{ marginTop: 12 }}>
+          {errorNotice}
+        </p>
+      ) : null}
       <header className="dashboard-header">
         <div>
           <h1 className="dashboard-title">{productName}</h1>
-          <p className="muted">Signed in as {session.user.email}. Managing {selectedChannel.name}.</p>
+          <p className="muted">
+            Signed in as {session.user.email}. Managing {selectedChannel.name}.
+          </p>
         </div>
-        <a className="button" href="/api/auth/signout">
-          Sign out
-        </a>
+        <div className="stack" style={{ flexDirection: 'row', gap: 8 }}>
+          <a
+            className="button-secondary"
+            href={`/dashboard/${encodeURIComponent(selectedChannel.slug)}/integrations`}
+          >
+            Settings → Integrations
+          </a>
+          <a className="button" href="/api/auth/signout">
+            Sign out
+          </a>
+        </div>
       </header>
 
       <section className="grid">
@@ -64,13 +105,19 @@ export default async function DashboardPage() {
 
         <div className="panel">
           <h2>Integrations</h2>
-          <p className="muted">Ko-fi webhook ingestion is active when its verification token is configured.</p>
-          <p className="muted">Twitch and YouTube are present as verified route stubs for future adapter work.</p>
+          <p className="muted">
+            Ko-fi webhook ingestion is active when its verification token is configured.
+          </p>
+          <p className="muted">
+            Twitch and YouTube are present as verified route stubs for future adapter work.
+          </p>
         </div>
 
         <div className="panel">
           <h2>Template settings</h2>
-          <p className="muted">Template editing will live here. v1 uses the default clean overlay presentation.</p>
+          <p className="muted">
+            Template editing will live here. v1 uses the default clean overlay presentation.
+          </p>
         </div>
       </section>
 

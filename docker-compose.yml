@@ -8,18 +8,18 @@ services:
     env_file:
       - .env
     environment:
-      NEXTAUTH_URL: "${NEXTAUTH_URL:-${PUBLIC_BASE_URL}}"
-      NEXTAUTH_SECRET: "${AUTH_SECRET}"
+      NEXTAUTH_URL: '${NEXTAUTH_URL:-${PUBLIC_BASE_URL}}'
+      NEXTAUTH_SECRET: '${AUTH_SECRET}'
     ports:
-      - "${WEB_PORT:-3000}:3000"
+      - '${WEB_PORT:-3000}:3000'
     volumes:
-      - "${ASSETS_PATH}:/app/assets"
+      - '${ASSETS_PATH}:/app/assets'
     depends_on:
       alerts-postgres:
         condition: service_healthy
       alerts-redis:
         condition: service_healthy
-    command: ["sh", "-c", "pnpm prisma:migrate && pnpm --filter @multi-stream-alerts/web start"]
+    command: ['sh', '-c', 'pnpm prisma:migrate && pnpm --filter @multi-stream-alerts/web start']
     restart: unless-stopped
 
   alerts-ingress:
@@ -31,15 +31,15 @@ services:
     env_file:
       - .env
     ports:
-      - "${INGRESS_PORT:-8080}:8080"
+      - '${INGRESS_PORT:-8080}:8080'
     volumes:
-      - "${ASSETS_PATH}:/app/assets"
+      - '${ASSETS_PATH}:/app/assets'
     depends_on:
       alerts-postgres:
         condition: service_healthy
       alerts-redis:
         condition: service_healthy
-    command: ["sh", "-c", "pnpm --filter @multi-stream-alerts/ingress start"]
+    command: ['sh', '-c', 'pnpm --filter @multi-stream-alerts/ingress start']
     restart: unless-stopped
 
   alerts-worker:
@@ -51,26 +51,26 @@ services:
     env_file:
       - .env
     volumes:
-      - "${ASSETS_PATH}:/app/assets"
+      - '${ASSETS_PATH}:/app/assets'
     depends_on:
       alerts-postgres:
         condition: service_healthy
       alerts-redis:
         condition: service_healthy
-    command: ["sh", "-c", "pnpm --filter @multi-stream-alerts/worker start"]
+    command: ['sh', '-c', 'pnpm --filter @multi-stream-alerts/worker start']
     restart: unless-stopped
 
   alerts-postgres:
     image: postgres:17-alpine
     container_name: alerts-postgres
     environment:
-      POSTGRES_DB: "${POSTGRES_DB}"
-      POSTGRES_USER: "${POSTGRES_USER}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: '${POSTGRES_DB}'
+      POSTGRES_USER: '${POSTGRES_USER}'
+      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD}'
     volumes:
-      - "${APP_DATA_PATH}/postgres:/var/lib/postgresql/data"
+      - '${APP_DATA_PATH}/postgres:/var/lib/postgresql/data'
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
       interval: 10s
       timeout: 5s
       retries: 10
@@ -79,11 +79,11 @@ services:
   alerts-redis:
     image: redis:7-alpine
     container_name: alerts-redis
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ['redis-server', '--appendonly', 'yes']
     volumes:
-      - "${APP_DATA_PATH}/redis:/data"
+      - '${APP_DATA_PATH}/redis:/data'
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 5s
       retries: 10

@@ -100,12 +100,12 @@ model Channel {
   createdAt           DateTime            @default(now()) @map("created_at")
   updatedAt           DateTime            @updatedAt @map("updated_at")
   owner               User?               @relation("ChannelOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
-  memberships         ChannelMembership[]
-  alertEvents         AlertEvent[]
-  alertTemplates      AlertTemplate[]
-  overlayProfiles     OverlayProfile[]
-  integrationSettings IntegrationSetting[]
-  deduplicationKeys   DeduplicationKey[]
+  memberships            ChannelMembership[]
+  alertEvents            AlertEvent[]
+  alertTemplates         AlertTemplate[]
+  overlayProfiles        OverlayProfile[]
+  integrationCredentials IntegrationCredential[]
+  deduplicationKeys      DeduplicationKey[]
 
   @@map("channels")
 }
@@ -178,18 +178,44 @@ model OverlayProfile {
   @@map("overlay_profiles")
 }
 
-model IntegrationSetting {
-  id           String   @id @default(cuid())
-  channelId    String   @map("channel_id")
-  provider     String
-  settingsJson Json     @default("{}") @map("settings_json")
-  isEnabled    Boolean  @default(false) @map("is_enabled")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-  channel      Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+model IntegrationCredential {
+  id                  String                        @id @default(cuid())
+  channelId           String                        @map("channel_id")
+  provider            String                        // "kofi" | "twitch" | "youtube"
+  isEnabled           Boolean                       @default(false) @map("is_enabled")
+  // Public, non-secret fields. Empty/null = not set.
+  twitchBroadcasterId String?                       @map("twitch_broadcaster_id")
+  createdAt           DateTime                      @default(now()) @map("created_at")
+  updatedAt           DateTime                      @updatedAt @map("updated_at")
+  channel             Channel                       @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  secrets             IntegrationCredentialSecret[]
 
   @@unique([channelId, provider])
-  @@map("integration_settings")
+  @@index([provider])
+  @@map("integration_credentials")
+}
+
+model IntegrationCredentialSecret {
+  id           String                @id @default(cuid())
+  credentialId String                @map("credential_id")
+  // Stable key string. Valid values:
+  //   kofi.verification_token
+  //   twitch.eventsub_secret
+  //   twitch.client_id
+  //   twitch.client_secret
+  //   youtube.client_id
+  //   youtube.client_secret
+  // Add a Zod enum (or literal-type union) at the TS layer in Task 4 to keep callers honest.
+  key          String
+  // Output of secrets.encryptSecret. Empty string == cleared.
+  ciphertext   String
+  createdAt    DateTime              @default(now()) @map("created_at")
+  updatedAt    DateTime              @updatedAt @map("updated_at")
+  credential   IntegrationCredential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+
+  @@unique([credentialId, key])
+  @@index([key])
+  @@map("integration_credential_secrets")
 }
 
 model DeduplicationKey {

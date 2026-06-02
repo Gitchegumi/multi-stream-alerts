@@ -1,0 +1,18 @@
+name: OSV Scanner PR
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  actions: read
+  security-events: write
+  contents: read
+
+jobs:
+  scan-pr:
+    name: Scan PR dependencies with OSV
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.3.8
+    with:
+      scan-args: |-
+        --lockfile=pnpm-lock.yaml
