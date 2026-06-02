@@ -15,16 +15,16 @@
     "@multi-stream-alerts/database": "workspace:*",
     "@multi-stream-alerts/shared": "workspace:*",
     "@multi-stream-alerts/ui": "workspace:*",
-    "@next/env": "16.2.6",
-    "next": "16.2.6",
+    "@next/env": "16.2.7",
+    "next": "16.2.7",
     "next-auth": "^4.24.11",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "zod": "^3.24.1"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
-    "@types/react": "^19.0.2",
+    "@types/react": "^19.2.16",
     "@types/react-dom": "^19.0.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
