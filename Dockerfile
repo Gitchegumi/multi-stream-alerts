@@ -12,6 +12,8 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm prisma:generate
 RUN pnpm --filter @multi-stream-alerts/${SERVICE} build
 
+USER 1000
+
 EXPOSE 3000
 EXPOSE 8080
 
