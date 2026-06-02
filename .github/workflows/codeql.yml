@@ -2,7 +2,6 @@ name: CodeQL
 
 on:
   pull_request:
-  merge_group:
   schedule:
     - cron: '17 6 * * 1'
 
@@ -30,13 +29,8 @@ jobs:
           languages: ${{ matrix.language }}
           queries: security-extended,security-and-quality
           build-mode: none
-      
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:${{ matrix.language }}"
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
-          category: "/language:${{ matrix.language }}"
+          category: '/language:${{ matrix.language }}'
