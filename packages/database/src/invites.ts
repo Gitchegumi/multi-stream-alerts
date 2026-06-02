@@ -1,0 +1,196 @@
+import { randomBytes } from "node:crypto";
+import type { Prisma, UserRole } from "@prisma/client";
+import { prisma } from "./client";
+
+const DEFAULT_CODE_LENGTH = 16;
+// Skip lookalikes: 0/O, 1/I/L.
+const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".replace(/[0O1IL]/g, "");
+
+export type InviteCodeSummary = {
+  id: string;
+  code: string;
+  role: UserRole;
+  maxUses: number;
+  usedCount: number;
+  expiresAt: Date | null;
+  isRevoked: boolean;
+  note: string | null;
+  createdByUserId: string;
+  createdAt: Date;
+};
+
+export class InviteCodeError extends Error {
+  readonly code: "INVALID" | "EXPIRED" | "REVOKED" | "EXHAUSTED";
+  constructor(code: InviteCodeError["code"], message: string) {
+    super(message);
+    this.code = code;
+    this.name = "InviteCodeError";
+  }
+}
+
+export function generateInviteCode(length: number = DEFAULT_CODE_LENGTH): string {
+  const safeLength = Math.max(8, Math.min(48, Math.floor(length)));
+  const bytes = randomBytes(safeLength);
+  let out = "";
+  for (let i = 0; i < safeLength; i++) {
+    const byte = bytes[i] ?? 0;
+    const char = ALPHABET[byte % ALPHABET.length];
+    if (!char) continue;
+    out += char;
+    if (i > 0 && i < safeLength - 1 && (i + 1) % 4 === 0) {
+      out += "-";
+    }
+  }
+  return out;
+}
+
+export async function createInviteCode(input: {
+  createdByUserId: string;
+  role?: UserRole;
+  maxUses?: number;
+  expiresAt?: Date | null;
+  note?: string | null;
+}): Promise<InviteCodeSummary> {
+  const maxUses = Math.max(1, Math.floor(input.maxUses ?? 1));
+  const code = generateInviteCode();
+  const created = await prisma.inviteCode.create({
+    data: {
+      code,
+      role: input.role ?? "owner",
+      maxUses,
+      expiresAt: input.expiresAt ?? null,
+      note: input.note ?? null,
+      createdByUserId: input.createdByUserId
+    }
+  });
+  return toSummary(created);
+}
+
+export async function listInviteCodes(createdByUserId?: string): Promise<InviteCodeSummary[]> {
+  const rows = await prisma.inviteCode.findMany({
+    where: createdByUserId ? { createdByUserId } : undefined,
+    orderBy: { createdAt: "desc" },
+    take: 200
+  });
+  return rows.map(toSummary);
+}
+
+export async function revokeInviteCode(id: string): Promise<InviteCodeSummary | null> {
+  const updated = await prisma.inviteCode.update({
+    where: { id },
+    data: { isRevoked: true }
+  });
+  return toSummary(updated);
+}
+
+export async function findInviteByCode(rawCode: string) {
+  if (!rawCode) return null;
+  const normalized = rawCode.trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+  if (!normalized) return null;
+  return prisma.inviteCode.findUnique({ where: { code: normalized } });
+}
+
+export function assertInviteIsUsable(invite: { isRevoked: boolean; usedCount: number; maxUses: number; expiresAt: Date | null }): void {
+  if (invite.isRevoked) {
+    throw new InviteCodeError("REVOKED", "This invite code has been revoked");
+  }
+  if (invite.expiresAt && invite.expiresAt.getTime() <= Date.now()) {
+    throw new InviteCodeError("EXPIRED", "This invite code has expired");
+  }
+  if (invite.usedCount >= invite.maxUses) {
+    throw new InviteCodeError("EXHAUSTED", "This invite code has already been used");
+  }
+}
+
+/**
+ * Atomically increment usedCount, write a redemption row, and return the
+ * resulting code + role. Throws InviteCodeError on race-condition loss or
+ * invalidation after fetch.
+ */
+export async function redeemInviteCode(input: { code: string; userId: string }): Promise<{
+  invite: InviteCodeSummary;
+  role: UserRole;
+}> {
+  const invite = await findInviteByCode(input.code);
+  if (!invite) {
+    throw new InviteCodeError("INVALID", "Invite code not found");
+  }
+
+  // Pre-flight validation (also re-runs inside the transaction).
+  assertInviteIsUsable(invite);
+
+  // The unique on (inviteCodeId, userId) guarantees a single user cannot
+  // redeem the same code twice even with concurrent requests.
+  try {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const fresh = await tx.inviteCode.findUnique({ where: { id: invite.id } });
+      if (!fresh) {
+        throw new InviteCodeError("INVALID", "Invite code not found");
+      }
+      assertInviteIsUsable(fresh);
+
+      const updated = await tx.inviteCode.update({
+        where: { id: fresh.id, usedCount: fresh.usedCount },
+        data: { usedCount: { increment: 1 } }
+      });
+
+      await tx.inviteCodeRedemption.create({
+        data: { inviteCodeId: fresh.id, userId: input.userId }
+      });
+
+      return updated;
+    });
+
+    return { invite: toSummary(result), role: result.role };
+  } catch (error) {
+    if (error instanceof InviteCodeError) {
+      throw error;
+    }
+    if (isUniqueConstraintError(error)) {
+      throw new InviteCodeError("EXHAUSTED", "This invite code has already been used by this account");
+    }
+    if (isOptimisticLockError(error)) {
+      throw new InviteCodeError("EXHAUSTED", "This invite code is no longer available");
+    }
+    throw error;
+  }
+}
+
+function toSummary(row: {
+  id: string;
+  code: string;
+  role: UserRole;
+  maxUses: number;
+  usedCount: number;
+  expiresAt: Date | null;
+  isRevoked: boolean;
+  note: string | null;
+  createdByUserId: string;
+  createdAt: Date;
+}): InviteCodeSummary {
+  return {
+    id: row.id,
+    code: row.code,
+    role: row.role,
+    maxUses: row.maxUses,
+    usedCount: row.usedCount,
+    expiresAt: row.expiresAt,
+    isRevoked: row.isRevoked,
+    note: row.note,
+    createdByUserId: row.createdByUserId,
+    createdAt: row.createdAt
+  };
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return Boolean(
+    error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "P2002"
+  );
+}
+
+function isOptimisticLockError(error: unknown): boolean {
+  // Prisma surfaces an "A record was modified since you read it" error as
+  // an exception without a stable code; guard by message substring.
+  const message = error instanceof Error ? error.message : String(error);
+  return /Record was modified since you read it|optimistic/i.test(message);
+}

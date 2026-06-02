@@ -5,6 +5,12 @@ const optionalBooleanString = z
   .optional()
   .transform((value) => value === "true");
 
+const optionalBooleanStringWithDefault = (defaultValue: boolean) =>
+  z
+    .string()
+    .optional()
+    .transform((value) => (value === undefined ? defaultValue : value === "true"));
+
 export const commonEnvSchema = z.object({
   NODE_ENV: z.string().default("development"),
   DATABASE_URL: z.string().min(1),
@@ -22,7 +28,9 @@ export const authEnvSchema = z.object({
   AUTH_OIDC_CLIENT_ID: z.string().min(1),
   AUTH_OIDC_CLIENT_SECRET: z.string().min(1),
   INITIAL_ADMIN_EMAIL: z.string().email(),
-  ALLOW_AUTO_PROVISION: optionalBooleanString
+  ALLOW_AUTO_PROVISION: optionalBooleanString,
+  ENABLE_LOCAL_REGISTRATION: optionalBooleanStringWithDefault(false),
+  PASSWORD_MIN_LENGTH: z.coerce.number().int().min(8).max(128).default(12)
 });
 
 export const ingressEnvSchema = commonEnvSchema.extend({

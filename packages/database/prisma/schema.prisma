@@ -42,19 +42,55 @@ enum AlertType {
 }
 
 model User {
-  id             String              @id @default(cuid())
-  authProvider   String              @map("auth_provider")
-  authSubject    String              @map("auth_subject")
-  email          String              @unique
-  displayName    String?             @map("display_name")
-  role           UserRole            @default(viewer)
-  createdAt      DateTime            @default(now()) @map("created_at")
-  updatedAt      DateTime            @updatedAt @map("updated_at")
-  ownedChannels  Channel[]           @relation("ChannelOwner")
-  memberships    ChannelMembership[]
+  id              String               @id @default(cuid())
+  authProvider    String               @map("auth_provider")
+  authSubject     String               @map("auth_subject")
+  email           String               @unique
+  displayName     String?              @map("display_name")
+  passwordHash    String?              @map("password_hash")
+  role            UserRole             @default(viewer)
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+  ownedChannels   Channel[]            @relation("ChannelOwner")
+  memberships     ChannelMembership[]
+  inviteCodes     InviteCode[]         @relation("InviteCodeCreator")
+  inviteRedemptions InviteCodeRedemption[]
 
   @@unique([authProvider, authSubject])
   @@map("users")
+}
+
+model InviteCode {
+  id              String               @id @default(cuid())
+  code            String               @unique
+  role            UserRole             @default(owner)
+  maxUses         Int                  @default(1) @map("max_uses")
+  usedCount       Int                  @default(0) @map("used_count")
+  expiresAt       DateTime?            @map("expires_at")
+  isRevoked       Boolean              @default(false) @map("is_revoked")
+  note            String?
+  createdByUserId String               @map("created_by_user_id")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+  createdBy       User                 @relation("InviteCodeCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  redemptions     InviteCodeRedemption[]
+
+  @@index([createdByUserId])
+  @@index([expiresAt])
+  @@map("invite_codes")
+}
+
+model InviteCodeRedemption {
+  id           String     @id @default(cuid())
+  inviteCodeId String     @map("invite_code_id")
+  userId       String     @map("user_id")
+  redeemedAt   DateTime   @default(now()) @map("redeemed_at")
+  inviteCode   InviteCode @relation(fields: [inviteCodeId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([inviteCodeId, userId])
+  @@index([userId])
+  @@map("invite_code_redemptions")
 }
 
 model Channel {
