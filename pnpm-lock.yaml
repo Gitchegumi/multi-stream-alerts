@@ -6,6 +6,7 @@ settings:
 
 overrides:
   postcss: 8.5.10
+  uuid: 11.1.0
 
 importers:
 
@@ -61,7 +62,7 @@ importers:
         specifier: 16.2.7
         version: 16.2.7(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       next-auth:
-        specifier: ^4.24.11
+        specifier: ^4.24.14
         version: 4.24.14(next@16.2.7(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       react:
         specifier: ^19.0.0
@@ -1153,9 +1154,8 @@ packages:
     resolution: {integrity: sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==}
     engines: {node: '>= 0.4.0'}
 
-  uuid@8.3.2:
-    resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
-    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+  uuid@11.1.0:
+    resolution: {integrity: sha512-0/A9rDy9P7cJ+8w1c9WD9V//9Wj15Ce2MPz8Ri6032usz+NfePxx5AcN3bN+r6ZL6jEo066/yNYB3tn4pQEx+A==}
     hasBin: true
 
   vary@1.1.2:
@@ -1813,7 +1813,7 @@ snapshots:
       preact-render-to-string: 5.2.6(preact@10.29.2)
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
-      uuid: 8.3.2
+      uuid: 11.1.0
 
   next@16.2.7(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
     dependencies:
@@ -2082,7 +2082,7 @@ snapshots:
 
   utils-merge@1.0.1: {}
 
-  uuid@8.3.2: {}
+  uuid@11.1.0: {}
 
   vary@1.1.2: {}
 
