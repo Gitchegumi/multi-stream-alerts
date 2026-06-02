@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
 import {
   canManageChannelCredentials,
   canViewChannel,
@@ -8,24 +8,24 @@ import {
   prisma,
   saveChannelCredentials,
   type IntegrationCredentialKey,
-  type IntegrationProvider
-} from "@multi-stream-alerts/database";
-import { requireDashboardSession } from "@/lib/session";
+  type IntegrationProvider,
+} from '@multi-stream-alerts/database';
+import { requireDashboardSession } from '@/lib/session';
 import {
   deleteInputSchema,
   fieldToDbKey,
   getInputSchemaForProvider,
-  isProvider
-} from "@/lib/integration-credential-schemas";
+  isProvider,
+} from '@/lib/integration-credential-schemas';
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 // Per the integration-credentials service, the public field on the
 // `twitch` provider's credential row. We surface a single field (the
 // broadcasterId) because it's what webhook routing needs; no other
 // public fields exist on the schema today.
-const TWITCH_BROADCASTER_ID_PUBLIC_FIELD = "twitchBroadcasterId" as const;
+const TWITCH_BROADCASTER_ID_PUBLIC_FIELD = 'twitchBroadcasterId' as const;
 
 type RouteParams = {
   channelSlug: string;
@@ -54,11 +54,11 @@ const defaultDeps: HandlerDeps = {
   getChannelCredentialStatus,
   saveChannelCredentials,
   clearChannelSecret,
-  clearAllChannelSecrets
+  clearAllChannelSecrets,
 };
 
 export type HandlerSession = {
-  user: { id: string; role: "admin" | "owner" | "editor" | "viewer" };
+  user: { id: string; role: 'admin' | 'owner' | 'editor' | 'viewer' };
 };
 
 export type StatusResponseBody = {
@@ -79,22 +79,26 @@ export type HandleGetArgs = {
 };
 
 export async function handleGet(
-  args: HandleGetArgs
+  args: HandleGetArgs,
 ): Promise<{ status: number; body?: unknown; headers?: Record<string, string> }> {
   const deps = args.deps ?? defaultDeps;
 
   if (!isProvider(args.provider)) {
-    return { status: 400, body: { error: "Invalid provider" } };
+    return { status: 400, body: { error: 'Invalid provider' } };
   }
 
   const channel = await deps.prisma.channel.findUnique({ where: { slug: args.channelSlug } });
   if (!channel) {
-    return { status: 404, body: { error: "Channel not found" } };
+    return { status: 404, body: { error: 'Channel not found' } };
   }
 
-  const canView = await deps.canViewChannel(args.session.user.id, args.session.user.role, channel.id);
+  const canView = await deps.canViewChannel(
+    args.session.user.id,
+    args.session.user.role,
+    channel.id,
+  );
   if (!canView) {
-    return { status: 403, body: { error: "Forbidden" } };
+    return { status: 403, body: { error: 'Forbidden' } };
   }
 
   const credentialStatus = await deps.getChannelCredentialStatus(channel.id, args.provider);
@@ -106,15 +110,15 @@ export async function handleGet(
   const body: StatusResponseBody = {
     configured: credentialStatus.configured as Record<string, boolean>,
     public: {
-      twitchBroadcasterId: credentialStatus.public.twitchBroadcasterId
+      twitchBroadcasterId: credentialStatus.public.twitchBroadcasterId,
     },
-    isEnabled: credentialStatus.isEnabled
+    isEnabled: credentialStatus.isEnabled,
   };
 
   return {
     status: 200,
     body,
-    headers: { "Cache-Control": "no-store" }
+    headers: { 'Cache-Control': 'no-store' },
   };
 }
 
@@ -137,7 +141,7 @@ export type HandlePutArgs = {
  */
 function applyPutBody(
   provider: IntegrationProvider,
-  rawBody: Record<string, unknown>
+  rawBody: Record<string, unknown>,
 ): {
   secrets: Partial<Record<IntegrationCredentialKey, string>>;
   publicFields: { twitchBroadcasterId?: string | null };
@@ -152,16 +156,16 @@ function applyPutBody(
   for (const [field, value] of Object.entries(rawBody)) {
     if (value === undefined) continue;
 
-    if (field === TWITCH_BROADCASTER_ID_PUBLIC_FIELD && provider === "twitch") {
+    if (field === TWITCH_BROADCASTER_ID_PUBLIC_FIELD && provider === 'twitch') {
       // Public field — never encrypted, never cleared via this path.
       // An empty string on the public field is treated as null (i.e. clear).
-      publicFields.twitchBroadcasterId = value === "" ? null : String(value);
+      publicFields.twitchBroadcasterId = value === '' ? null : String(value);
       continue;
     }
 
     // For all other fields, the value must be a string. The per-provider
     // Zod schema has already validated this; we re-assert for type safety.
-    if (typeof value !== "string") {
+    if (typeof value !== 'string') {
       // The Zod schema should have rejected non-string values already.
       // Skip defensively rather than coercing.
       continue;
@@ -178,7 +182,7 @@ function applyPutBody(
       continue;
     }
 
-    if (value === "") {
+    if (value === '') {
       keysCleared.push(dbKey);
     } else {
       secrets[dbKey] = value;
@@ -190,26 +194,26 @@ function applyPutBody(
 }
 
 export async function handlePut(
-  args: HandlePutArgs
+  args: HandlePutArgs,
 ): Promise<{ status: number; body?: unknown; headers?: Record<string, string> }> {
   const deps = args.deps ?? defaultDeps;
 
   if (!isProvider(args.provider)) {
-    return { status: 400, body: { error: "Invalid provider" } };
+    return { status: 400, body: { error: 'Invalid provider' } };
   }
 
   const channel = await deps.prisma.channel.findUnique({ where: { slug: args.channelSlug } });
   if (!channel) {
-    return { status: 404, body: { error: "Channel not found" } };
+    return { status: 404, body: { error: 'Channel not found' } };
   }
 
   const canManage = await deps.canManageChannelCredentials(
     args.session.user.id,
     args.session.user.role,
-    channel.id
+    channel.id,
   );
   if (!canManage) {
-    return { status: 403, body: { error: "Forbidden" } };
+    return { status: 403, body: { error: 'Forbidden' } };
   }
 
   const provider: IntegrationProvider = args.provider;
@@ -219,7 +223,7 @@ export async function handlePut(
   const schema = getInputSchemaForProvider(provider);
   const parsed = schema.safeParse(args.rawBody);
   if (!parsed.success) {
-    return { status: 400, body: { error: "Invalid payload", issues: parsed.error.issues } };
+    return { status: 400, body: { error: 'Invalid payload', issues: parsed.error.issues } };
   }
 
   const validated = parsed.data as Record<string, unknown>;
@@ -233,7 +237,7 @@ export async function handlePut(
     await deps.clearChannelSecret({
       channelId: channel.id,
       provider,
-      key
+      key,
     });
   }
 
@@ -243,7 +247,7 @@ export async function handlePut(
       channelId: channel.id,
       provider,
       secrets,
-      publicFields
+      publicFields,
     });
   } else {
     // Nothing to save. Read back the current status to return.
@@ -253,23 +257,23 @@ export async function handlePut(
   // Audit log. channelSlug, provider, userId, and the key names — never
   // the values. The audit log is the only place we need this trail; the
   // route response is the status shape, not the saved values.
-  console.info("credentials updated", {
+  console.info('credentials updated', {
     channelSlug: args.channelSlug,
     provider,
     userId: args.session.user.id,
     keysWritten,
-    keysCleared
+    keysCleared,
   });
 
   const body: StatusResponseBody = {
     configured: newStatus.configured as Record<string, boolean>,
     public: {
-      twitchBroadcasterId: newStatus.public.twitchBroadcasterId
+      twitchBroadcasterId: newStatus.public.twitchBroadcasterId,
     },
-    isEnabled: newStatus.isEnabled
+    isEnabled: newStatus.isEnabled,
   };
 
-  return { status: 200, body, headers: { "Cache-Control": "no-store" } };
+  return { status: 200, body, headers: { 'Cache-Control': 'no-store' } };
 }
 
 // ---------------------------------------------------------------------------
@@ -285,42 +289,42 @@ export type HandleDeleteArgs = {
 };
 
 export async function handleDelete(
-  args: HandleDeleteArgs
+  args: HandleDeleteArgs,
 ): Promise<{ status: number; body?: unknown }> {
   const deps = args.deps ?? defaultDeps;
 
   if (!isProvider(args.provider)) {
-    return { status: 400, body: { error: "Invalid provider" } };
+    return { status: 400, body: { error: 'Invalid provider' } };
   }
 
   const channel = await deps.prisma.channel.findUnique({ where: { slug: args.channelSlug } });
   if (!channel) {
-    return { status: 404, body: { error: "Channel not found" } };
+    return { status: 404, body: { error: 'Channel not found' } };
   }
 
   const canManage = await deps.canManageChannelCredentials(
     args.session.user.id,
     args.session.user.role,
-    channel.id
+    channel.id,
   );
   if (!canManage) {
-    return { status: 403, body: { error: "Forbidden" } };
+    return { status: 403, body: { error: 'Forbidden' } };
   }
 
   const provider: IntegrationProvider = args.provider;
   const parsed = deleteInputSchema.safeParse(args.rawBody);
   if (!parsed.success) {
-    return { status: 400, body: { error: "Invalid delete payload" } };
+    return { status: 400, body: { error: 'Invalid delete payload' } };
   }
 
   const payload = parsed.data;
   if (payload.all) {
     await deps.clearAllChannelSecrets({ channelId: channel.id, provider });
-    console.info("credentials cleared", {
+    console.info('credentials cleared', {
       channelSlug: args.channelSlug,
       provider,
       userId: args.session.user.id,
-      all: true
+      all: true,
     });
     return { status: 204 };
   }
@@ -328,13 +332,13 @@ export async function handleDelete(
   await deps.clearChannelSecret({
     channelId: channel.id,
     provider,
-    key: payload.key as IntegrationCredentialKey
+    key: payload.key as IntegrationCredentialKey,
   });
-  console.info("credentials cleared", {
+  console.info('credentials cleared', {
     channelSlug: args.channelSlug,
     provider,
     userId: args.session.user.id,
-    key: payload.key
+    key: payload.key,
   });
   return { status: 204 };
 }
@@ -353,7 +357,7 @@ export async function GET(_request: Request, context: Context) {
   const result = await handleGet({
     session: session as unknown as HandlerSession,
     channelSlug: params.channelSlug,
-    provider: params.provider
+    provider: params.provider,
   });
   return jsonResponse(result);
 }
@@ -366,14 +370,14 @@ export async function PUT(request: Request, context: Context) {
   try {
     rawBody = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
   const result = await handlePut({
     session: session as unknown as HandlerSession,
     channelSlug: params.channelSlug,
     provider: params.provider,
-    rawBody
+    rawBody,
   });
   return jsonResponse(result);
 }
@@ -386,19 +390,23 @@ export async function DELETE(request: Request, context: Context) {
   try {
     rawBody = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
   const result = await handleDelete({
     session: session as unknown as HandlerSession,
     channelSlug: params.channelSlug,
     provider: params.provider,
-    rawBody
+    rawBody,
   });
   return jsonResponse(result);
 }
 
-function jsonResponse(result: { status: number; body?: unknown; headers?: Record<string, string> }) {
+function jsonResponse(result: {
+  status: number;
+  body?: unknown;
+  headers?: Record<string, string>;
+}) {
   if (result.status === 204) {
     return new Response(null, { status: 204, headers: result.headers });
   }

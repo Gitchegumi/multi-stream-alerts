@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState, useTransition } from "react";
-import type { CredentialStatus, IntegrationProvider } from "@multi-stream-alerts/database";
-import { fieldToDbKey } from "@/lib/integration-credential-schemas";
+import { useState, useTransition } from 'react';
+import type { CredentialStatus, IntegrationProvider } from '@multi-stream-alerts/database';
+import { fieldToDbKey } from '@/lib/integration-credential-schemas';
 
 type Props = {
   channelSlug: string;
@@ -19,27 +19,76 @@ type Props = {
 // server. They also render as type="text" instead of "password".
 const FIELDS: Record<
   IntegrationProvider,
-  { key: string; label: string; placeholder: string; minLength?: number; isPublic?: boolean; maxLength?: number }[]
+  {
+    key: string;
+    label: string;
+    placeholder: string;
+    minLength?: number;
+    isPublic?: boolean;
+    maxLength?: number;
+  }[]
 > = {
   kofi: [
-    { key: "verificationToken", label: "Verification token", placeholder: "Paste from Ko-fi", minLength: 1, maxLength: 256 }
+    {
+      key: 'verificationToken',
+      label: 'Verification token',
+      placeholder: 'Paste from Ko-fi',
+      minLength: 1,
+      maxLength: 256,
+    },
   ],
   twitch: [
-    { key: "eventsubSecret", label: "EventSub secret", placeholder: "16+ character secret", minLength: 16, maxLength: 256 },
-    { key: "clientId", label: "Client ID", placeholder: "Twitch app client ID", minLength: 1, maxLength: 128 },
-    { key: "clientSecret", label: "Client secret", placeholder: "Twitch app client secret", minLength: 1, maxLength: 256 },
-    { key: "broadcasterId", label: "Broadcaster ID (public)", placeholder: "Numeric user ID", isPublic: true, maxLength: 32 }
+    {
+      key: 'eventsubSecret',
+      label: 'EventSub secret',
+      placeholder: '16+ character secret',
+      minLength: 16,
+      maxLength: 256,
+    },
+    {
+      key: 'clientId',
+      label: 'Client ID',
+      placeholder: 'Twitch app client ID',
+      minLength: 1,
+      maxLength: 128,
+    },
+    {
+      key: 'clientSecret',
+      label: 'Client secret',
+      placeholder: 'Twitch app client secret',
+      minLength: 1,
+      maxLength: 256,
+    },
+    {
+      key: 'broadcasterId',
+      label: 'Broadcaster ID (public)',
+      placeholder: 'Numeric user ID',
+      isPublic: true,
+      maxLength: 32,
+    },
   ],
   youtube: [
-    { key: "clientId", label: "Client ID", placeholder: "Google OAuth client ID", minLength: 1, maxLength: 128 },
-    { key: "clientSecret", label: "Client secret", placeholder: "Google OAuth client secret", minLength: 1, maxLength: 256 }
-  ]
+    {
+      key: 'clientId',
+      label: 'Client ID',
+      placeholder: 'Google OAuth client ID',
+      minLength: 1,
+      maxLength: 128,
+    },
+    {
+      key: 'clientSecret',
+      label: 'Client secret',
+      placeholder: 'Google OAuth client secret',
+      minLength: 1,
+      maxLength: 256,
+    },
+  ],
 };
 
 function labelFor(p: IntegrationProvider): string {
-  if (p === "kofi") return "Ko-fi";
-  if (p === "twitch") return "Twitch";
-  return "YouTube";
+  if (p === 'kofi') return 'Ko-fi';
+  if (p === 'twitch') return 'Twitch';
+  return 'YouTube';
 }
 
 export function IntegrationSettingsForm({ channelSlug, provider, initialStatus, readOnly }: Props) {
@@ -65,7 +114,7 @@ export function IntegrationSettingsForm({ channelSlug, provider, initialStatus, 
   // configured" badges always reflect the DB's truth, not the client's
   // optimistic view.
   const refreshStatus = async () => {
-    const res = await fetch(baseUrl, { method: "GET", cache: "no-store" });
+    const res = await fetch(baseUrl, { method: 'GET', cache: 'no-store' });
     if (!res.ok) return;
     const data = (await res.json()) as CredentialStatus;
     setStatus(data);
@@ -81,12 +130,12 @@ export function IntegrationSettingsForm({ channelSlug, provider, initialStatus, 
       const body: Record<string, string> = {};
       for (const f of fields) {
         const v = values[f.key];
-        if (v !== undefined && v !== "") body[f.key] = v;
+        if (v !== undefined && v !== '') body[f.key] = v;
       }
       const res = await fetch(baseUrl, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body)
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         setError(`Save failed: ${res.status}`);
@@ -95,32 +144,28 @@ export function IntegrationSettingsForm({ channelSlug, provider, initialStatus, 
       const data = (await res.json()) as CredentialStatus;
       setStatus(data);
       setValues({});
-      setNotice("Saved.");
+      setNotice('Saved.');
     });
   };
 
   const clearField = (key: string) => {
-    if (
-      !confirm(
-        "Clear this secret? You'll need to re-enter it to re-enable the integration."
-      )
-    ) {
+    if (!confirm("Clear this secret? You'll need to re-enter it to re-enable the integration.")) {
       return;
     }
     setError(null);
     setNotice(null);
     startClear(async () => {
       const res = await fetch(baseUrl, {
-        method: "DELETE",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ key })
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ key }),
       });
       if (!res.ok) {
         setError(`Clear failed: ${res.status}`);
         return;
       }
       await refreshStatus();
-      setNotice("Cleared.");
+      setNotice('Cleared.');
     });
   };
 
@@ -130,16 +175,16 @@ export function IntegrationSettingsForm({ channelSlug, provider, initialStatus, 
     setNotice(null);
     startClear(async () => {
       const res = await fetch(baseUrl, {
-        method: "DELETE",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ all: true })
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ all: true }),
       });
       if (!res.ok) {
         setError(`Clear-all failed: ${res.status}`);
         return;
       }
       await refreshStatus();
-      setNotice("Cleared all secrets.");
+      setNotice('Cleared all secrets.');
     });
   };
 
@@ -152,7 +197,7 @@ export function IntegrationSettingsForm({ channelSlug, provider, initialStatus, 
         // project from the form's field name (camelCase) to that.
         // The public field is the only one that maps by name.
         let isConfigured = false;
-        if (f.key === "broadcasterId") {
+        if (f.key === 'broadcasterId') {
           isConfigured = Boolean(status.public.twitchBroadcasterId);
         } else {
           const dbKey = fieldToDbKey(provider, f.key);
@@ -167,33 +212,27 @@ export function IntegrationSettingsForm({ channelSlug, provider, initialStatus, 
               {f.label}
             </label>
             {readOnly ? (
-              <div className="muted">
-                {isConfigured ? "Configured" : "Not configured"}
-              </div>
+              <div className="muted">{isConfigured ? 'Configured' : 'Not configured'}</div>
             ) : (
               <>
                 <input
                   id={`${provider}-${f.key}`}
                   className="input"
-                  type={f.isPublic ? "text" : "password"}
+                  type={f.isPublic ? 'text' : 'password'}
                   autoComplete="off"
                   placeholder={
-                    isConfigured
-                      ? "•••••• (configured — type to replace)"
-                      : f.placeholder
+                    isConfigured ? '•••••• (configured — type to replace)' : f.placeholder
                   }
                   minLength={f.minLength}
                   maxLength={f.maxLength ?? (f.isPublic ? 32 : 256)}
-                  value={values[f.key] ?? ""}
-                  onChange={(e) =>
-                    setValues((prev) => ({ ...prev, [f.key]: e.target.value }))
-                  }
+                  value={values[f.key] ?? ''}
+                  onChange={(e) => setValues((prev) => ({ ...prev, [f.key]: e.target.value }))}
                 />
-                <div className="muted" style={{ fontSize: "0.85em" }}>
-                  {isConfigured ? "✓ Configured" : "Not configured"}
+                <div className="muted" style={{ fontSize: '0.85em' }}>
+                  {isConfigured ? '✓ Configured' : 'Not configured'}
                   {!f.isPublic && isConfigured ? (
                     <>
-                      {" · "}
+                      {' · '}
                       <button
                         type="button"
                         className="link-button"
@@ -212,14 +251,14 @@ export function IntegrationSettingsForm({ channelSlug, provider, initialStatus, 
       })}
 
       {!readOnly ? (
-        <div className="stack" style={{ flexDirection: "row", gap: 8 }}>
+        <div className="stack" style={{ flexDirection: 'row', gap: 8 }}>
           <button
             className="button"
             type="button"
             onClick={save}
             disabled={saving || clearing || !hasAnyValue(values)}
           >
-            {saving ? "Saving..." : "Save"}
+            {saving ? 'Saving...' : 'Save'}
           </button>
           <button
             className="button-secondary"
@@ -227,13 +266,13 @@ export function IntegrationSettingsForm({ channelSlug, provider, initialStatus, 
             onClick={clearAll}
             disabled={saving || clearing}
           >
-            {clearing ? "Clearing..." : "Clear all"}
+            {clearing ? 'Clearing...' : 'Clear all'}
           </button>
         </div>
       ) : null}
 
       {status.isEnabled ? (
-        <p className="muted" style={{ color: "var(--accent)" }}>
+        <p className="muted" style={{ color: 'var(--accent)' }}>
           ✓ {labelFor(provider)} integration is enabled
         </p>
       ) : null}

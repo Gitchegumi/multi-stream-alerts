@@ -16,7 +16,7 @@
  *   - maxAge:   10 minutes (long enough for the user to complete OIDC
  *               and return; short enough to limit replay)
  */
-export const INVITE_CODE_COOKIE = "ga_signup_invite";
+export const INVITE_CODE_COOKIE = 'ga_signup_invite';
 
 export const INVITE_CODE_COOKIE_MAX_AGE_SECONDS = 10 * 60;
 
@@ -29,24 +29,26 @@ export const MAX_INVITE_CODE_BYTES = 512;
 
 export type InviteCodeCookieValidation =
   | { ok: true; inviteCode: string }
-  | { ok: false; reason: "MISSING" | "MALFORMED" | "TOO_LONG" };
+  | { ok: false; reason: 'MISSING' | 'MALFORMED' | 'TOO_LONG' };
 
-export function validateInviteCodeForCookie(raw: string | null | undefined): InviteCodeCookieValidation {
+export function validateInviteCodeForCookie(
+  raw: string | null | undefined,
+): InviteCodeCookieValidation {
   if (!raw) {
-    return { ok: false, reason: "MISSING" };
+    return { ok: false, reason: 'MISSING' };
   }
   const trimmed = raw.trim();
   if (!trimmed) {
-    return { ok: false, reason: "MISSING" };
+    return { ok: false, reason: 'MISSING' };
   }
-  if (Buffer.byteLength(trimmed, "utf8") > MAX_INVITE_CODE_BYTES) {
-    return { ok: false, reason: "TOO_LONG" };
+  if (Buffer.byteLength(trimmed, 'utf8') > MAX_INVITE_CODE_BYTES) {
+    return { ok: false, reason: 'TOO_LONG' };
   }
   // Mirror the normalizer used by `findInviteByCode` so the value the
   // callback sees is in the same shape the database stores.
-  const normalized = trimmed.toUpperCase().replace(/[^A-Z0-9-]/g, "");
+  const normalized = trimmed.toUpperCase().replace(/[^A-Z0-9-]/g, '');
   if (!normalized) {
-    return { ok: false, reason: "MALFORMED" };
+    return { ok: false, reason: 'MALFORMED' };
   }
   return { ok: true, inviteCode: normalized };
 }

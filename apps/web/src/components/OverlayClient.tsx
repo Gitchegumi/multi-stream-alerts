@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { overlayMessage, type AlertEvent } from "@multi-stream-alerts/shared";
-import { useEffect, useRef, useState } from "react";
+import { overlayMessage, type AlertEvent } from '@multi-stream-alerts/shared';
+import { useEffect, useRef, useState } from 'react';
 
 export function OverlayClient({ displayKey, profile }: { displayKey: string; profile: string }) {
   const [activeAlert, setActiveAlert] = useState<AlertEvent | null>(null);
@@ -10,9 +10,11 @@ export function OverlayClient({ displayKey, profile }: { displayKey: string; pro
   const timeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const source = new EventSource(`/api/events/stream?displayKey=${encodeURIComponent(displayKey)}`);
+    const source = new EventSource(
+      `/api/events/stream?displayKey=${encodeURIComponent(displayKey)}`,
+    );
 
-    source.addEventListener("alert", (event) => {
+    source.addEventListener('alert', (event) => {
       queueRef.current.push(JSON.parse((event as MessageEvent).data) as AlertEvent);
       drainQueue();
     });
@@ -42,11 +44,14 @@ export function OverlayClient({ displayKey, profile }: { displayKey: string; pro
     activeRef.current = true;
     setActiveAlert(nextAlert);
 
-    timeoutRef.current = window.setTimeout(() => {
-      setActiveAlert(null);
-      activeRef.current = false;
-      drainQueue();
-    }, profile === "test" ? 3500 : 6500);
+    timeoutRef.current = window.setTimeout(
+      () => {
+        setActiveAlert(null);
+        activeRef.current = false;
+        drainQueue();
+      },
+      profile === 'test' ? 3500 : 6500,
+    );
   }
 
   return (

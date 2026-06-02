@@ -1,24 +1,24 @@
-import { z } from "zod";
+import { z } from 'zod';
 
-export const alertPlatforms = ["kofi", "twitch", "youtube", "tiktok", "manual"] as const;
+export const alertPlatforms = ['kofi', 'twitch', 'youtube', 'tiktok', 'manual'] as const;
 
 export const alertTypes = [
-  "tip",
-  "follow",
-  "subscription",
-  "resubscription",
-  "membership",
-  "superchat",
-  "supersticker",
-  "raid",
-  "cheer",
-  "gift",
-  "shop_order",
-  "commission",
-  "channel_point",
-  "stream_online",
-  "stream_offline",
-  "test"
+  'tip',
+  'follow',
+  'subscription',
+  'resubscription',
+  'membership',
+  'superchat',
+  'supersticker',
+  'raid',
+  'cheer',
+  'gift',
+  'shop_order',
+  'commission',
+  'channel_point',
+  'stream_online',
+  'stream_offline',
+  'test',
 ] as const;
 
 export type AlertPlatform = (typeof alertPlatforms)[number];
@@ -38,12 +38,12 @@ export const alertEventSchema = z.object({
   quantity: z.number().int().positive().optional(),
   rawEventId: z.string().min(1),
   rawPayload: z.unknown().optional(),
-  createdAt: z.string().datetime()
+  createdAt: z.string().datetime(),
 });
 
 export type AlertEvent = z.infer<typeof alertEventSchema>;
 
-export const redisAlertChannel = "alerts:events";
+export const redisAlertChannel = 'alerts:events';
 
 export function serializeAlertEvent(event: AlertEvent): string {
   return JSON.stringify(alertEventSchema.parse(event));
@@ -62,18 +62,18 @@ export function overlayMessage(event: AlertEvent): string {
 }
 
 export function safeFallbackMessage(event: AlertEvent): string {
-  const amount = event.amount && event.currency ? ` ${event.amount} ${event.currency}` : "";
+  const amount = event.amount && event.currency ? ` ${event.amount} ${event.currency}` : '';
 
   switch (event.type) {
-    case "tip":
+    case 'tip':
       return `${event.displayName} tipped${amount}`;
-    case "subscription":
+    case 'subscription':
       return `${event.displayName} subscribed`;
-    case "commission":
+    case 'commission':
       return `${event.displayName} sent a commission`;
-    case "shop_order":
+    case 'shop_order':
       return `${event.displayName} placed a shop order`;
-    case "test":
+    case 'test':
       return `${event.displayName} sent a test alert`;
     default:
       return `${event.displayName} triggered an alert`;

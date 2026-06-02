@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
 /**
  * Verifier result for the Twitch EventSub HMAC match-loop.
@@ -50,12 +50,15 @@ export function verifyTwitchEventSubSignature(input: {
 
   const signatureBuffer = Buffer.from(input.signature);
   for (const candidate of input.candidates) {
-    const expected = `sha256=${createHmac("sha256", candidate.secret)
+    const expected = `sha256=${createHmac('sha256', candidate.secret)
       .update(input.messageId + input.timestamp)
       .update(input.rawBody)
-      .digest("hex")}`;
+      .digest('hex')}`;
     const expectedBuffer = Buffer.from(expected);
-    if (expectedBuffer.length === signatureBuffer.length && timingSafeEqual(expectedBuffer, signatureBuffer)) {
+    if (
+      expectedBuffer.length === signatureBuffer.length &&
+      timingSafeEqual(expectedBuffer, signatureBuffer)
+    ) {
       return { channelId: candidate.channelId, valid: true };
     }
   }

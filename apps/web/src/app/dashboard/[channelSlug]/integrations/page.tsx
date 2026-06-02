@@ -1,19 +1,19 @@
-import { redirect, notFound } from "next/navigation";
+import { redirect, notFound } from 'next/navigation';
 import {
   prisma,
   getChannelCredentialStatus,
   canViewChannel,
   canManageChannelCredentials,
   PROVIDERS,
-  type IntegrationProvider
-} from "@multi-stream-alerts/database";
-import { requireDashboardSession } from "@/lib/session";
-import { IntegrationSettingsForm } from "@/components/IntegrationSettingsForm";
+  type IntegrationProvider,
+} from '@multi-stream-alerts/database';
+import { requireDashboardSession } from '@/lib/session';
+import { IntegrationSettingsForm } from '@/components/IntegrationSettingsForm';
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
 export default async function IntegrationsPage({
-  params
+  params,
 }: {
   params: Promise<{ channelSlug: string }>;
 }) {
@@ -24,12 +24,12 @@ export default async function IntegrationsPage({
   if (!channel) notFound();
 
   const canView = await canViewChannel(session.user.id, session.user.role, channel.id);
-  if (!canView) redirect("/dashboard?error=forbidden");
+  if (!canView) redirect('/dashboard?error=forbidden');
 
   const canManage = await canManageChannelCredentials(
     session.user.id,
     session.user.role,
-    channel.id
+    channel.id,
   );
 
   // Fetch status for all three providers in parallel. The status shape
@@ -38,8 +38,8 @@ export default async function IntegrationsPage({
   const statuses = await Promise.all(
     PROVIDERS.map(async (provider) => ({
       provider,
-      status: await getChannelCredentialStatus(channel.id, provider)
-    }))
+      status: await getChannelCredentialStatus(channel.id, provider),
+    })),
   );
 
   return (
@@ -50,8 +50,8 @@ export default async function IntegrationsPage({
           <p className="muted">
             Managing <strong>{channel.name}</strong> ({channel.slug}).
             {canManage
-              ? " Configure platform credentials below."
-              : " You can view settings but not edit them."}
+              ? ' Configure platform credentials below.'
+              : ' You can view settings but not edit them.'}
           </p>
         </div>
         <a className="button" href="/dashboard">
@@ -78,13 +78,13 @@ export default async function IntegrationsPage({
 }
 
 function labelForProvider(p: IntegrationProvider): string {
-  if (p === "kofi") return "Ko-fi";
-  if (p === "twitch") return "Twitch";
-  return "YouTube";
+  if (p === 'kofi') return 'Ko-fi';
+  if (p === 'twitch') return 'Twitch';
+  return 'YouTube';
 }
 
 function descriptionForProvider(p: IntegrationProvider): string {
-  if (p === "kofi") return "Webhook verification token from your Ko-fi account settings.";
-  if (p === "twitch") return "EventSub secret, client ID, client secret, and broadcaster ID.";
-  return "Client ID and client secret for YouTube Data API access.";
+  if (p === 'kofi') return 'Webhook verification token from your Ko-fi account settings.';
+  if (p === 'twitch') return 'EventSub secret, client ID, client secret, and broadcaster ID.';
+  return 'Client ID and client secret for YouTube Data API access.';
 }

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID } from 'node:crypto';
 
 /**
  * Pure slug normalizer for a new user's personal channel.
@@ -13,15 +13,15 @@ import { randomUUID } from "node:crypto";
 export function generateUniqueChannelSlugSync(email: string): string {
   const base =
     email
-      .split("@")[0]
+      .split('@')[0]
       ?.toLowerCase()
-      .replace(/[^a-z0-9-]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 24) || "user";
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 24) || 'user';
   // randomUUID() gives 36 chars of the form
   // "xxxxxxxx-xxxx-Mxxx-Nxxx-xxxxxxxxxxxx". We only need the first 8
   // hex chars to make a collision effectively impossible, and dropping
   // the dashes keeps the slug URL-friendly.
-  const suffix = randomUUID().replace(/-/g, "").slice(0, 8);
+  const suffix = randomUUID().replace(/-/g, '').slice(0, 8);
   return `${base}-${suffix}`;
 }
