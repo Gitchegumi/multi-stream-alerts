@@ -78,6 +78,66 @@ textarea {
   margin-top: 24px;
 }
 
+.catalog-manager {
+  display: grid;
+  gap: 16px;
+}
+
+.platform-groups,
+.alert-config-list,
+.layout-list,
+.layout-editor {
+  display: grid;
+  gap: 12px;
+}
+
+.platform-group {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.alert-config-row {
+  display: grid;
+  grid-template-columns: minmax(190px, 1.2fr) minmax(160px, 1fr) minmax(160px, 1fr) minmax(180px, 1.2fr) minmax(160px, 0.8fr) auto;
+  gap: 10px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.layout-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 140px minmax(140px, 1fr) minmax(140px, 1fr) minmax(150px, 0.8fr) auto auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.toggle-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.number-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(72px, 1fr));
+  gap: 8px;
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -213,6 +273,30 @@ textarea {
   animation: alert-pop 520ms ease-out;
 }
 
+.alert-card-horizontal {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  text-align: left;
+  gap: 22px;
+}
+
+.alert-card-compact {
+  min-width: min(420px, 90vw);
+  padding: 18px 22px;
+}
+
+.alert-asset {
+  width: min(180px, 36vw);
+  max-height: 180px;
+  object-fit: contain;
+  margin: 0 auto 14px;
+}
+
+.alert-card-horizontal .alert-asset {
+  margin: 0;
+}
+
 .alert-title {
   margin: 0 0 8px;
   color: var(--accent);
@@ -243,6 +327,22 @@ textarea {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 900px) {
+  .alert-config-row {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-header,
+  .layout-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .dashboard-header {
+    flex-direction: column;
   }
 }
 

@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { prisma, toAlertEvent } from './client';
 import { publishAlertEvent } from './redis';
+import { ensureWorkspaceAlertDefaults, resolveAlertConfig } from './alert-catalog';
 import type { AlertEvent, AlertPlatform, AlertType } from '@multi-stream-alerts/shared';
 
 export async function ensureDefaultChannel() {
@@ -32,6 +33,8 @@ export async function ensureDefaultChannel() {
     });
   }
 
+  await ensureWorkspaceAlertDefaults(channel.id);
+
   return channel;
 }
 
@@ -39,6 +42,7 @@ export async function createStoredAlertEvent(input: {
   channelId: string;
   platform: AlertPlatform;
   type: AlertType;
+  eventKey?: string;
   displayName: string;
   amount?: number;
   currency?: string;
@@ -48,13 +52,41 @@ export async function createStoredAlertEvent(input: {
   quantity?: number;
   rawEventId: string;
   rawPayload?: unknown;
-}) {
+  layoutIdOverride?: string;
+}): Promise<AlertEvent | null> {
+  const config = await resolveAlertConfig({
+    channelId: input.channelId,
+    platform: input.platform,
+    type: input.type,
+    eventKey: input.eventKey,
+  });
+
+  if (!config) {
+    return null;
+  }
+
+  const layout =
+    input.layoutIdOverride !== undefined
+      ? await prisma.workspaceAlertLayout.findFirst({
+          where: { id: input.layoutIdOverride, channelId: input.channelId },
+        })
+      : config.layout;
+  const eventType = config.alertEventType;
   const row = await prisma.alertEvent.create({
     data: {
       id: randomUUID(),
       channelId: input.channelId,
       platform: input.platform,
       type: input.type,
+      eventKey: eventType.eventKey,
+      layoutId: layout?.id,
+      layoutName: layout?.name,
+      layoutStyle: layout?.style,
+      durationMs: config.durationMs ?? layout?.defaultDurationMs,
+      volume: config.volume ?? layout?.defaultVolume,
+      templateText: config.templateText,
+      visualAssetUrl: layout?.visualAssetUrl,
+      soundAssetUrl: layout?.soundAssetUrl,
       displayName: input.displayName,
       amount: input.amount,
       currency: input.currency,
@@ -73,8 +105,11 @@ export async function createStoredAlertEvent(input: {
 
 export async function storeAndPublishAlertEvent(
   input: Parameters<typeof createStoredAlertEvent>[0],
-): Promise<AlertEvent> {
+): Promise<AlertEvent | null> {
   const event = await createStoredAlertEvent(input);
+  if (!event) {
+    return null;
+  }
   await publishAlertEvent(event);
   return event;
 }

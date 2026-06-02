@@ -22,6 +22,13 @@ const typeMap: Record<string, AlertType> = {
   'Shop Order': 'shop_order',
 };
 
+const eventKeyMap: Record<string, string> = {
+  Tip: 'kofi.tipped',
+  Subscription: 'kofi.subscribed',
+  Commission: 'kofi.commission',
+  'Shop Order': 'kofi.shop_order',
+};
+
 export function parseKofiFormData(body: { data?: unknown }) {
   if (typeof body.data !== 'string') {
     throw new Error('Missing Ko-fi data field');
@@ -37,6 +44,7 @@ export function parseKofiFormData(body: { data?: unknown }) {
     event: {
       platform: 'kofi' as const,
       type,
+      eventKey: eventKeyMap[parsed.type] ?? 'kofi.tipped',
       displayName: parsed.from_name?.trim() || 'Ko-fi supporter',
       amount: parseAmount(parsed.amount),
       currency: parsed.currency,

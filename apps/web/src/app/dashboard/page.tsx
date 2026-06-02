@@ -1,10 +1,12 @@
 import {
   ensureDefaultChannel,
+  getWorkspaceAlertSetup,
   getAuthorizedChannels,
   prisma,
   toAlertEvent,
 } from '@multi-stream-alerts/database';
 import { productName } from '@multi-stream-alerts/ui';
+import { AlertCatalogManager } from '@/components/AlertCatalogManager';
 import { ManualAlertForm } from '@/components/ManualAlertForm';
 import { requireDashboardSession } from '@/lib/session';
 
@@ -57,6 +59,31 @@ export default async function DashboardPage({
     label: profile.name,
     url: `${publicBaseUrl}/overlay/${profile.slug}?displayKey=${encodeURIComponent(profile.displayKey)}`,
   }));
+  const alertSetup = await getWorkspaceAlertSetup(selectedChannel.id);
+  const alertConfigs = alertSetup.configs.map((config) => ({
+    id: config.id,
+    enabled: config.enabled,
+    layoutId: config.layoutId,
+    displayName: config.displayName,
+    templateText: config.templateText,
+    durationMs: config.durationMs,
+    volume: config.volume,
+    alertEventType: {
+      platform: config.alertEventType.platform,
+      eventKey: config.alertEventType.eventKey,
+      displayName: config.alertEventType.displayName,
+    },
+  }));
+  const alertLayouts = alertSetup.layouts.map((layout) => ({
+    id: layout.id,
+    name: layout.name,
+    style: layout.style,
+    visualAssetUrl: layout.visualAssetUrl,
+    soundAssetUrl: layout.soundAssetUrl,
+    defaultDurationMs: layout.defaultDurationMs,
+    defaultVolume: layout.defaultVolume,
+    isSystemPreset: layout.isSystemPreset,
+  }));
 
   return (
     <main className="dashboard-shell">
@@ -102,23 +129,15 @@ export default async function DashboardPage({
             ))}
           </div>
         </div>
+      </section>
 
-        <div className="panel">
-          <h2>Integrations</h2>
-          <p className="muted">
-            Ko-fi webhook ingestion is active when its verification token is configured.
-          </p>
-          <p className="muted">
-            Twitch and YouTube are present as verified route stubs for future adapter work.
-          </p>
-        </div>
-
-        <div className="panel">
-          <h2>Template settings</h2>
-          <p className="muted">
-            Template editing will live here. v1 uses the default clean overlay presentation.
-          </p>
-        </div>
+      <section style={{ marginTop: 16 }}>
+        <AlertCatalogManager
+          channelId={selectedChannel.id}
+          channelSlug={selectedChannel.slug}
+          initialConfigs={alertConfigs}
+          initialLayouts={alertLayouts}
+        />
       </section>
 
       <section className="panel" style={{ marginTop: 16 }}>
