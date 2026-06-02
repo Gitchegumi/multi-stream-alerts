@@ -27,24 +27,24 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: 20.11.0
+          node-version: 24
           cache: pnpm
 
       - name: Install dependencies
-        run: corepack pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Prisma generate
-        run: corepack pnpm --filter @multi-stream-alerts/database prisma:generate
+        run: pnpm --filter @multi-stream-alerts/database prisma:generate
 
       - name: Typecheck
-        run: corepack pnpm -r typecheck
+        run: pnpm -r typecheck
 
       - name: Test (database)
-        run: corepack pnpm --filter @multi-stream-alerts/database test
+        run: pnpm --filter @multi-stream-alerts/database test
 
       - name: Test (web)
-        run: corepack pnpm --filter @multi-stream-alerts/web test
+        run: pnpm --filter @multi-stream-alerts/web test
 
       - name: Test (ingress)
         # ingress has no test script yet — assert at least a typecheck pass here.
-        run: corepack pnpm --filter @multi-stream-alerts/ingress typecheck
+        run: pnpm --filter @multi-stream-alerts/ingress typecheck
