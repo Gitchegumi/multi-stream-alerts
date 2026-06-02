@@ -1,5 +1,6 @@
 import express from "express";
 import { parseIngressEnv } from "@multi-stream-alerts/shared";
+import { kofiWebhookExpressHandler } from "./kofi-webhook";
 
 const env = parseIngressEnv(process.env);
 const app = express();
@@ -10,14 +11,11 @@ app.get("/health", (_request, response) => {
   response.json({ ok: true });
 });
 
-app.post("/api/webhooks/kofi", express.urlencoded({ extended: false }), (_request, response) => {
-  // TODO(per-workspace-credentials): Resolve the receiving channel from the
-  // Ko-Fi payload and look up its stored verification token. Task 8 will
-  // implement the new path-based handler.
-  response
-    .status(501)
-    .json({ error: "Ko-Fi ingestion is stubbed pending per-workspace credential wiring" });
-});
+app.post(
+  "/api/webhooks/kofi/:channelSlug",
+  express.urlencoded({ extended: false }),
+  kofiWebhookExpressHandler
+);
 
 app.post("/api/webhooks/twitch", express.raw({ type: "*/*" }), (_request, response) => {
   // TODO(per-workspace-credentials): Resolve the receiving channel from the
