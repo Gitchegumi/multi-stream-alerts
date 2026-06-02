@@ -1,21 +1,24 @@
 import type { NextAuthOptions, Profile } from "next-auth";
-import AuthentikProvider from "next-auth/providers/authentik";
-import CredentialsProvider from "next-auth/providers/credentials";
-import { prisma } from "@multi-stream-alerts/database";
+import { cookies } from "next/headers";
+import {
+  prisma,
+  findInviteByCode,
+  redeemInviteCode,
+  assertInviteIsUsable,
+  InviteCodeError
+} from "@multi-stream-alerts/database";
 import type { UserRole } from "@multi-stream-alerts/database";
-import { parseBooleanEnv } from "@multi-stream-alerts/shared";
-import { authenticateLocalUser } from "./local-auth";
+import { INVITE_CODE_COOKIE, validateInviteCodeForCookie } from "./oidc-state";
 
 type OidcProfile = Profile & {
   sub?: string;
   email?: string;
+  email_verified?: boolean;
   name?: string;
   preferred_username?: string;
 };
 
 const oidcIssuer = (process.env.AUTH_OIDC_ISSUER ?? "https://<your-oidc-provider>/<issuer-path>").replace(/\/+$/, "");
-
-const localRegistrationEnabled = process.env.ENABLE_LOCAL_REGISTRATION === "true";
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.AUTH_SECRET,
@@ -24,13 +27,20 @@ export const authOptions: NextAuthOptions = {
     signIn: "/signin"
   },
   providers: [
-    AuthentikProvider({
+    // Generic OIDC provider. NextAuth's `oauth.js` base provider does
+    // OIDC discovery automatically when given an `issuer` (or
+    // `wellKnown`) field, so this single config works with any
+    // OIDC-compliant IdP (Authentik, Keycloak, Okta, Authing, Azure AD,
+    // Google, etc.). Set the three env vars and you're done.
+    {
       id: "oidc",
-      name: "OIDC",
+      name: process.env.AUTH_OIDC_PROVIDER_NAME ?? "OIDC",
+      type: "oauth",
       issuer: oidcIssuer,
       clientId: process.env.AUTH_OIDC_CLIENT_ID ?? "<your-oidc-client-id>",
       clientSecret: process.env.AUTH_OIDC_CLIENT_SECRET ?? "<your-oidc-client-secret>",
       authorization: { params: { scope: "openid email profile" } },
+      checks: ["pkce", "state", "nonce"],
       profile(profile) {
         return {
           id: profile.sub ?? profile.email ?? "",
@@ -38,40 +48,10 @@ export const authOptions: NextAuthOptions = {
           name: profile.name ?? profile.preferred_username ?? profile.email
         };
       }
-    }),
-    ...(localRegistrationEnabled
-      ? [
-          CredentialsProvider({
-            id: "credentials",
-            name: "Email & Password",
-            credentials: {
-              email: { label: "Email", type: "email" },
-              password: { label: "Password", type: "password" }
-            },
-            async authorize(rawCredentials) {
-              const result = await authenticateLocalUser(rawCredentials);
-              if (!result.ok) {
-                return null;
-              }
-              return {
-                id: result.userId,
-                email: result.email,
-                name: result.displayName ?? result.email,
-                role: result.role
-              };
-            }
-          })
-        ]
-      : [])
+    }
   ],
   callbacks: {
     async signIn({ account, profile }) {
-      if (account?.provider === "credentials") {
-        // Credentials users are validated inside authorize() and the
-        // resulting user record is the only thing we trust.
-        return Boolean(account.providerAccountId);
-      }
-
       const oidcProfile = profile as OidcProfile | undefined;
       // For OIDC, the OAuth `sub` claim (from the ID token) is the canonical
       // stable identifier and is what Auth.js stores on `account.providerAccountId`.
@@ -107,39 +87,120 @@ export const authOptions: NextAuthOptions = {
         return true;
       }
 
+      // First-time OIDC login for an unknown user. The only paths to a
+      // new account are:
+      //   (a) the email matches INITIAL_ADMIN_EMAIL — bootstraps the
+      //       first admin with no invite code required.
+      //   (b) a valid invite code was stashed in the ga_signup_invite
+      //       cookie by the /register page — required for any other
+      //       first-time login, even if ALLOW_AUTO_PROVISION=true.
       const isInitialAdmin = email === process.env.INITIAL_ADMIN_EMAIL;
-      if (!isInitialAdmin && !parseBooleanEnv(process.env.ALLOW_AUTO_PROVISION)) {
+      if (isInitialAdmin) {
+        await prisma.user.create({
+          data: {
+            authProvider: account.provider,
+            authSubject,
+            email,
+            displayName: oidcProfile?.name ?? email,
+            role: "admin"
+          }
+        });
+        return true;
+      }
+
+      // Pull the invite code from the short-lived cookie set by
+      // /register. We also clear it here so a successful sign-in does
+      // not leave a stale code around for the next visit.
+      const cookieJar = await cookies();
+      const rawInvite = cookieJar.get(INVITE_CODE_COOKIE)?.value;
+      const inviteValidation = validateInviteCodeForCookie(rawInvite);
+      if (!inviteValidation.ok) {
+        return false;
+      }
+      try {
+        cookieJar.delete(INVITE_CODE_COOKIE);
+      } catch {
+        // The cookie may have been set in a different request scope;
+        // ignoring a delete failure is safe — at worst the cookie
+        // expires on its 10-minute maxAge.
+      }
+
+      // Pre-flight: fail fast on a clearly invalid code before we touch
+      // the database transaction. The atomic re-check inside
+      // `redeemInviteCode` is still authoritative.
+      const invite = await findInviteByCode(inviteValidation.inviteCode);
+      if (!invite) {
+        return false;
+      }
+      try {
+        assertInviteIsUsable(invite);
+      } catch {
         return false;
       }
 
-      await prisma.user.create({
-        data: {
-          authProvider: account.provider,
-          authSubject,
-          email,
-          displayName: oidcProfile?.name ?? email,
-          role: isInitialAdmin ? "admin" : "viewer"
+      // Create the user row first. The redemption is keyed off the real
+      // user id so the (inviteCodeId, userId) unique is satisfied with
+      // the real identity on the first try.
+      let createdUserId: string;
+      try {
+        const user = await prisma.user.create({
+          data: {
+            authProvider: account.provider,
+            authSubject,
+            email,
+            displayName: oidcProfile?.name ?? email,
+            role: "viewer"
+          }
+        });
+        createdUserId = user.id;
+      } catch (error) {
+        if (isUniqueConstraintError(error)) {
+          return false;
         }
+        throw error;
+      }
+
+      // Redeem the invite. On failure, roll back the user we just created
+      // so the email is not silently consumed.
+      let redeemedRole: UserRole = "viewer";
+      try {
+        const redeemed = await redeemInviteCode({
+          code: inviteValidation.inviteCode,
+          userId: createdUserId
+        });
+        redeemedRole = redeemed.role;
+      } catch (error) {
+        await prisma.user.delete({ where: { id: createdUserId } }).catch(() => undefined);
+        if (error instanceof InviteCodeError) {
+          return false;
+        }
+        throw error;
+      }
+
+      // Apply the role the invite assigned (the user was created as
+      // viewer above; the invite can promote to owner/admin/etc.).
+      if (redeemedRole !== "viewer") {
+        await prisma.user.update({ where: { id: createdUserId }, data: { role: redeemedRole } });
+      }
+
+      // Provision a personal channel for the new user.
+      const channel = await prisma.channel.create({
+        data: {
+          name: oidcProfile?.name ?? email.split("@")[0] ?? "My Channel",
+          slug: await generateUniqueChannelSlug(email),
+          ownerUserId: createdUserId
+        }
+      });
+
+      await prisma.channelMembership.create({
+        data: { channelId: channel.id, userId: createdUserId, role: "owner" }
       });
 
       return true;
     },
-    async jwt({ token, account, profile, user }) {
+    async jwt({ token, account, profile }) {
       if (token.userId && token.role) {
         return token;
-      }
-
-      // Credentials sign-ins arrive with a fully populated `user` object
-      // from `authorize()`. Hydrate the token directly from it.
-      if (account?.provider === "credentials" && user) {
-        const credentialsUser = user as { id?: string; role?: UserRole; email?: string | null; name?: string | null };
-        if (credentialsUser.id && credentialsUser.role) {
-          token.userId = credentialsUser.id;
-          token.role = credentialsUser.role;
-          token.email = credentialsUser.email ?? token.email;
-          token.name = credentialsUser.name ?? token.name;
-          return token;
-        }
       }
 
       const oidcProfile = profile as OidcProfile | undefined;
@@ -173,3 +234,24 @@ export const authOptions: NextAuthOptions = {
     }
   }
 };
+
+async function generateUniqueChannelSlug(email: string): Promise<string> {
+  const base = email
+    .split("@")[0]
+    ?.toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24) || "user";
+  const candidate = `${base}-${Math.random().toString(16).slice(2, 8)}`;
+  const existing = await prisma.channel.findUnique({ where: { slug: candidate } });
+  if (existing) {
+    return `${candidate}-${Math.random().toString(16).slice(2, 8)}`;
+  }
+  return candidate;
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return Boolean(
+    error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "P2002"
+  );
+}

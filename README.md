@@ -59,7 +59,7 @@ Set `INITIAL_DISPLAY_KEY` to a long random value before first startup. The defau
 
 ## Authentication Model
 
-Dashboard routes require OIDC through Auth.js/NextAuth. Authentik is the first supported provider, while environment variable names are kept provider-neutral for future Keycloak support.
+Dashboard routes require OIDC through Auth.js/NextAuth. The provider is configured generically: set `AUTH_OIDC_ISSUER`, `AUTH_OIDC_CLIENT_ID`, and `AUTH_OIDC_CLIENT_SECRET` and the application will perform OIDC discovery against the issuer's well-known endpoint. This works with any OIDC-compliant provider (Authentik, Keycloak, Okta, Authing, Azure AD, Google, etc.).
 
 ```env
 AUTH_SECRET=<long-random-auth-secret>
@@ -87,43 +87,50 @@ Roles:
 - `editor` can edit assigned channel templates and overlays.
 - `viewer` can view assigned dashboard content.
 
-### Local Email & Password Registration
+### Invite-Gated Signup (OIDC only)
 
-GitchAlerts supports local email/password accounts in addition to OIDC. Local registration is gated by invite codes and is **off by default** — set `ENABLE_LOCAL_REGISTRATION=true` in `.env` to enable it.
+GitchAlerts uses a single sign-in path: every user signs in through the configured OIDC identity provider. There is no local email/password account option. To onboard a new user, an admin generates an invite code; on first successful OIDC sign-in, the code is redeemed and the new user is provisioned with a personal channel.
 
 ```env
-ENABLE_LOCAL_REGISTRATION=true
-PASSWORD_MIN_LENGTH=12
+# Optional display name for the OIDC sign-in button (defaults to "OIDC").
+# AUTH_OIDC_PROVIDER_NAME="Authentik"
 ```
 
-Local password rules are:
+#### Sign-up flow
 
-- At least `PASSWORD_MIN_LENGTH` characters (default 12, range 8–128).
-- Must include at least one uppercase letter, one lowercase letter, one digit, and one symbol.
-- Hashed with bcrypt at cost 12.
-- Compared in constant time inside the credentials provider.
+1. Admin signs in with the email in `INITIAL_ADMIN_EMAIL` (still OIDC; no special first-time wizard).
+2. Admin opens `/dashboard/admin/invites` and mints a new code (single-use or multi-use, with an optional role and expiration).
+3. Admin shares the code with the new user out-of-band.
+4. New user visits `/register`, pastes the code, and clicks **Continue to sign in**.
+5. The browser sets a short-lived, http-only cookie carrying the code, then redirects to the configured OIDC provider.
+6. The user authenticates with the IdP. On the OIDC callback, the server reads the cookie, redeems the code, creates the user, and provisions a personal channel in one transaction. The cookie is cleared immediately.
 
-The OIDC path is unchanged. New users self-register at `/register` with an email, password, confirm-password, and a valid invite code.
+If the user is already a member, the OIDC callback just refreshes their last-known display name and signs them in — no invite code required.
 
-The first admin is still created by signing in through OIDC with the email in `INITIAL_ADMIN_EMAIL`. From there, that admin can mint invite codes at `/dashboard/admin/invites` for other users.
+The first admin is still created by signing in through OIDC with the email in `INITIAL_ADMIN_EMAIL`. That admin does **not** need an invite code.
 
 #### Invite codes
 
 - Created by admins at `/dashboard/admin/invites`.
 - Each code has a role (defaults to `owner`), a `maxUses` count (default 1), and an optional `expiresAt` timestamp.
-- A code can be revoked at any time. Revoked or expired codes are rejected at registration.
+- A code can be revoked at any time. Revoked or expired codes are rejected at sign-in.
 - Multi-use codes track per-user redemptions in `invite_code_redemptions` so a single user cannot burn a code's quota twice.
 - Codes use a Crockford-style alphabet that drops lookalike characters (no `0`, `O`, `1`, `I`, `L`).
 
 #### What the new user gets
 
-A successful local registration creates:
+A successful first OIDC sign-in (with a valid invite code) creates:
 
-- a `User` row with `authProvider="local"` and a bcrypt-hashed password (cost 12),
+- a `User` row keyed on `(authProvider, authSubject)` from the IdP,
+- a `InviteCodeRedemption` row tying the user to the code they used,
 - a personal `Channel` whose `ownerUserId` is the new user, and
 - a `ChannelMembership` granting the new user `owner` role on that channel.
 
 Users only see channels they are members of (or, for admins, every channel). Cross-user isolation is enforced by the existing `getAuthorizedChannels` and `canManageChannel` helpers; nothing in this change relaxes those checks.
+
+#### First-time sign-in without an invite code
+
+If a user attempts to sign in via OIDC without a valid invite cookie and they are not the initial admin, the `signIn` callback returns `false` and NextAuth redirects to `/signin?error=AccessDenied`. The user is never created and the IdP round-trip is harmless (no database side effects).
 
 ## Route Protection
 
