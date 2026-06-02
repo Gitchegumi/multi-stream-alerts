@@ -153,7 +153,12 @@ export async function handleKofiWebhook(
 
   console.info('kofi webhook accepted', { channelSlug, rawEventId: parsed.rawEventId });
 
-  const event: AlertEvent = await publish({ ...parsed.event, channelId: channel.id });
+  const event: AlertEvent | null = await publish({ ...parsed.event, channelId: channel.id });
+  if (!event) {
+    response.status(200).json({ ok: true, duplicate: false, suppressed: true });
+    return;
+  }
+
   response.status(200).json({ ok: true, duplicate: false, event });
 }
 

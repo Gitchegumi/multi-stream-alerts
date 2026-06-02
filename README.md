@@ -181,6 +181,56 @@ https://<your-alerts-domain>/api/webhooks/youtube/<your-channel-slug>
 
 Webhook routes do not use OIDC. They must verify provider secrets/signatures and only ingest events. Ko-fi and YouTube webhooks include the channel slug in the path; Twitch uses a single global callback URL and identifies the channel by matching the inbound HMAC against stored per-channel `eventsubSecret` values.
 
+## Alert Event Catalog and Layouts
+
+Alert types and alert layouts are separate concepts. An alert type is the event that happened, such as `twitch.followed` or `youtube.superchat`. A layout is the reusable visual/audio presentation used when the event fires. One layout can be assigned to many alert types, and different alert types can use different layouts in the same workspace.
+
+The global alert catalog is stored in `alert_event_types` and seeded during migrations/startup. Per-workspace activation and overrides live in `workspace_alert_configs`. Reusable workspace layouts live in `workspace_alert_layouts`. Existing vertical and horizontal presentations are default layout presets, not alert identities.
+
+Supported catalog keys:
+
+```text
+YouTube:
+youtube.tipped
+youtube.superchat
+youtube.subscribed
+youtube.member
+youtube.merch_purchased
+youtube.widget_event
+
+Twitch:
+twitch.followed
+twitch.subscribed
+twitch.single_sub_gift
+twitch.community_gift
+twitch.cheered
+twitch.tipped
+twitch.raided
+twitch.external_purchase
+twitch.community_gifted_sub
+twitch.hypechat
+twitch.charity_donation
+twitch.merch_purchased
+twitch.redemption
+twitch.widget_event
+
+Ko-fi:
+kofi.tipped
+kofi.subscribed
+kofi.commission
+kofi.shop_order
+
+Generic/API:
+generic.widget_event
+
+Manual:
+manual.test
+```
+
+Workspace owners/admins/editors can configure alert types from the dashboard. Each alert type has an enabled flag, display-name override, assigned layout, optional message template, duration override, volume override, and test button. Disabled alert types are not stored or published. Unknown or unmapped incoming events are logged with opaque metadata and can fall back to the platform's `*.widget_event` handler or `generic.widget_event` when that handler is enabled.
+
+Layouts can be created and edited independently. Each layout has a name, style (`vertical`, `horizontal`, `compact`, or `custom`), optional visual asset URL, optional sound asset URL, default duration, default volume, and preview button. Deleting a layout is blocked while active alert configs use it unless the request explicitly falls back those configs to the default layout first.
+
 ## Docker Compose
 
 Start the stack after configuring `.env`:
