@@ -39,9 +39,14 @@ export default async function DashboardPage() {
           <h1 className="dashboard-title">{productName}</h1>
           <p className="muted">Signed in as {session.user.email}. Managing {selectedChannel.name}.</p>
         </div>
-        <a className="button" href="/api/auth/signout">
-          Sign out
-        </a>
+        <div className="stack" style={{ flexDirection: "row", gap: 8 }}>
+          <a className="button-secondary" href={`/dashboard/${encodeURIComponent(selectedChannel.slug)}/integrations`}>
+            Settings → Integrations
+          </a>
+          <a className="button" href="/api/auth/signout">
+            Sign out
+          </a>
+        </div>
       </header>
 
       <section className="grid">
