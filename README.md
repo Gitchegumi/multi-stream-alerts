@@ -131,6 +131,18 @@ Users only see channels they are members of (or, for admins, every channel). Cro
 
 If a user attempts to sign in via OIDC without a valid invite cookie and they are not the initial admin, the `signIn` callback returns `false` and NextAuth redirects to `/signin?error=AccessDenied`. The user is never created and the IdP round-trip is harmless (no database side effects).
 
+## Instance secrets
+
+`INSTANCE_ENCRYPTION_KEY` is a 32-byte key (base64-encoded) used to encrypt per-channel platform credentials (Ko-fi verification token, Twitch EventSub secret / OAuth client credentials / broadcaster ID, YouTube OAuth client credentials) at rest in the database. The app will fail to boot without it — there is no fallback.
+
+Generate it once when you first set up the instance:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+Treat this key like a database root password: back it up somewhere safe. **Rotating the key invalidates every stored secret.** Existing ciphertext becomes unreadable, and every channel must re-enter its Ko-fi / Twitch / YouTube credentials from the dashboard. Plan rotations for known maintenance windows and store at least one historical copy until all channels have re-onboarded.
+
 ## Route Protection
 
 Dashboard:
@@ -162,12 +174,12 @@ The SSE stream requires a valid display key and only emits events for that overl
 Webhooks:
 
 ```text
-https://<your-alerts-domain>/api/webhooks/kofi
+https://<your-alerts-domain>/api/webhooks/kofi/<your-channel-slug>
 https://<your-alerts-domain>/api/webhooks/twitch
-https://<your-alerts-domain>/api/webhooks/youtube
+https://<your-alerts-domain>/api/webhooks/youtube/<your-channel-slug>
 ```
 
-Webhook routes do not use OIDC. They must verify provider secrets/signatures and only ingest events.
+Webhook routes do not use OIDC. They must verify provider secrets/signatures and only ingest events. Ko-fi and YouTube webhooks include the channel slug in the path; Twitch uses a single global callback URL and identifies the channel by matching the inbound HMAC against stored per-channel `eventsubSecret` values.
 
 ## Docker Compose
 
@@ -208,24 +220,13 @@ App-level protections still apply even when routed through a reverse proxy.
 
 ## Ko-fi Setup
 
-Configure the Ko-fi webhook URL:
+Configure platform credentials from the dashboard. The webhook URL pattern is shown below; the verification token is managed per-channel.
 
 ```text
-https://<your-alerts-domain>/api/webhooks/kofi
+https://<your-alerts-domain>/api/webhooks/kofi/<your-channel-slug>
 ```
 
-Set the matching token in `.env`:
-
-```env
-KOFI_VERIFICATION_TOKEN=<your-kofi-verification-token>
-```
-
-Ko-fi events are parsed from `application/x-www-form-urlencoded` payloads where `data` contains JSON. v1 maps events to the default channel from:
-
-```env
-DEFAULT_CHANNEL_SLUG=<default-channel-slug>
-DEFAULT_CHANNEL_NAME=<default-channel-name>
-```
+Set the matching verification token in Dashboard → Settings → Integrations → Ko-fi. The token is stored encrypted at rest using `INSTANCE_ENCRYPTION_KEY`.
 
 Supported Ko-fi types:
 
@@ -235,6 +236,33 @@ Supported Ko-fi types:
 - `Shop Order`
 
 Duplicate Ko-fi `message_id` values are ignored. Private Ko-fi messages are not displayed in overlays.
+
+## Twitch Setup
+
+Configure per-channel Twitch credentials from Dashboard → Settings → Integrations → Twitch. Each channel stores four fields:
+
+- `eventsubSecret` — per-channel secret used to verify EventSub HMAC signatures. Generate a random 16+ character string; set this in your Twitch app's EventSub subscription callback URL settings **and** store it in the dashboard. The webhook handler matches inbound HMACs against stored secrets to identify the receiving channel.
+- `clientId` / `clientSecret` — Twitch app OAuth credentials used to call the Twitch API (subscriptions, user lookups, etc.).
+- `broadcasterId` — numeric user ID of the channel receiving the events. Find it via the Twitch API (`/users?login=<channel>`) or your Twitch dashboard.
+
+The Twitch EventSub callback URL is global per app. The receiving channel is identified implicitly by which stored `eventsubSecret` validates the inbound HMAC — see `apps/ingress/src/twitch-webhook.ts`.
+
+> **v1 stub:** EventSub subscription creation and event normalization are still future work; v1 verifies the HMAC and returns `501 Not Implemented`.
+
+## YouTube Setup
+
+Configure per-channel YouTube credentials from Dashboard → Settings → Integrations → YouTube. Each channel stores two fields:
+
+- `clientId` — Google OAuth client ID for YouTube Data API access.
+- `clientSecret` — Google OAuth client secret paired with the client ID.
+
+The webhook URL is per-channel:
+
+```text
+https://<your-alerts-domain>/api/webhooks/youtube/<your-channel-slug>
+```
+
+> **v1 stub:** Pub/Sub hub challenge verification and Super Chat / membership event normalization are still future work; v1 verifies the URL resolution and returns `501 Not Implemented`.
 
 ## OBS or Meld Browser Source
 
@@ -270,10 +298,10 @@ Ko-fi webhook test:
 Send a form-encoded POST to:
 
 ```text
-https://<your-alerts-domain>/api/webhooks/kofi
+https://<your-alerts-domain>/api/webhooks/kofi/<your-channel-slug>
 ```
 
-The form field `data` should contain a JSON payload with a matching `verification_token`, a unique `message_id`, and a supported Ko-fi `type`.
+The form field `data` should contain a JSON payload with a matching `verification_token` (the one stored in Dashboard → Settings → Integrations → Ko-fi for that channel), a unique `message_id`, and a supported Ko-fi `type`.
 
 ## Known Limitations
 
@@ -289,5 +317,4 @@ The form field `data` should contain a JSON payload with a matching `verificatio
 - YouTube Super Chat, membership, and live chat support.
 - TikTok adapter research.
 - Dashboard controls for templates, overlay settings, and display key rotation.
-- Channel-specific provider integration settings.
 - Asset management for alert sounds/images.
