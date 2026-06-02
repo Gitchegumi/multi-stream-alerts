@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 /**
  * Environment variable schemas shared across the multi-stream-alerts monorepo.
@@ -9,7 +9,7 @@ import { z } from "zod";
  */
 
 export const commonEnvSchema = z.object({
-  NODE_ENV: z.string().default("development"),
+  NODE_ENV: z.string().default('development'),
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1),
   DEFAULT_CHANNEL_SLUG: z.string().min(1),
@@ -20,10 +20,10 @@ export const commonEnvSchema = z.object({
   INSTANCE_ENCRYPTION_KEY: z
     .string()
     .min(1)
-    .refine((value) => Buffer.from(value, "base64").length === 32, {
+    .refine((value) => Buffer.from(value, 'base64').length === 32, {
       message:
-        'INSTANCE_ENCRYPTION_KEY must be a base64-encoded 32-byte key (generate with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))")'
-    })
+        "INSTANCE_ENCRYPTION_KEY must be a base64-encoded 32-byte key (generate with: node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\")",
+    }),
 });
 
 export const authEnvSchema = z.object({
@@ -34,11 +34,11 @@ export const authEnvSchema = z.object({
   INITIAL_ADMIN_EMAIL: z.string().email(),
   // Optional display name override for the OIDC sign-in button. Defaults
   // to "OIDC" when unset.
-  AUTH_OIDC_PROVIDER_NAME: z.string().min(1).optional()
+  AUTH_OIDC_PROVIDER_NAME: z.string().min(1).optional(),
 });
 
 export const ingressEnvSchema = commonEnvSchema.extend({
-  INGRESS_PORT: z.coerce.number().int().positive().default(8080)
+  INGRESS_PORT: z.coerce.number().int().positive().default(8080),
 });
 
 export const webEnvSchema = commonEnvSchema.merge(authEnvSchema);
@@ -57,9 +57,9 @@ export function parseWebEnv(env: NodeJS.ProcessEnv) {
 
 export function parseBooleanEnv(value: string | undefined, defaultValue = false) {
   return z
-    .enum(["true", "false"])
+    .enum(['true', 'false'])
     .optional()
-    .transform((parsedValue) => (parsedValue ? parsedValue === "true" : defaultValue))
+    .transform((parsedValue) => (parsedValue ? parsedValue === 'true' : defaultValue))
     .parse(value);
 }
 
@@ -75,15 +75,15 @@ export function getInstanceEncryptionKey(): Buffer {
 
   if (!value) {
     throw new Error(
-      'INSTANCE_ENCRYPTION_KEY must be a base64-encoded 32-byte key (generate with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))")'
+      "INSTANCE_ENCRYPTION_KEY must be a base64-encoded 32-byte key (generate with: node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\")",
     );
   }
 
-  const decoded = Buffer.from(value, "base64");
+  const decoded = Buffer.from(value, 'base64');
 
   if (decoded.length !== 32) {
     throw new Error(
-      `INSTANCE_ENCRYPTION_KEY must decode to exactly 32 bytes (got ${decoded.length}). Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`
+      `INSTANCE_ENCRYPTION_KEY must decode to exactly 32 bytes (got ${decoded.length}). Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`,
     );
   }
 

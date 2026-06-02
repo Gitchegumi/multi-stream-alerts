@@ -1,1 +1,1 @@
-export const productName = "GitcheGumi Alerts";
+export const productName = 'GitcheGumi Alerts';

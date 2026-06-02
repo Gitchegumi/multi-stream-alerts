@@ -1,8 +1,5 @@
-import type { Request, NextFunction } from "express";
-import {
-  prisma,
-  getChannelDecryptedSecret
-} from "@multi-stream-alerts/database";
+import type { Request, NextFunction } from 'express';
+import { prisma, getChannelDecryptedSecret } from '@multi-stream-alerts/database';
 
 /**
  * Structural shape for the Express `Response` that the handler uses.
@@ -15,7 +12,7 @@ interface YoutubeWebhookResponse {
   status: (code: number) => { json: (body: unknown) => void };
 }
 
-export type YoutubeRejectionReason = "channel_not_found" | "not_configured";
+export type YoutubeRejectionReason = 'channel_not_found' | 'not_configured';
 
 /**
  * Dependency-injection seam for tests. Each field is optional; defaults
@@ -40,15 +37,15 @@ const defaultDeps: Required<YoutubeWebhookDeps> = {
   getDecryptedClientId: (channelId) =>
     getChannelDecryptedSecret({
       channelId,
-      provider: "youtube",
-      key: "youtube.client_id"
+      provider: 'youtube',
+      key: 'youtube.client_id',
     }),
   getDecryptedClientSecret: (channelId) =>
     getChannelDecryptedSecret({
       channelId,
-      provider: "youtube",
-      key: "youtube.client_secret"
-    })
+      provider: 'youtube',
+      key: 'youtube.client_secret',
+    }),
 };
 
 /**
@@ -72,13 +69,13 @@ const defaultDeps: Required<YoutubeWebhookDeps> = {
  * Express req/response objects.
  */
 export async function handleYoutubeWebhook(
-  request: Pick<Request, "params" | "body">,
+  request: Pick<Request, 'params' | 'body'>,
   response: YoutubeWebhookResponse,
-  deps: YoutubeWebhookDeps = {}
+  deps: YoutubeWebhookDeps = {},
 ): Promise<void> {
   const channelSlug = request.params.channelSlug;
-  if (typeof channelSlug !== "string" || channelSlug.length === 0) {
-    response.status(400).json({ error: "Missing channelSlug" });
+  if (typeof channelSlug !== 'string' || channelSlug.length === 0) {
+    response.status(400).json({ error: 'Missing channelSlug' });
     return;
   }
 
@@ -89,8 +86,8 @@ export async function handleYoutubeWebhook(
 
   const channel = await findChannel(channelSlug);
   if (!channel) {
-    console.warn("youtube webhook rejected", { channelSlug, reason: "channel_not_found" });
-    response.status(404).json({ error: "Channel not found" });
+    console.warn('youtube webhook rejected', { channelSlug, reason: 'channel_not_found' });
+    response.status(404).json({ error: 'Channel not found' });
     return;
   }
 
@@ -98,20 +95,20 @@ export async function handleYoutubeWebhook(
   // is not fully configured for YouTube ingestion.
   const [clientId, clientSecret] = await Promise.all([
     getClientId(channel.id),
-    getClientSecret(channel.id)
+    getClientSecret(channel.id),
   ]);
 
   if (!clientId || !clientSecret) {
-    console.warn("youtube webhook rejected", { channelSlug, reason: "not_configured" });
-    response.status(503).json({ error: "YouTube not configured for this channel" });
+    console.warn('youtube webhook rejected', { channelSlug, reason: 'not_configured' });
+    response.status(503).json({ error: 'YouTube not configured for this channel' });
     return;
   }
 
   // Future OAuth verification would happen here. For v1 we return the
   // same 501 stub the old global route did, but only AFTER successfully
   // resolving + decrypting the channel's credentials.
-  console.info("youtube webhook accepted", { channelSlug, channelId: channel.id });
-  response.status(501).json({ error: "YouTube ingestion is stubbed for future implementation" });
+  console.info('youtube webhook accepted', { channelSlug, channelId: channel.id });
+  response.status(501).json({ error: 'YouTube ingestion is stubbed for future implementation' });
 }
 
 /**
@@ -123,7 +120,7 @@ export async function handleYoutubeWebhook(
 export async function youtubeWebhookExpressHandler(
   request: Request,
   response: YoutubeWebhookResponse,
-  _next: NextFunction
+  _next: NextFunction,
 ): Promise<void> {
   await handleYoutubeWebhook(request, response);
 }

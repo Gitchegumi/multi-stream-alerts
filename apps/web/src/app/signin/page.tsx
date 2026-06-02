@@ -1,23 +1,23 @@
-import { redirect } from "next/navigation";
-import Link from "next/link";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { SignInForm } from "@/components/SignInForm";
+import { redirect } from 'next/navigation';
+import Link from 'next/link';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { SignInForm } from '@/components/SignInForm';
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
 export default async function SignInPage({
-  searchParams
+  searchParams,
 }: {
   searchParams: Promise<{ callbackUrl?: string; error?: string }>;
 }) {
   const session = await getServerSession(authOptions);
   if (session?.user?.id) {
-    redirect("/dashboard");
+    redirect('/dashboard');
   }
 
   const params = await searchParams;
-  const callbackUrl = params.callbackUrl ?? "/dashboard";
+  const callbackUrl = params.callbackUrl ?? '/dashboard';
   const error = params.error;
 
   return (

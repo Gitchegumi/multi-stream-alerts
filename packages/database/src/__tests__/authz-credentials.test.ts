@@ -1,8 +1,8 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { mock } from "node:test";
-import type { UserRole } from "@prisma/client";
-import { canManageChannelCredentials } from "../authz";
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mock } from 'node:test';
+import type { UserRole } from '@prisma/client';
+import { canManageChannelCredentials } from '../authz';
 
 // ---------------------------------------------------------------------------
 // canManageChannelCredentials
@@ -29,15 +29,19 @@ function makePrismaStub(membership: MembershipRow) {
   });
   return {
     channelMembership: {
-      findUnique
-    }
+      findUnique,
+    },
   };
 }
 
-async function withPrismaStub<T>(stub: ReturnType<typeof makePrismaStub>, fn: () => Promise<T>): Promise<T> {
-  const { prisma } = await import("../client.ts");
+async function withPrismaStub<T>(
+  stub: ReturnType<typeof makePrismaStub>,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const { prisma } = await import('../client.ts');
   const original = prisma.channelMembership.findUnique;
-  (prisma.channelMembership as unknown as { findUnique: unknown }).findUnique = stub.channelMembership.findUnique;
+  (prisma.channelMembership as unknown as { findUnique: unknown }).findUnique =
+    stub.channelMembership.findUnique;
   try {
     return await fn();
   } finally {
@@ -45,62 +49,66 @@ async function withPrismaStub<T>(stub: ReturnType<typeof makePrismaStub>, fn: ()
   }
 }
 
-test("canManageChannelCredentials returns true for an admin regardless of membership", async () => {
+test('canManageChannelCredentials returns true for an admin regardless of membership', async () => {
   const stub = makePrismaStub(null);
   const result = await withPrismaStub(stub, () =>
-    canManageChannelCredentials("admin-user-1", "admin", "channel-1")
+    canManageChannelCredentials('admin-user-1', 'admin', 'channel-1'),
   );
   assert.equal(result, true);
   // Admins must short-circuit BEFORE the membership lookup.
   assert.equal(
     stub.channelMembership.findUnique.mock.calls.length,
     0,
-    "admin path must not consult the membership table"
+    'admin path must not consult the membership table',
   );
 });
 
-test("canManageChannelCredentials returns true for a channel owner", async () => {
-  const stub = makePrismaStub({ channelId: "channel-1", userId: "owner-1", role: "owner" });
+test('canManageChannelCredentials returns true for a channel owner', async () => {
+  const stub = makePrismaStub({ channelId: 'channel-1', userId: 'owner-1', role: 'owner' });
   const result = await withPrismaStub(stub, () =>
-    canManageChannelCredentials("owner-1", "owner", "channel-1")
+    canManageChannelCredentials('owner-1', 'owner', 'channel-1'),
   );
   assert.equal(result, true);
   assert.equal(stub.channelMembership.findUnique.mock.calls.length, 1);
-  const args = (stub.channelMembership.findUnique as unknown as { lastArgs?: unknown }).lastArgs as {
+  const args = (stub.channelMembership.findUnique as unknown as { lastArgs?: unknown })
+    .lastArgs as {
     where: { channelId_userId: { channelId: string; userId: string } };
   };
-  assert.deepEqual(args.where, { channelId_userId: { channelId: "channel-1", userId: "owner-1" } });
+  assert.deepEqual(args.where, { channelId_userId: { channelId: 'channel-1', userId: 'owner-1' } });
 });
 
-test("canManageChannelCredentials returns false for an editor (not in the allowlist)", async () => {
-  const stub = makePrismaStub({ channelId: "channel-1", userId: "editor-1", role: "editor" });
+test('canManageChannelCredentials returns false for an editor (not in the allowlist)', async () => {
+  const stub = makePrismaStub({ channelId: 'channel-1', userId: 'editor-1', role: 'editor' });
   const result = await withPrismaStub(stub, () =>
-    canManageChannelCredentials("editor-1", "editor", "channel-1")
+    canManageChannelCredentials('editor-1', 'editor', 'channel-1'),
   );
   assert.equal(result, false);
   assert.equal(stub.channelMembership.findUnique.mock.calls.length, 1);
 });
 
-test("canManageChannelCredentials returns false for a viewer", async () => {
-  const stub = makePrismaStub({ channelId: "channel-1", userId: "viewer-1", role: "viewer" });
+test('canManageChannelCredentials returns false for a viewer', async () => {
+  const stub = makePrismaStub({ channelId: 'channel-1', userId: 'viewer-1', role: 'viewer' });
   const result = await withPrismaStub(stub, () =>
-    canManageChannelCredentials("viewer-1", "viewer", "channel-1")
+    canManageChannelCredentials('viewer-1', 'viewer', 'channel-1'),
   );
   assert.equal(result, false);
   assert.equal(stub.channelMembership.findUnique.mock.calls.length, 1);
 });
 
-test("canManageChannelCredentials returns false for a user with no membership at all", async () => {
+test('canManageChannelCredentials returns false for a user with no membership at all', async () => {
   const stub = makePrismaStub(null);
   const result = await withPrismaStub(stub, () =>
-    canManageChannelCredentials("stranger-1", "viewer", "channel-1")
+    canManageChannelCredentials('stranger-1', 'viewer', 'channel-1'),
   );
   assert.equal(result, false);
   assert.equal(stub.channelMembership.findUnique.mock.calls.length, 1);
-  const args = (stub.channelMembership.findUnique as unknown as { lastArgs?: unknown }).lastArgs as {
+  const args = (stub.channelMembership.findUnique as unknown as { lastArgs?: unknown })
+    .lastArgs as {
     where: { channelId_userId: { channelId: string; userId: string } };
   };
-  assert.deepEqual(args.where, { channelId_userId: { channelId: "channel-1", userId: "stranger-1" } });
+  assert.deepEqual(args.where, {
+    channelId_userId: { channelId: 'channel-1', userId: 'stranger-1' },
+  });
 });
 
 test("canManageChannelCredentials returns false for a non-admin user querying a different channel's id", async () => {
@@ -109,12 +117,13 @@ test("canManageChannelCredentials returns false for a non-admin user querying a 
   // returned row (or its absence) is what determines the answer.
   const stub = makePrismaStub(null);
   const result = await withPrismaStub(stub, () =>
-    canManageChannelCredentials("owner-1", "owner", "channel-2")
+    canManageChannelCredentials('owner-1', 'owner', 'channel-2'),
   );
   assert.equal(result, false);
   assert.equal(stub.channelMembership.findUnique.mock.calls.length, 1);
-  const args = (stub.channelMembership.findUnique as unknown as { lastArgs?: unknown }).lastArgs as {
+  const args = (stub.channelMembership.findUnique as unknown as { lastArgs?: unknown })
+    .lastArgs as {
     where: { channelId_userId: { channelId: string; userId: string } };
   };
-  assert.deepEqual(args.where, { channelId_userId: { channelId: "channel-2", userId: "owner-1" } });
+  assert.deepEqual(args.where, { channelId_userId: { channelId: 'channel-2', userId: 'owner-1' } });
 });

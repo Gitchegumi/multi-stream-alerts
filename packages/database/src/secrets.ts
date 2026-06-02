@@ -1,5 +1,11 @@
-import { createCipheriv, createDecipheriv, randomBytes, type CipherGCM, type DecipherGCM } from "node:crypto";
-import { getInstanceEncryptionKey } from "@multi-stream-alerts/shared";
+import {
+  createCipheriv,
+  createDecipheriv,
+  randomBytes,
+  type CipherGCM,
+  type DecipherGCM,
+} from 'node:crypto';
+import { getInstanceEncryptionKey } from '@multi-stream-alerts/shared';
 
 /**
  * AES-256-GCM helpers for encrypting per-channel platform secrets at rest.
@@ -56,7 +62,7 @@ export function __resetCachedKeyForTesting(): void {
  * stripped by `redact`.
  */
 function debugLog(err: unknown): void {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === 'production') {
     return;
   }
   const message = err instanceof Error ? err.message : String(err);
@@ -77,20 +83,20 @@ function debugLog(err: unknown): void {
  *   because the IV is freshly randomized every time.
  */
 export function encryptSecret(plaintext: string): string {
-  if (plaintext === "") {
-    return "";
+  if (plaintext === '') {
+    return '';
   }
 
   const key = resolveKey();
   const iv = randomBytes(IV_BYTES);
-  const cipher = createCipheriv("aes-256-gcm", key, iv, {
-    authTagLength: AUTH_TAG_BYTES
+  const cipher = createCipheriv('aes-256-gcm', key, iv, {
+    authTagLength: AUTH_TAG_BYTES,
   }) as CipherGCM;
 
-  const body = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  const body = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const authTag = cipher.getAuthTag();
 
-  return `${iv.toString("base64")}.${authTag.toString("base64")}.${body.toString("base64")}`;
+  return `${iv.toString('base64')}.${authTag.toString('base64')}.${body.toString('base64')}`;
 }
 
 /**
@@ -105,45 +111,45 @@ export function encryptSecret(plaintext: string): string {
  * can match on it).
  */
 export function decryptSecret(ciphertext: string): string {
-  if (ciphertext === "") {
-    return "";
+  if (ciphertext === '') {
+    return '';
   }
 
   try {
-    const parts = ciphertext.split(".");
+    const parts = ciphertext.split('.');
     if (parts.length !== 3) {
-      throw new Error("malformed ciphertext: expected 3 dot-separated segments");
+      throw new Error('malformed ciphertext: expected 3 dot-separated segments');
     }
 
     const [ivPart, tagPart, bodyPart] = parts;
     if (!ivPart || !tagPart || !bodyPart) {
-      throw new Error("malformed ciphertext: empty segment");
+      throw new Error('malformed ciphertext: empty segment');
     }
 
     // Round-trip each segment through base64 to surface non-base64
     // characters as a clean "Failed to decrypt secret" error rather
     // than letting the decipher throw a low-level Error from crypto.
-    const iv = Buffer.from(ivPart, "base64");
-    const authTag = Buffer.from(tagPart, "base64");
-    const body = Buffer.from(bodyPart, "base64");
+    const iv = Buffer.from(ivPart, 'base64');
+    const authTag = Buffer.from(tagPart, 'base64');
+    const body = Buffer.from(bodyPart, 'base64');
 
     if (iv.length !== IV_BYTES) {
       throw new Error(`malformed ciphertext: IV must be ${IV_BYTES} bytes (got ${iv.length})`);
     }
     if (authTag.length !== AUTH_TAG_BYTES) {
       throw new Error(
-        `malformed ciphertext: auth tag must be ${AUTH_TAG_BYTES} bytes (got ${authTag.length})`
+        `malformed ciphertext: auth tag must be ${AUTH_TAG_BYTES} bytes (got ${authTag.length})`,
       );
     }
 
     const key = resolveKey();
-    const decipher = createDecipheriv("aes-256-gcm", key, iv, {
-      authTagLength: AUTH_TAG_BYTES
+    const decipher = createDecipheriv('aes-256-gcm', key, iv, {
+      authTagLength: AUTH_TAG_BYTES,
     }) as DecipherGCM;
     decipher.setAuthTag(authTag);
 
     const plaintext = Buffer.concat([decipher.update(body), decipher.final()]);
-    return plaintext.toString("utf8");
+    return plaintext.toString('utf8');
   } catch (err) {
     // Re-wrap so callers see a single, stable error message regardless
     // of whether the failure was structural (bad base64, wrong segment
@@ -151,8 +157,8 @@ export function decryptSecret(ciphertext: string): string {
     // error is logged — redacted — for debugging, but never surfaced.
     debugLog(err);
     throw new Error(
-      `Failed to decrypt secret: ${err instanceof Error ? err.message : "unknown error"}`,
-      err instanceof Error ? { cause: err } : undefined
+      `Failed to decrypt secret: ${err instanceof Error ? err.message : 'unknown error'}`,
+      err instanceof Error ? { cause: err } : undefined,
     );
   }
 }
@@ -165,5 +171,5 @@ export function decryptSecret(ciphertext: string): string {
  *     throw new Error(`bad ciphertext: ${redact(value)}`);
  */
 export function redact(_value: string): string {
-  return "[REDACTED]";
+  return '[REDACTED]';
 }

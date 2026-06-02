@@ -1,6 +1,6 @@
-import type { Prisma } from "@prisma/client";
-import { prisma } from "./client";
-import { encryptSecret, decryptSecret, redact } from "./secrets";
+import type { Prisma } from '@prisma/client';
+import { prisma } from './client';
+import { encryptSecret, decryptSecret, redact } from './secrets';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -11,14 +11,14 @@ import { encryptSecret, decryptSecret, redact } from "./secrets";
  * the comment block in packages/database/prisma/schema.prisma.
  */
 export type IntegrationCredentialKey =
-  | "kofi.verification_token"
-  | "twitch.eventsub_secret"
-  | "twitch.client_id"
-  | "twitch.client_secret"
-  | "youtube.client_id"
-  | "youtube.client_secret";
+  | 'kofi.verification_token'
+  | 'twitch.eventsub_secret'
+  | 'twitch.client_id'
+  | 'twitch.client_secret'
+  | 'youtube.client_id'
+  | 'youtube.client_secret';
 
-export const PROVIDERS = ["kofi", "twitch", "youtube"] as const;
+export const PROVIDERS = ['kofi', 'twitch', 'youtube'] as const;
 export type IntegrationProvider = (typeof PROVIDERS)[number];
 
 /**
@@ -43,9 +43,9 @@ export type CredentialStatus = {
  * that provider has a non-empty ciphertext.
  */
 export const REQUIRED_KEYS_BY_PROVIDER: Record<IntegrationProvider, IntegrationCredentialKey[]> = {
-  kofi: ["kofi.verification_token"],
-  twitch: ["twitch.eventsub_secret", "twitch.client_id", "twitch.client_secret"],
-  youtube: ["youtube.client_id", "youtube.client_secret"]
+  kofi: ['kofi.verification_token'],
+  twitch: ['twitch.eventsub_secret', 'twitch.client_id', 'twitch.client_secret'],
+  youtube: ['youtube.client_id', 'youtube.client_secret'],
 };
 
 // ---------------------------------------------------------------------------
@@ -53,12 +53,12 @@ export const REQUIRED_KEYS_BY_PROVIDER: Record<IntegrationProvider, IntegrationC
 // ---------------------------------------------------------------------------
 
 const ALL_VALID_KEYS: ReadonlySet<string> = new Set<IntegrationCredentialKey>([
-  "kofi.verification_token",
-  "twitch.eventsub_secret",
-  "twitch.client_id",
-  "twitch.client_secret",
-  "youtube.client_id",
-  "youtube.client_secret"
+  'kofi.verification_token',
+  'twitch.eventsub_secret',
+  'twitch.client_id',
+  'twitch.client_secret',
+  'youtube.client_id',
+  'youtube.client_secret',
 ]);
 
 const ALL_VALID_PROVIDERS: ReadonlySet<string> = new Set<IntegrationProvider>(PROVIDERS);
@@ -85,15 +85,13 @@ function assertValidProvider(provider: string): asserts provider is IntegrationP
  * ciphertext — only the boolean "is this key set" map.
  */
 function buildStatus(
-  row:
-    | (Prisma.IntegrationCredentialGetPayload<{ include: { secrets: true } }> | null)
-    | null
+  row: (Prisma.IntegrationCredentialGetPayload<{ include: { secrets: true } }> | null) | null,
 ): CredentialStatus {
   if (!row) {
     return {
       configured: {},
       public: { twitchBroadcasterId: null },
-      isEnabled: false
+      isEnabled: false,
     };
   }
 
@@ -101,7 +99,7 @@ function buildStatus(
   for (const secret of row.secrets) {
     // The DB stores `ciphertext === ""` as the "cleared" sentinel. Only
     // a non-empty ciphertext means "this key is configured".
-    if (secret.ciphertext !== "") {
+    if (secret.ciphertext !== '') {
       // Trust the schema enum comment for valid keys; ignore any
       // garbage that somehow made it into the DB.
       if (ALL_VALID_KEYS.has(secret.key)) {
@@ -113,7 +111,7 @@ function buildStatus(
   return {
     configured,
     public: { twitchBroadcasterId: row.twitchBroadcasterId },
-    isEnabled: row.isEnabled
+    isEnabled: row.isEnabled,
   };
 }
 
@@ -128,12 +126,12 @@ function buildStatus(
  */
 export async function getChannelCredentialStatus(
   channelId: string,
-  provider: IntegrationProvider
+  provider: IntegrationProvider,
 ): Promise<CredentialStatus> {
   assertValidProvider(provider);
   const row = await prisma.integrationCredential.findFirst({
     where: { channelId, provider },
-    include: { secrets: true }
+    include: { secrets: true },
   });
   return buildStatus(row);
 }
@@ -152,13 +150,13 @@ export async function getChannelDecryptedSecret(input: {
 
   const row = await prisma.integrationCredential.findFirst({
     where: { channelId: input.channelId, provider: input.provider },
-    include: { secrets: true }
+    include: { secrets: true },
   });
   if (!row) return null;
 
   const secret = row.secrets.find((s) => s.key === input.key);
   if (!secret) return null;
-  if (secret.ciphertext === "") return null;
+  if (secret.ciphertext === '') return null;
   return decryptSecret(secret.ciphertext);
 }
 
@@ -172,14 +170,14 @@ export async function getAllTwitchEventSubSecrets(): Promise<
   Array<{ channelId: string; secret: string }>
 > {
   const rows = await prisma.integrationCredential.findMany({
-    where: { provider: "twitch" },
-    include: { secrets: true }
+    where: { provider: 'twitch' },
+    include: { secrets: true },
   });
 
   const out: Array<{ channelId: string; secret: string }> = [];
   for (const row of rows) {
-    const secret = row.secrets.find((s) => s.key === "twitch.eventsub_secret");
-    if (!secret || secret.ciphertext === "") continue;
+    const secret = row.secrets.find((s) => s.key === 'twitch.eventsub_secret');
+    if (!secret || secret.ciphertext === '') continue;
     out.push({ channelId: row.channelId, secret: decryptSecret(secret.ciphertext) });
   }
   return out;
@@ -229,45 +227,45 @@ export async function saveChannelCredentials(input: {
       where: {
         channelId_provider: {
           channelId: input.channelId,
-          provider: input.provider
-        }
+          provider: input.provider,
+        },
       },
       create: {
         channelId: input.channelId,
         provider: input.provider,
         isEnabled: false,
-        twitchBroadcasterId: input.publicFields?.twitchBroadcasterId ?? null
+        twitchBroadcasterId: input.publicFields?.twitchBroadcasterId ?? null,
       },
       update: {
         // Public-field update (only the fields the caller actually
         // passed in). We never blank twitchBroadcasterId unless the
         // caller explicitly passes `null`.
-        ...(input.publicFields && "twitchBroadcasterId" in input.publicFields
+        ...(input.publicFields && 'twitchBroadcasterId' in input.publicFields
           ? { twitchBroadcasterId: input.publicFields.twitchBroadcasterId ?? null }
           : {}),
-        isEnabled: false
+        isEnabled: false,
       },
-      select: { id: true }
+      select: { id: true },
     });
 
     // 2. For each (key, value) in `secrets`, encrypt + upsert the
     //    secret row. Empty string is a sentinel: it clears the row
     //    without actually encrypting anything.
     for (const [key, value] of Object.entries(input.secrets)) {
-      const ciphertext = value === "" ? "" : encryptSecret(value);
+      const ciphertext = value === '' ? '' : encryptSecret(value);
       await tx.integrationCredentialSecret.upsert({
         where: {
           credentialId_key: {
             credentialId: credential.id,
-            key
-          }
+            key,
+          },
         },
         create: {
           credentialId: credential.id,
           key,
-          ciphertext
+          ciphertext,
         },
-        update: { ciphertext }
+        update: { ciphertext },
       });
     }
 
@@ -279,29 +277,27 @@ export async function saveChannelCredentials(input: {
       where: {
         channelId_provider: {
           channelId: input.channelId,
-          provider: input.provider
-        }
+          provider: input.provider,
+        },
       },
-      include: { secrets: true }
+      include: { secrets: true },
     });
     if (!fresh) {
       // Should be impossible — we just upserted. Treat as an error
       // and let the transaction roll back.
       throw new Error(
-        `saveChannelCredentials: credential row vanished mid-transaction for channelId=${input.channelId}`
+        `saveChannelCredentials: credential row vanished mid-transaction for channelId=${input.channelId}`,
       );
     }
 
-    const presentKeys = new Set(
-      fresh.secrets.filter((s) => s.ciphertext !== "").map((s) => s.key)
-    );
+    const presentKeys = new Set(fresh.secrets.filter((s) => s.ciphertext !== '').map((s) => s.key));
     const required = REQUIRED_KEYS_BY_PROVIDER[input.provider];
     const shouldBeEnabled = required.every((k) => presentKeys.has(k));
 
     if (shouldBeEnabled !== fresh.isEnabled) {
       await tx.integrationCredential.update({
         where: { id: fresh.id },
-        data: { isEnabled: shouldBeEnabled }
+        data: { isEnabled: shouldBeEnabled },
       });
     }
   });
@@ -325,7 +321,7 @@ export async function clearChannelSecret(input: {
   await prisma.$transaction(async (tx) => {
     const credential = await tx.integrationCredential.findFirst({
       where: { channelId: input.channelId, provider: input.provider },
-      select: { id: true }
+      select: { id: true },
     });
     if (!credential) {
       // Nothing to clear. Treat as a no-op rather than an error — the
@@ -341,7 +337,7 @@ export async function clearChannelSecret(input: {
     // transaction. Matches the `clearAllChannelSecrets` pattern below.
     const clearResult = await tx.integrationCredentialSecret.updateMany({
       where: { credentialId: credential.id, key: input.key },
-      data: { ciphertext: "" }
+      data: { ciphertext: '' },
     });
     if (clearResult.count === 0) {
       // No matching secret row to clear. Nothing else to do.
@@ -353,7 +349,7 @@ export async function clearChannelSecret(input: {
     // a subsequent save with a non-empty value.
     await tx.integrationCredential.update({
       where: { id: credential.id },
-      data: { isEnabled: false }
+      data: { isEnabled: false },
     });
   });
 }
@@ -371,7 +367,7 @@ export async function clearAllChannelSecrets(input: {
   await prisma.$transaction(async (tx) => {
     const credential = await tx.integrationCredential.findFirst({
       where: { channelId: input.channelId, provider: input.provider },
-      select: { id: true }
+      select: { id: true },
     });
     if (!credential) {
       // No row, no secrets — nothing to do.
@@ -379,12 +375,12 @@ export async function clearAllChannelSecrets(input: {
     }
 
     await tx.integrationCredentialSecret.deleteMany({
-      where: { credentialId: credential.id }
+      where: { credentialId: credential.id },
     });
 
     await tx.integrationCredential.update({
       where: { id: credential.id },
-      data: { isEnabled: false }
+      data: { isEnabled: false },
     });
   });
 }

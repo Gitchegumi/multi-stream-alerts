@@ -6,6 +6,8 @@
   "scripts": {
     "build": "corepack pnpm -r build",
     "dev": "corepack pnpm --filter @multi-stream-alerts/web dev",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
     "lint": "corepack pnpm -r lint",
     "prisma:generate": "corepack pnpm --filter @multi-stream-alerts/database prisma:generate",
     "prisma:migrate": "corepack pnpm --filter @multi-stream-alerts/database prisma:migrate",
@@ -15,5 +17,8 @@
     "node": ">=20.11.0",
     "pnpm": ">=9.0.0"
   },
-  "packageManager": "pnpm@9.15.4"
+  "packageManager": "pnpm@9.15.4",
+  "devDependencies": {
+    "prettier": "^3.4.0"
+  }
 }

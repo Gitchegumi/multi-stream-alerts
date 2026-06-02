@@ -1,10 +1,10 @@
-import { randomBytes } from "node:crypto";
-import type { Prisma, UserRole } from "@prisma/client";
-import { prisma } from "./client";
+import { randomBytes } from 'node:crypto';
+import type { Prisma, UserRole } from '@prisma/client';
+import { prisma } from './client';
 
 const DEFAULT_CODE_LENGTH = 16;
 // Skip lookalikes: 0/O, 1/I/L.
-const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".replace(/[0O1IL]/g, "");
+const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'.replace(/[0O1IL]/g, '');
 
 export type InviteCodeSummary = {
   id: string;
@@ -20,25 +20,25 @@ export type InviteCodeSummary = {
 };
 
 export class InviteCodeError extends Error {
-  readonly code: "INVALID" | "EXPIRED" | "REVOKED" | "EXHAUSTED";
-  constructor(code: InviteCodeError["code"], message: string) {
+  readonly code: 'INVALID' | 'EXPIRED' | 'REVOKED' | 'EXHAUSTED';
+  constructor(code: InviteCodeError['code'], message: string) {
     super(message);
     this.code = code;
-    this.name = "InviteCodeError";
+    this.name = 'InviteCodeError';
   }
 }
 
 export function generateInviteCode(length: number = DEFAULT_CODE_LENGTH): string {
   const safeLength = Math.max(8, Math.min(48, Math.floor(length)));
   const bytes = randomBytes(safeLength);
-  let out = "";
+  let out = '';
   for (let i = 0; i < safeLength; i++) {
     const byte = bytes[i] ?? 0;
     const char = ALPHABET[byte % ALPHABET.length];
     if (!char) continue;
     out += char;
     if (i > 0 && i < safeLength - 1 && (i + 1) % 4 === 0) {
-      out += "-";
+      out += '-';
     }
   }
   return out;
@@ -56,12 +56,12 @@ export async function createInviteCode(input: {
   const created = await prisma.inviteCode.create({
     data: {
       code,
-      role: input.role ?? "owner",
+      role: input.role ?? 'owner',
       maxUses,
       expiresAt: input.expiresAt ?? null,
       note: input.note ?? null,
-      createdByUserId: input.createdByUserId
-    }
+      createdByUserId: input.createdByUserId,
+    },
   });
   return toSummary(created);
 }
@@ -69,8 +69,8 @@ export async function createInviteCode(input: {
 export async function listInviteCodes(createdByUserId?: string): Promise<InviteCodeSummary[]> {
   const rows = await prisma.inviteCode.findMany({
     where: createdByUserId ? { createdByUserId } : undefined,
-    orderBy: { createdAt: "desc" },
-    take: 200
+    orderBy: { createdAt: 'desc' },
+    take: 200,
   });
   return rows.map(toSummary);
 }
@@ -78,27 +78,35 @@ export async function listInviteCodes(createdByUserId?: string): Promise<InviteC
 export async function revokeInviteCode(id: string): Promise<InviteCodeSummary | null> {
   const updated = await prisma.inviteCode.update({
     where: { id },
-    data: { isRevoked: true }
+    data: { isRevoked: true },
   });
   return toSummary(updated);
 }
 
 export async function findInviteByCode(rawCode: string) {
   if (!rawCode) return null;
-  const normalized = rawCode.trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+  const normalized = rawCode
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9-]/g, '');
   if (!normalized) return null;
   return prisma.inviteCode.findUnique({ where: { code: normalized } });
 }
 
-export function assertInviteIsUsable(invite: { isRevoked: boolean; usedCount: number; maxUses: number; expiresAt: Date | null }): void {
+export function assertInviteIsUsable(invite: {
+  isRevoked: boolean;
+  usedCount: number;
+  maxUses: number;
+  expiresAt: Date | null;
+}): void {
   if (invite.isRevoked) {
-    throw new InviteCodeError("REVOKED", "This invite code has been revoked");
+    throw new InviteCodeError('REVOKED', 'This invite code has been revoked');
   }
   if (invite.expiresAt && invite.expiresAt.getTime() <= Date.now()) {
-    throw new InviteCodeError("EXPIRED", "This invite code has expired");
+    throw new InviteCodeError('EXPIRED', 'This invite code has expired');
   }
   if (invite.usedCount >= invite.maxUses) {
-    throw new InviteCodeError("EXHAUSTED", "This invite code has already been used");
+    throw new InviteCodeError('EXHAUSTED', 'This invite code has already been used');
   }
 }
 
@@ -113,7 +121,7 @@ export async function redeemInviteCode(input: { code: string; userId: string }):
 }> {
   const invite = await findInviteByCode(input.code);
   if (!invite) {
-    throw new InviteCodeError("INVALID", "Invite code not found");
+    throw new InviteCodeError('INVALID', 'Invite code not found');
   }
 
   // Pre-flight validation (also re-runs inside the transaction).
@@ -125,17 +133,17 @@ export async function redeemInviteCode(input: { code: string; userId: string }):
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const fresh = await tx.inviteCode.findUnique({ where: { id: invite.id } });
       if (!fresh) {
-        throw new InviteCodeError("INVALID", "Invite code not found");
+        throw new InviteCodeError('INVALID', 'Invite code not found');
       }
       assertInviteIsUsable(fresh);
 
       const updated = await tx.inviteCode.update({
         where: { id: fresh.id, usedCount: fresh.usedCount },
-        data: { usedCount: { increment: 1 } }
+        data: { usedCount: { increment: 1 } },
       });
 
       await tx.inviteCodeRedemption.create({
-        data: { inviteCodeId: fresh.id, userId: input.userId }
+        data: { inviteCodeId: fresh.id, userId: input.userId },
       });
 
       return updated;
@@ -147,10 +155,13 @@ export async function redeemInviteCode(input: { code: string; userId: string }):
       throw error;
     }
     if (isUniqueConstraintError(error)) {
-      throw new InviteCodeError("EXHAUSTED", "This invite code has already been used by this account");
+      throw new InviteCodeError(
+        'EXHAUSTED',
+        'This invite code has already been used by this account',
+      );
     }
     if (isOptimisticLockError(error)) {
-      throw new InviteCodeError("EXHAUSTED", "This invite code is no longer available");
+      throw new InviteCodeError('EXHAUSTED', 'This invite code is no longer available');
     }
     throw error;
   }
@@ -171,7 +182,17 @@ export async function redeemInviteCode(input: { code: string; userId: string }):
  */
 export async function redeemInviteCodeInTransaction(
   tx: Prisma.TransactionClient,
-  input: { invite: { id: string; usedCount: number; maxUses: number; isRevoked: boolean; expiresAt: Date | null; role: UserRole }; userId: string }
+  input: {
+    invite: {
+      id: string;
+      usedCount: number;
+      maxUses: number;
+      isRevoked: boolean;
+      expiresAt: Date | null;
+      role: UserRole;
+    };
+    userId: string;
+  },
 ): Promise<{ invite: InviteCodeSummary; role: UserRole }> {
   try {
     // Re-fetch the invite inside the caller's transaction so we see the
@@ -180,17 +201,17 @@ export async function redeemInviteCodeInTransaction(
     // between the caller's pre-flight and the actual write.
     const fresh = await tx.inviteCode.findUnique({ where: { id: input.invite.id } });
     if (!fresh) {
-      throw new InviteCodeError("INVALID", "Invite code not found");
+      throw new InviteCodeError('INVALID', 'Invite code not found');
     }
     assertInviteIsUsable(fresh);
 
     const updated = await tx.inviteCode.update({
       where: { id: fresh.id, usedCount: fresh.usedCount },
-      data: { usedCount: { increment: 1 } }
+      data: { usedCount: { increment: 1 } },
     });
 
     await tx.inviteCodeRedemption.create({
-      data: { inviteCodeId: fresh.id, userId: input.userId }
+      data: { inviteCodeId: fresh.id, userId: input.userId },
     });
 
     return { invite: toSummary(updated), role: updated.role };
@@ -199,10 +220,13 @@ export async function redeemInviteCodeInTransaction(
       throw error;
     }
     if (isUniqueConstraintError(error)) {
-      throw new InviteCodeError("EXHAUSTED", "This invite code has already been used by this account");
+      throw new InviteCodeError(
+        'EXHAUSTED',
+        'This invite code has already been used by this account',
+      );
     }
     if (isOptimisticLockError(error)) {
-      throw new InviteCodeError("EXHAUSTED", "This invite code is no longer available");
+      throw new InviteCodeError('EXHAUSTED', 'This invite code is no longer available');
     }
     throw error;
   }
@@ -230,13 +254,16 @@ function toSummary(row: {
     isRevoked: row.isRevoked,
     note: row.note,
     createdByUserId: row.createdByUserId,
-    createdAt: row.createdAt
+    createdAt: row.createdAt,
   };
 }
 
 function isUniqueConstraintError(error: unknown): boolean {
   return Boolean(
-    error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "P2002"
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    (error as { code?: string }).code === 'P2002',
   );
 }
 

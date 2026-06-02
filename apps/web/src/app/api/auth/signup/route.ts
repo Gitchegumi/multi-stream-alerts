@@ -1,13 +1,13 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { z } from "zod";
+import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { z } from 'zod';
 import {
   INVITE_CODE_COOKIE,
   INVITE_CODE_COOKIE_MAX_AGE_SECONDS,
-  validateInviteCodeForCookie
-} from "@/lib/oidc-state";
+  validateInviteCodeForCookie,
+} from '@/lib/oidc-state';
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
 // Per-IP rate limit. Mirrors the pattern in
 // apps/web/src/app/api/events/stream/route.ts; a TODO exists to
@@ -21,7 +21,7 @@ const maxAttemptsPerWindow = 10;
 const signupRateLimits = new Map<string, { count: number; resetAt: number }>();
 
 const schema = z.object({
-  inviteCode: z.string().trim().min(1)
+  inviteCode: z.string().trim().min(1),
 });
 
 /**
@@ -37,24 +37,30 @@ const schema = z.object({
 export async function POST(request: Request) {
   const clientIp = getClientIp(request);
   if (isRateLimited(clientIp)) {
-    return NextResponse.json({ ok: false, message: "Too many signup attempts, try again shortly" }, { status: 429 });
+    return NextResponse.json(
+      { ok: false, message: 'Too many signup attempts, try again shortly' },
+      { status: 429 },
+    );
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ ok: false, message: "Invalid JSON body" }, { status: 400 });
+    return NextResponse.json({ ok: false, message: 'Invalid JSON body' }, { status: 400 });
   }
 
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ ok: false, message: "Invite code is required" }, { status: 400 });
+    return NextResponse.json({ ok: false, message: 'Invite code is required' }, { status: 400 });
   }
 
   const validation = validateInviteCodeForCookie(parsed.data.inviteCode);
   if (!validation.ok) {
-    return NextResponse.json({ ok: false, message: "Invite code is not in a valid format" }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, message: 'Invite code is not in a valid format' },
+      { status: 400 },
+    );
   }
 
   const cookieJar = await cookies();
@@ -62,18 +68,18 @@ export async function POST(request: Request) {
     name: INVITE_CODE_COOKIE,
     value: validation.inviteCode,
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: INVITE_CODE_COOKIE_MAX_AGE_SECONDS
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: INVITE_CODE_COOKIE_MAX_AGE_SECONDS,
   });
 
   return NextResponse.json({ ok: true });
 }
 
 function getClientIp(request: Request) {
-  const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return forwardedFor || request.headers.get("x-real-ip") || "unknown";
+  const forwardedFor = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  return forwardedFor || request.headers.get('x-real-ip') || 'unknown';
 }
 
 function isRateLimited(clientIp: string): boolean {

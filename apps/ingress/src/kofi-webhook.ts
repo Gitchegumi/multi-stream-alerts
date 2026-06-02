@@ -1,13 +1,13 @@
-import type { Request, NextFunction } from "express";
-import { timingSafeEqual } from "node:crypto";
+import type { Request, NextFunction } from 'express';
+import { timingSafeEqual } from 'node:crypto';
 import {
   prisma,
   getChannelDecryptedSecret,
   claimDeduplicationKey,
-  storeAndPublishAlertEvent
-} from "@multi-stream-alerts/database";
-import type { AlertEvent } from "@multi-stream-alerts/shared";
-import { parseKofiFormData } from "./kofi";
+  storeAndPublishAlertEvent,
+} from '@multi-stream-alerts/database';
+import type { AlertEvent } from '@multi-stream-alerts/shared';
+import { parseKofiFormData } from './kofi';
 
 /**
  * Structural shape for the Express `Response` that the handler uses.
@@ -35,7 +35,11 @@ export function tokensMatch(expected: string, provided: string): boolean {
   return timingSafeEqual(a, b);
 }
 
-export type RejectionReason = "channel_not_found" | "not_configured" | "invalid_token" | "duplicate";
+export type RejectionReason =
+  | 'channel_not_found'
+  | 'not_configured'
+  | 'invalid_token'
+  | 'duplicate';
 
 /**
  * Dependency-injection seam for tests. Each field is optional; defaults
@@ -46,7 +50,11 @@ export interface KofiWebhookDeps {
   findChannelBySlug?: (slug: string) => Promise<{ id: string; slug: string } | null>;
   getDecryptedToken?: (channelId: string) => Promise<string | null>;
   parseForm?: (body: unknown) => ReturnType<typeof parseKofiFormData>;
-  claimDedup?: (input: { provider: string; rawEventId: string; channelId: string }) => Promise<boolean>;
+  claimDedup?: (input: {
+    provider: string;
+    rawEventId: string;
+    channelId: string;
+  }) => Promise<boolean>;
   storeAndPublish?: typeof storeAndPublishAlertEvent;
 }
 
@@ -58,12 +66,12 @@ const defaultDeps: Required<KofiWebhookDeps> = {
   getDecryptedToken: (channelId) =>
     getChannelDecryptedSecret({
       channelId,
-      provider: "kofi",
-      key: "kofi.verification_token"
+      provider: 'kofi',
+      key: 'kofi.verification_token',
     }),
   parseForm: (body) => parseKofiFormData(body as { data?: unknown }),
   claimDedup: claimDeduplicationKey,
-  storeAndPublish: storeAndPublishAlertEvent
+  storeAndPublish: storeAndPublishAlertEvent,
 };
 
 /**
@@ -84,13 +92,13 @@ const defaultDeps: Required<KofiWebhookDeps> = {
  * req/response objects.
  */
 export async function handleKofiWebhook(
-  request: Pick<Request, "params" | "body">,
+  request: Pick<Request, 'params' | 'body'>,
   response: KofiWebhookResponse,
-  deps: KofiWebhookDeps = {}
+  deps: KofiWebhookDeps = {},
 ): Promise<void> {
   const channelSlug = request.params.channelSlug;
-  if (typeof channelSlug !== "string" || channelSlug.length === 0) {
-    response.status(400).json({ error: "Missing channelSlug" });
+  if (typeof channelSlug !== 'string' || channelSlug.length === 0) {
+    response.status(400).json({ error: 'Missing channelSlug' });
     return;
   }
 
@@ -103,17 +111,15 @@ export async function handleKofiWebhook(
 
   const channel = await findChannel(channelSlug);
   if (!channel) {
-    console.warn("kofi webhook rejected", { channelSlug, reason: "channel_not_found" });
-    response.status(404).json({ error: "Channel not found" });
+    console.warn('kofi webhook rejected', { channelSlug, reason: 'channel_not_found' });
+    response.status(404).json({ error: 'Channel not found' });
     return;
   }
 
   const expectedToken = await getToken(channel.id);
   if (!expectedToken) {
-    console.warn("kofi webhook rejected", { channelSlug, reason: "not_configured" });
-    response
-      .status(503)
-      .json({ error: "Ko-fi not configured for this channel" });
+    console.warn('kofi webhook rejected', { channelSlug, reason: 'not_configured' });
+    response.status(503).json({ error: 'Ko-fi not configured for this channel' });
     return;
   }
 
@@ -124,28 +130,28 @@ export async function handleKofiWebhook(
     // parseKofiFormData throws on missing/malformed `data` field. The
     // exact reason isn't useful to the caller and certainly not in a
     // log line that could leak the token.
-    response.status(400).json({ error: "Malformed Ko-fi payload" });
+    response.status(400).json({ error: 'Malformed Ko-fi payload' });
     return;
   }
 
   if (!tokensMatch(expectedToken, parsed.verificationToken)) {
-    console.warn("kofi webhook rejected", { channelSlug, reason: "invalid_token" });
-    response.status(401).json({ error: "Invalid verification token" });
+    console.warn('kofi webhook rejected', { channelSlug, reason: 'invalid_token' });
+    response.status(401).json({ error: 'Invalid verification token' });
     return;
   }
 
   const fresh = await claimKey({
-    provider: "kofi",
+    provider: 'kofi',
     rawEventId: parsed.rawEventId,
-    channelId: channel.id
+    channelId: channel.id,
   });
   if (!fresh) {
-    console.warn("kofi webhook rejected", { channelSlug, reason: "duplicate" });
+    console.warn('kofi webhook rejected', { channelSlug, reason: 'duplicate' });
     response.status(200).json({ ok: true, duplicate: true });
     return;
   }
 
-  console.info("kofi webhook accepted", { channelSlug, rawEventId: parsed.rawEventId });
+  console.info('kofi webhook accepted', { channelSlug, rawEventId: parsed.rawEventId });
 
   const event: AlertEvent = await publish({ ...parsed.event, channelId: channel.id });
   response.status(200).json({ ok: true, duplicate: false, event });
@@ -160,7 +166,7 @@ export async function handleKofiWebhook(
 export async function kofiWebhookExpressHandler(
   request: Request,
   response: KofiWebhookResponse,
-  _next: NextFunction
+  _next: NextFunction,
 ): Promise<void> {
   await handleKofiWebhook(request, response);
 }

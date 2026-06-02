@@ -1,9 +1,13 @@
-import Redis from "ioredis";
-import { redisAlertChannel, serializeAlertEvent, type AlertEvent } from "@multi-stream-alerts/shared";
+import Redis from 'ioredis';
+import {
+  redisAlertChannel,
+  serializeAlertEvent,
+  type AlertEvent,
+} from '@multi-stream-alerts/shared';
 
 export function createRedisClient() {
-  return new Redis(process.env.REDIS_URL ?? "redis://alerts-redis:6379", {
-    maxRetriesPerRequest: null
+  return new Redis(process.env.REDIS_URL ?? 'redis://alerts-redis:6379', {
+    maxRetriesPerRequest: null,
   });
 }
 

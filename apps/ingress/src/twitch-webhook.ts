@@ -1,6 +1,6 @@
-import type { Request, NextFunction } from "express";
-import { getAllTwitchEventSubSecrets } from "@multi-stream-alerts/database";
-import { verifyTwitchEventSubSignature } from "./twitch";
+import type { Request, NextFunction } from 'express';
+import { getAllTwitchEventSubSecrets } from '@multi-stream-alerts/database';
+import { verifyTwitchEventSubSignature } from './twitch';
 
 /**
  * Structural shape for the Express `Response` that the handler uses.
@@ -30,7 +30,7 @@ export interface TwitchWebhookDeps {
 
 const defaultDeps: Required<TwitchWebhookDeps> = {
   getCandidates: getAllTwitchEventSubSecrets,
-  verifySignature: verifyTwitchEventSubSignature
+  verifySignature: verifyTwitchEventSubSignature,
 };
 
 /**
@@ -56,9 +56,9 @@ const defaultDeps: Required<TwitchWebhookDeps> = {
  * to `{ channelId: null, valid: false }` and we 401.
  */
 export async function handleTwitchWebhook(
-  request: Pick<Request, "headers" | "body">,
+  request: Pick<Request, 'headers' | 'body'>,
   response: TwitchWebhookResponse,
-  deps: TwitchWebhookDeps = {}
+  deps: TwitchWebhookDeps = {},
 ): Promise<void> {
   const resolved: Required<TwitchWebhookDeps> = { ...defaultDeps, ...deps };
   const getCandidates = resolved.getCandidates;
@@ -66,30 +66,30 @@ export async function handleTwitchWebhook(
 
   const candidates = await getCandidates();
 
-  const messageId = headerString(request.headers["twitch-eventsub-message-id"]);
-  const timestamp = headerString(request.headers["twitch-eventsub-message-timestamp"]);
-  const signature = headerString(request.headers["twitch-eventsub-message-signature"]);
+  const messageId = headerString(request.headers['twitch-eventsub-message-id']);
+  const timestamp = headerString(request.headers['twitch-eventsub-message-timestamp']);
+  const signature = headerString(request.headers['twitch-eventsub-message-signature']);
 
   // express.raw() puts the raw body on `body` as a Buffer.
-  const rawBody = Buffer.isBuffer(request.body) ? request.body : Buffer.from("");
+  const rawBody = Buffer.isBuffer(request.body) ? request.body : Buffer.from('');
 
   const result = verifySignature({
     candidates,
     messageId,
     timestamp,
     signature,
-    rawBody
+    rawBody,
   });
 
   if (!result.valid) {
-    console.warn("twitch webhook rejected", { reason: "no_matching_secret" });
-    response.status(401).json({ error: "Invalid Twitch EventSub signature" });
+    console.warn('twitch webhook rejected', { reason: 'no_matching_secret' });
+    response.status(401).json({ error: 'Invalid Twitch EventSub signature' });
     return;
   }
 
-  console.info("twitch webhook accepted", { channelId: result.channelId });
+  console.info('twitch webhook accepted', { channelId: result.channelId });
   response.status(501).json({
-    error: "Twitch EventSub ingestion is stubbed pending per-workspace credential wiring"
+    error: 'Twitch EventSub ingestion is stubbed pending per-workspace credential wiring',
   });
 }
 
@@ -102,7 +102,7 @@ export async function handleTwitchWebhook(
 export async function twitchWebhookExpressHandler(
   request: Request,
   response: TwitchWebhookResponse,
-  _next: NextFunction
+  _next: NextFunction,
 ): Promise<void> {
   await handleTwitchWebhook(request, response);
 }
@@ -114,7 +114,7 @@ export async function twitchWebhookExpressHandler(
  * `express.raw()` route.
  */
 function headerString(value: string | string[] | undefined): string | undefined {
-  if (typeof value === "string") return value;
-  if (Array.isArray(value) && value.length > 0 && typeof value[0] === "string") return value[0];
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'string') return value[0];
   return undefined;
 }

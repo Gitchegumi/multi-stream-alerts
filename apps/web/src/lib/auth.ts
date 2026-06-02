@@ -1,14 +1,14 @@
-import type { NextAuthOptions, Profile } from "next-auth";
-import { cookies } from "next/headers";
+import type { NextAuthOptions, Profile } from 'next-auth';
+import { cookies } from 'next/headers';
 import {
   prisma,
   redeemInviteCodeInTransaction,
   assertInviteIsUsable,
   InviteCodeError,
-  type Prisma
-} from "@multi-stream-alerts/database";
-import { INVITE_CODE_COOKIE, validateInviteCodeForCookie } from "./oidc-state";
-import { generateUniqueChannelSlugSync } from "./channel-slug";
+  type Prisma,
+} from '@multi-stream-alerts/database';
+import { INVITE_CODE_COOKIE, validateInviteCodeForCookie } from './oidc-state';
+import { generateUniqueChannelSlugSync } from './channel-slug';
 
 type OidcProfile = Profile & {
   sub?: string;
@@ -26,13 +26,15 @@ type OidcProfile = Profile & {
   preferred_username?: string;
 };
 
-const oidcIssuer = (process.env.AUTH_OIDC_ISSUER ?? "https://<your-oidc-provider>/<issuer-path>").replace(/\/+$/, "");
+const oidcIssuer = (
+  process.env.AUTH_OIDC_ISSUER ?? 'https://<your-oidc-provider>/<issuer-path>'
+).replace(/\/+$/, '');
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.AUTH_SECRET,
-  session: { strategy: "jwt" },
+  session: { strategy: 'jwt' },
   pages: {
-    signIn: "/signin"
+    signIn: '/signin',
   },
   providers: [
     // Generic OIDC provider. NextAuth's `oauth.js` base provider does
@@ -41,9 +43,9 @@ export const authOptions: NextAuthOptions = {
     // OIDC-compliant IdP (Authentik, Keycloak, Okta, Authing, Azure AD,
     // Google, etc.). Set the three env vars and you're done.
     {
-      id: "oidc",
-      name: process.env.AUTH_OIDC_PROVIDER_NAME ?? "OIDC",
-      type: "oauth",
+      id: 'oidc',
+      name: process.env.AUTH_OIDC_PROVIDER_NAME ?? 'OIDC',
+      type: 'oauth',
       // Both `issuer` and `wellKnown` are required. NextAuth's
       // openid-client adapter only runs OIDC discovery when a
       // `wellKnown` URL is present; without it, next-auth constructs
@@ -56,18 +58,18 @@ export const authOptions: NextAuthOptions = {
       // from the IdP's well-known document.
       issuer: oidcIssuer,
       wellKnown: `${oidcIssuer}/.well-known/openid-configuration`,
-      clientId: process.env.AUTH_OIDC_CLIENT_ID ?? "<your-oidc-client-id>",
-      clientSecret: process.env.AUTH_OIDC_CLIENT_SECRET ?? "<your-oidc-client-secret>",
-      authorization: { params: { scope: "openid email profile" } },
-      checks: ["pkce", "state", "nonce"],
+      clientId: process.env.AUTH_OIDC_CLIENT_ID ?? '<your-oidc-client-id>',
+      clientSecret: process.env.AUTH_OIDC_CLIENT_SECRET ?? '<your-oidc-client-secret>',
+      authorization: { params: { scope: 'openid email profile' } },
+      checks: ['pkce', 'state', 'nonce'],
       profile(profile) {
         return {
-          id: profile.sub ?? profile.email ?? "",
+          id: profile.sub ?? profile.email ?? '',
           email: profile.email,
-          name: profile.name ?? profile.preferred_username ?? profile.email
+          name: profile.name ?? profile.preferred_username ?? profile.email,
         };
-      }
-    }
+      },
+    },
   ],
   callbacks: {
     async signIn({ account, profile }) {
@@ -75,7 +77,9 @@ export const authOptions: NextAuthOptions = {
       if (oidcProfile?.email_verified === false) {
         // Visibility-only; we don't deny the sign-in for the reason
         // documented on the OidcProfile type above.
-        console.warn("OIDC sign-in arrived with email_verified=false", { email: oidcProfile.email });
+        console.warn('OIDC sign-in arrived with email_verified=false', {
+          email: oidcProfile.email,
+        });
       }
       // For OIDC, the OAuth `sub` claim (from the ID token) is the canonical
       // stable identifier and is what Auth.js stores on `account.providerAccountId`.
@@ -92,11 +96,8 @@ export const authOptions: NextAuthOptions = {
 
       const existingUser = await prisma.user.findFirst({
         where: {
-          OR: [
-            { authProvider: account.provider, authSubject },
-            { email }
-          ]
-        }
+          OR: [{ authProvider: account.provider, authSubject }, { email }],
+        },
       });
 
       if (existingUser) {
@@ -105,8 +106,8 @@ export const authOptions: NextAuthOptions = {
           data: {
             authProvider: account.provider,
             authSubject,
-            displayName: oidcProfile?.name ?? existingUser.displayName
-          }
+            displayName: oidcProfile?.name ?? existingUser.displayName,
+          },
         });
         return true;
       }
@@ -126,8 +127,8 @@ export const authOptions: NextAuthOptions = {
             authSubject,
             email,
             displayName: oidcProfile?.name ?? email,
-            role: "admin"
-          }
+            role: 'admin',
+          },
         });
         return true;
       }
@@ -160,10 +161,10 @@ export const authOptions: NextAuthOptions = {
           // write against. The atomic re-check inside
           // `redeemInviteCodeInTransaction` is still authoritative.
           const invite = await tx.inviteCode.findUnique({
-            where: { code: inviteValidation.inviteCode }
+            where: { code: inviteValidation.inviteCode },
           });
           if (!invite) {
-            throw new InviteCodeError("INVALID", "Invite code not found");
+            throw new InviteCodeError('INVALID', 'Invite code not found');
           }
           assertInviteIsUsable(invite);
 
@@ -173,30 +174,30 @@ export const authOptions: NextAuthOptions = {
               authSubject,
               email,
               displayName: oidcProfile?.name ?? email,
-              role: "viewer"
-            }
+              role: 'viewer',
+            },
           });
 
           const redeemed = await redeemInviteCodeInTransaction(tx, {
             invite,
-            userId: user.id
+            userId: user.id,
           });
 
           // Apply the role the invite assigned (the user was created
           // as viewer above; the invite can promote to owner/admin/etc.).
-          if (redeemed.role !== "viewer") {
+          if (redeemed.role !== 'viewer') {
             await tx.user.update({ where: { id: user.id }, data: { role: redeemed.role } });
           }
 
           const channel = await createChannelWithUniqueSlug(
             tx,
-            oidcProfile?.name ?? email.split("@")[0] ?? "My Channel",
+            oidcProfile?.name ?? email.split('@')[0] ?? 'My Channel',
             email,
-            user.id
+            user.id,
           );
 
           await tx.channelMembership.create({
-            data: { channelId: channel.id, userId: user.id, role: "owner" }
+            data: { channelId: channel.id, userId: user.id, role: 'owner' },
           });
         });
       } catch (error) {
@@ -221,7 +222,9 @@ export const authOptions: NextAuthOptions = {
 
       const dbUser = authSubject
         ? await prisma.user.findUnique({
-            where: { authProvider_authSubject: { authProvider: account?.provider ?? "oidc", authSubject } }
+            where: {
+              authProvider_authSubject: { authProvider: account?.provider ?? 'oidc', authSubject },
+            },
           })
         : token.email
           ? await prisma.user.findUnique({ where: { email: token.email } })
@@ -238,14 +241,14 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (!token.userId || !token.role) {
-        throw new Error("Missing authenticated user");
+        throw new Error('Missing authenticated user');
       }
 
       session.user.id = token.userId;
       session.user.role = token.role;
       return session;
-    }
-  }
+    },
+  },
 };
 
 /**
@@ -269,13 +272,13 @@ async function createChannelWithUniqueSlug(
   tx: Prisma.TransactionClient,
   preferredName: string,
   email: string,
-  ownerUserId: string
+  ownerUserId: string,
 ) {
   for (let attempt = 0; attempt < MAX_CHANNEL_SLUG_ATTEMPTS; attempt += 1) {
     const slug = generateUniqueChannelSlugSync(email);
     try {
       return await tx.channel.create({
-        data: { name: preferredName, slug, ownerUserId }
+        data: { name: preferredName, slug, ownerUserId },
       });
     } catch (error) {
       if (isUniqueConstraintError(error) && attempt < MAX_CHANNEL_SLUG_ATTEMPTS - 1) {
@@ -286,11 +289,14 @@ async function createChannelWithUniqueSlug(
   }
   // Unreachable: the loop either returns or throws on the last
   // iteration. Belt-and-suspenders to satisfy the type checker.
-  throw new Error("channel slug collision retry exhausted");
+  throw new Error('channel slug collision retry exhausted');
 }
 
 function isUniqueConstraintError(error: unknown): boolean {
   return Boolean(
-    error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "P2002"
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    (error as { code?: string }).code === 'P2002',
   );
 }

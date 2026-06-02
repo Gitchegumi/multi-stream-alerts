@@ -1,5 +1,5 @@
-import { z } from "zod";
-import type { IntegrationCredentialKey } from "@multi-stream-alerts/database";
+import { z } from 'zod';
+import type { IntegrationCredentialKey } from '@multi-stream-alerts/database';
 
 // Per-provider input schemas for PUT /api/channels/:slug/integrations/:provider.
 //
@@ -16,39 +16,39 @@ import type { IntegrationCredentialKey } from "@multi-stream-alerts/database";
 // are needed.
 
 export const kofiInputSchema = z.object({
-  verificationToken: z.string().max(256) // empty allowed -> clear
+  verificationToken: z.string().max(256), // empty allowed -> clear
 });
 
 export const twitchInputSchema = z.object({
   eventsubSecret: z.string().min(16).max(256).optional(), // required keys get a min length when saving
   clientId: z.string().min(1).max(128).optional(),
   clientSecret: z.string().min(1).max(256).optional(),
-  broadcasterId: z.string().regex(/^\d+$/).optional() // public field
+  broadcasterId: z.string().regex(/^\d+$/).optional(), // public field
 });
 
 export const youtubeInputSchema = z.object({
   clientId: z.string().min(1).max(128).optional(),
-  clientSecret: z.string().min(1).max(256).optional()
+  clientSecret: z.string().min(1).max(256).optional(),
 });
 
 // DELETE body: either a single key to clear, or all secrets for the provider.
 export const deleteInputSchema = z.union([
   z.object({ key: z.string().min(1), all: z.literal(false).optional() }),
-  z.object({ all: z.literal(true) })
+  z.object({ all: z.literal(true) }),
 ]);
 
 // Provider type guard
-export function isProvider(value: string): value is "kofi" | "twitch" | "youtube" {
-  return value === "kofi" || value === "twitch" || value === "youtube";
+export function isProvider(value: string): value is 'kofi' | 'twitch' | 'youtube' {
+  return value === 'kofi' || value === 'twitch' || value === 'youtube';
 }
 
-export function getInputSchemaForProvider(provider: "kofi" | "twitch" | "youtube") {
+export function getInputSchemaForProvider(provider: 'kofi' | 'twitch' | 'youtube') {
   switch (provider) {
-    case "kofi":
+    case 'kofi':
       return kofiInputSchema;
-    case "twitch":
+    case 'twitch':
       return twitchInputSchema;
-    case "youtube":
+    case 'youtube':
       return youtubeInputSchema;
   }
 }
@@ -65,23 +65,23 @@ export function getInputSchemaForProvider(provider: "kofi" | "twitch" | "youtube
  * that provider (e.g. `broadcasterId` is a public field, not a secret).
  */
 export function fieldToDbKey(
-  provider: "kofi" | "twitch" | "youtube",
-  field: string
+  provider: 'kofi' | 'twitch' | 'youtube',
+  field: string,
 ): IntegrationCredentialKey | null {
-  if (provider === "twitch") {
-    if (field === "eventsubSecret") return "twitch.eventsub_secret";
-    if (field === "clientId") return "twitch.client_id";
-    if (field === "clientSecret") return "twitch.client_secret";
+  if (provider === 'twitch') {
+    if (field === 'eventsubSecret') return 'twitch.eventsub_secret';
+    if (field === 'clientId') return 'twitch.client_id';
+    if (field === 'clientSecret') return 'twitch.client_secret';
     return null;
   }
-  if (provider === "youtube") {
-    if (field === "clientId") return "youtube.client_id";
-    if (field === "clientSecret") return "youtube.client_secret";
+  if (provider === 'youtube') {
+    if (field === 'clientId') return 'youtube.client_id';
+    if (field === 'clientSecret') return 'youtube.client_secret';
     return null;
   }
   // kofi
-  if (provider === "kofi" && field === "verificationToken") {
-    return "kofi.verification_token";
+  if (provider === 'kofi' && field === 'verificationToken') {
+    return 'kofi.verification_token';
   }
   return null;
 }
