@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { CredentialStatus, IntegrationProvider } from "@multi-stream-alerts/database";
+import { fieldToDbKey } from "@/lib/integration-credential-schemas";
 
 type Props = {
   channelSlug: string;
@@ -154,7 +155,7 @@ export function IntegrationSettingsForm({ channelSlug, provider, initialStatus, 
         if (f.key === "broadcasterId") {
           isConfigured = Boolean(status.public.twitchBroadcasterId);
         } else {
-          const dbKey = formFieldToDbKey(provider, f.key);
+          const dbKey = fieldToDbKey(provider, f.key);
           if (dbKey) {
             isConfigured = status.configured[dbKey] === true;
           }
@@ -241,32 +242,6 @@ export function IntegrationSettingsForm({ channelSlug, provider, initialStatus, 
       {error ? <p className="error">{error}</p> : null}
     </div>
   );
-}
-
-// Map a form field name (camelCase) to the DB credential key (snake_case).
-// Mirrors the mapping in apps/web/src/lib/integration-credential-schemas.ts
-// (`fieldToDbKey`). The form treats `broadcasterId` as a public field and
-// does not pass it through this mapping — the server routes it to the
-// public column directly. So this helper is for secret fields only.
-function formFieldToDbKey(
-  provider: IntegrationProvider,
-  field: string
-): import("@multi-stream-alerts/database").IntegrationCredentialKey | null {
-  if (provider === "twitch") {
-    if (field === "eventsubSecret") return "twitch.eventsub_secret";
-    if (field === "clientId") return "twitch.client_id";
-    if (field === "clientSecret") return "twitch.client_secret";
-    return null;
-  }
-  if (provider === "youtube") {
-    if (field === "clientId") return "youtube.client_id";
-    if (field === "clientSecret") return "youtube.client_secret";
-    return null;
-  }
-  if (provider === "kofi" && field === "verificationToken") {
-    return "kofi.verification_token";
-  }
-  return null;
 }
 
 function hasAnyValue(values: Record<string, string>): boolean {
