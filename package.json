@@ -22,14 +22,14 @@
   "packageManager": "pnpm@9.15.4",
   "pnpm": {
     "overrides": {
-      "postcss": "8.5.10",
+      "postcss": "8.5.15",
       "uuid": "11.1.1"
     }
   },
   "devDependencies": {
-    "postcss": "8.5.10",
+    "postcss": "8.5.15",
     "husky": "^9.1.0",
-    "lint-staged": "^15.2.0",
+    "lint-staged": "^17.0.7",
     "prettier": "^3.4.0"
   }
 }
