@@ -66,7 +66,6 @@ AUTH_SECRET=<long-random-auth-secret>
 AUTH_OIDC_ISSUER=https://<your-oidc-provider>/<issuer-path>
 AUTH_OIDC_CLIENT_ID=<your-oidc-client-id>
 AUTH_OIDC_CLIENT_SECRET=<your-oidc-client-secret>
-ALLOW_AUTO_PROVISION=false
 INITIAL_ADMIN_EMAIL=<your-admin-email>
 ```
 
@@ -78,7 +77,7 @@ AUTH_OIDC_ISSUER=https://<your-authentik-domain>/application/o/<application-slug
 
 The discovery URL `AUTH_OIDC_ISSUER/.well-known/openid-configuration` must return `200 OK` directly. If Authentik or your reverse proxy redirects from `http` to `https`, from an IP address to a host name, or to a path with different slash formatting, NextAuth will fail sign-in with `expected 200 OK, got: 301 Moved Permanently`.
 
-The first admin is recognized by `INITIAL_ADMIN_EMAIL`. With `ALLOW_AUTO_PROVISION=false`, unknown OIDC users are denied dashboard access unless they already exist in the database.
+The first admin is recognized by `INITIAL_ADMIN_EMAIL`. Every other first-time sign-in is gated by a valid invite code (see [Invite-Gated Signup](#invite-gated-signup-oidc-only) below).
 
 Roles:
 

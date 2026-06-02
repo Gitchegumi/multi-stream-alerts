@@ -9,6 +9,17 @@ import {
 
 export const dynamic = "force-dynamic";
 
+// Per-IP rate limit. Mirrors the pattern in
+// apps/web/src/app/api/events/stream/route.ts; a TODO exists to
+// extract this to a shared util. Limit is intentionally tighter than
+// the stream route (10 / min vs 30 / min) because this endpoint is
+// the invite-code enumeration vector: an attacker trying random
+// codes can otherwise burn through valid single-use codes and
+// observe which codes succeed by the presence/absence of the cookie.
+const rateLimitWindowMs = 60_000;
+const maxAttemptsPerWindow = 10;
+const signupRateLimits = new Map<string, { count: number; resetAt: number }>();
+
 const schema = z.object({
   inviteCode: z.string().trim().min(1)
 });
@@ -24,6 +35,11 @@ const schema = z.object({
  * `pages.signIn` machinery pick up the cookie on the next render.
  */
 export async function POST(request: Request) {
+  const clientIp = getClientIp(request);
+  if (isRateLimited(clientIp)) {
+    return NextResponse.json({ ok: false, message: "Too many signup attempts, try again shortly" }, { status: 429 });
+  }
+
   let body: unknown;
   try {
     body = await request.json();
@@ -53,4 +69,31 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({ ok: true });
+}
+
+function getClientIp(request: Request) {
+  const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return forwardedFor || request.headers.get("x-real-ip") || "unknown";
+}
+
+function isRateLimited(clientIp: string): boolean {
+  const now = Date.now();
+  const existing = signupRateLimits.get(clientIp);
+
+  if (!existing || existing.resetAt <= now) {
+    signupRateLimits.set(clientIp, { count: 1, resetAt: now + rateLimitWindowMs });
+    cleanupExpiredRateLimits(now);
+    return false;
+  }
+
+  existing.count += 1;
+  return existing.count > maxAttemptsPerWindow;
+}
+
+function cleanupExpiredRateLimits(now: number) {
+  for (const [clientIp, limit] of signupRateLimits) {
+    if (limit.resetAt <= now) {
+      signupRateLimits.delete(clientIp);
+    }
+  }
 }

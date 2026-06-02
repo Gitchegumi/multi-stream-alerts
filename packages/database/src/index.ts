@@ -5,3 +5,4 @@ export * from "./invites";
 export * from "./redis";
 
 export type { UserRole, AlertPlatform, AlertType } from "@prisma/client";
+export type { Prisma } from "@prisma/client";

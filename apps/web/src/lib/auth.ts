@@ -2,17 +2,25 @@ import type { NextAuthOptions, Profile } from "next-auth";
 import { cookies } from "next/headers";
 import {
   prisma,
-  findInviteByCode,
-  redeemInviteCode,
+  redeemInviteCodeInTransaction,
   assertInviteIsUsable,
-  InviteCodeError
+  InviteCodeError,
+  type Prisma
 } from "@multi-stream-alerts/database";
-import type { UserRole } from "@multi-stream-alerts/database";
 import { INVITE_CODE_COOKIE, validateInviteCodeForCookie } from "./oidc-state";
+import { generateUniqueChannelSlugSync } from "./channel-slug";
 
 type OidcProfile = Profile & {
   sub?: string;
   email?: string;
+  /**
+   * Some IdPs (Google, Authentik) populate `email_verified`. We do NOT
+   * gate sign-in on this claim: the trust anchor for new accounts is the
+   * invite code (a one-time, admin-issued secret), not the email's
+   * verification status. An attacker who controls the IdP's
+   * `email_verified` claim also controls `sub`/`email`, so the check
+   * adds no real security. Logging it for visibility is enough.
+   */
   email_verified?: boolean;
   name?: string;
   preferred_username?: string;
@@ -53,6 +61,11 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ account, profile }) {
       const oidcProfile = profile as OidcProfile | undefined;
+      if (oidcProfile?.email_verified === false) {
+        // Visibility-only; we don't deny the sign-in for the reason
+        // documented on the OidcProfile type above.
+        console.warn("OIDC sign-in arrived with email_verified=false", { email: oidcProfile.email });
+      }
       // For OIDC, the OAuth `sub` claim (from the ID token) is the canonical
       // stable identifier and is what Auth.js stores on `account.providerAccountId`.
       // We prefer `profile.sub` because it is what the IdP actually asserted;
@@ -92,8 +105,8 @@ export const authOptions: NextAuthOptions = {
       //   (a) the email matches INITIAL_ADMIN_EMAIL — bootstraps the
       //       first admin with no invite code required.
       //   (b) a valid invite code was stashed in the ga_signup_invite
-      //       cookie by the /register page — required for any other
-      //       first-time login, even if ALLOW_AUTO_PROVISION=true.
+      //       cookie by the /register page — required for every other
+      //       first-time login.
       const isInitialAdmin = email === process.env.INITIAL_ADMIN_EMAIL;
       if (isInitialAdmin) {
         await prisma.user.create({
@@ -125,76 +138,65 @@ export const authOptions: NextAuthOptions = {
         // expires on its 10-minute maxAge.
       }
 
-      // Pre-flight: fail fast on a clearly invalid code before we touch
-      // the database transaction. The atomic re-check inside
-      // `redeemInviteCode` is still authoritative.
-      const invite = await findInviteByCode(inviteValidation.inviteCode);
-      if (!invite) {
-        return false;
-      }
+      // Provision the new user, redeem the invite, and create their
+      // personal channel + membership in a single transaction. If any
+      // step fails, the whole write is rolled back — no orphaned user
+      // row, no half-claimed invite, no channel without an owner.
       try {
-        assertInviteIsUsable(invite);
-      } catch {
-        return false;
-      }
-
-      // Create the user row first. The redemption is keyed off the real
-      // user id so the (inviteCodeId, userId) unique is satisfied with
-      // the real identity on the first try.
-      let createdUserId: string;
-      try {
-        const user = await prisma.user.create({
-          data: {
-            authProvider: account.provider,
-            authSubject,
-            email,
-            displayName: oidcProfile?.name ?? email,
-            role: "viewer"
+        await prisma.$transaction(async (tx) => {
+          // Find the invite inside the transaction so the pre-flight
+          // validation reads the same row version the redemption will
+          // write against. The atomic re-check inside
+          // `redeemInviteCodeInTransaction` is still authoritative.
+          const invite = await tx.inviteCode.findUnique({
+            where: { code: inviteValidation.inviteCode }
+          });
+          if (!invite) {
+            throw new InviteCodeError("INVALID", "Invite code not found");
           }
-        });
-        createdUserId = user.id;
-      } catch (error) {
-        if (isUniqueConstraintError(error)) {
-          return false;
-        }
-        throw error;
-      }
+          assertInviteIsUsable(invite);
 
-      // Redeem the invite. On failure, roll back the user we just created
-      // so the email is not silently consumed.
-      let redeemedRole: UserRole = "viewer";
-      try {
-        const redeemed = await redeemInviteCode({
-          code: inviteValidation.inviteCode,
-          userId: createdUserId
+          const user = await tx.user.create({
+            data: {
+              authProvider: account.provider,
+              authSubject,
+              email,
+              displayName: oidcProfile?.name ?? email,
+              role: "viewer"
+            }
+          });
+
+          const redeemed = await redeemInviteCodeInTransaction(tx, {
+            invite,
+            userId: user.id
+          });
+
+          // Apply the role the invite assigned (the user was created
+          // as viewer above; the invite can promote to owner/admin/etc.).
+          if (redeemed.role !== "viewer") {
+            await tx.user.update({ where: { id: user.id }, data: { role: redeemed.role } });
+          }
+
+          const channel = await createChannelWithUniqueSlug(
+            tx,
+            oidcProfile?.name ?? email.split("@")[0] ?? "My Channel",
+            email,
+            user.id
+          );
+
+          await tx.channelMembership.create({
+            data: { channelId: channel.id, userId: user.id, role: "owner" }
+          });
         });
-        redeemedRole = redeemed.role;
       } catch (error) {
-        await prisma.user.delete({ where: { id: createdUserId } }).catch(() => undefined);
         if (error instanceof InviteCodeError) {
           return false;
         }
+        // Anything else (P2002 race, connection drop, etc.) propagates
+        // — the transaction has already rolled back so the user row is
+        // not consumed.
         throw error;
       }
-
-      // Apply the role the invite assigned (the user was created as
-      // viewer above; the invite can promote to owner/admin/etc.).
-      if (redeemedRole !== "viewer") {
-        await prisma.user.update({ where: { id: createdUserId }, data: { role: redeemedRole } });
-      }
-
-      // Provision a personal channel for the new user.
-      const channel = await prisma.channel.create({
-        data: {
-          name: oidcProfile?.name ?? email.split("@")[0] ?? "My Channel",
-          slug: await generateUniqueChannelSlug(email),
-          ownerUserId: createdUserId
-        }
-      });
-
-      await prisma.channelMembership.create({
-        data: { channelId: channel.id, userId: createdUserId, role: "owner" }
-      });
 
       return true;
     },
@@ -235,19 +237,45 @@ export const authOptions: NextAuthOptions = {
   }
 };
 
-async function generateUniqueChannelSlug(email: string): Promise<string> {
-  const base = email
-    .split("@")[0]
-    ?.toLowerCase()
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 24) || "user";
-  const candidate = `${base}-${Math.random().toString(16).slice(2, 8)}`;
-  const existing = await prisma.channel.findUnique({ where: { slug: candidate } });
-  if (existing) {
-    return `${candidate}-${Math.random().toString(16).slice(2, 8)}`;
+/**
+ * Maximum number of slug-generation attempts before giving up. The
+ * random suffix is 8 hex chars (32 bits of entropy) so a collision
+ * probability per attempt is ~1 in 4 billion; 5 attempts makes the
+ * total probability of giving up astronomically small. If we ever do
+ * hit the cap, we let the underlying P2002 propagate and fail the
+ * transaction — we'd rather refuse a signup than ever return a
+ * non-unique slug.
+ */
+const MAX_CHANNEL_SLUG_ATTEMPTS = 5;
+
+/**
+ * Create a Channel row with a slug guaranteed to be unique in the
+ * database, retrying on P2002 (unique-violation) collisions. Must be
+ * called inside a `prisma.$transaction` so the `findUnique` + `create`
+ * pair sees a consistent view of the channel table.
+ */
+async function createChannelWithUniqueSlug(
+  tx: Prisma.TransactionClient,
+  preferredName: string,
+  email: string,
+  ownerUserId: string
+) {
+  for (let attempt = 0; attempt < MAX_CHANNEL_SLUG_ATTEMPTS; attempt += 1) {
+    const slug = generateUniqueChannelSlugSync(email);
+    try {
+      return await tx.channel.create({
+        data: { name: preferredName, slug, ownerUserId }
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error) && attempt < MAX_CHANNEL_SLUG_ATTEMPTS - 1) {
+        continue;
+      }
+      throw error;
+    }
   }
-  return candidate;
+  // Unreachable: the loop either returns or throws on the last
+  // iteration. Belt-and-suspenders to satisfy the type checker.
+  throw new Error("channel slug collision retry exhausted");
 }
 
 function isUniqueConstraintError(error: unknown): boolean {

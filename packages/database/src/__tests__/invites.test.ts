@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { generateInviteCode, assertInviteIsUsable, InviteCodeError } from "../invites.ts";
+import { mock } from "node:test";
+import { generateInviteCode, assertInviteIsUsable, InviteCodeError, redeemInviteCodeInTransaction } from "../invites.ts";
 
 // NOTE: `redeemInviteCode` is intentionally not covered here because it
 // requires a real Prisma client. The atomic-race-condition logic inside
@@ -74,4 +75,123 @@ test("InviteCodeError carries a stable machine-readable code", () => {
     assert.equal(err.name, "InviteCodeError");
     assert.ok(err instanceof Error);
   }
+});
+
+test("redeemInviteCodeInTransaction writes through the supplied transaction client", async () => {
+  // Build a minimal in-memory Prisma.TransactionClient that records the
+  // calls made by the in-transaction variant. We only stub the three
+  // delegates the function actually uses.
+  const callLog: { method: string; args: unknown }[] = [];
+  const freshRow = {
+    id: "invite-1",
+    code: "ABCD-EFGH",
+    role: "owner" as const,
+    maxUses: 1,
+    usedCount: 0,
+    isRevoked: false,
+    expiresAt: null,
+    note: null,
+    createdByUserId: "admin-1",
+    createdAt: new Date("2026-01-01T00:00:00Z")
+  };
+  const updatedRow = { ...freshRow, usedCount: 1 };
+
+  const tx = {
+    inviteCode: {
+      findUnique: mock.fn(async (args: unknown) => {
+        callLog.push({ method: "inviteCode.findUnique", args });
+        return freshRow;
+      }),
+      update: mock.fn(async (args: unknown) => {
+        callLog.push({ method: "inviteCode.update", args });
+        return updatedRow;
+      })
+    },
+    inviteCodeRedemption: {
+      create: mock.fn(async (args: unknown) => {
+        callLog.push({ method: "inviteCodeRedemption.create", args });
+        return { id: "redemption-1", inviteCodeId: freshRow.id, userId: "user-1" };
+      })
+    }
+  };
+
+  const result = await redeemInviteCodeInTransaction(tx as never, {
+    invite: freshRow,
+    userId: "user-1"
+  });
+
+  // Exactly three writes, in the right order.
+  assert.equal(callLog.length, 3);
+  assert.equal(callLog[0]!.method, "inviteCode.findUnique");
+  assert.equal(callLog[1]!.method, "inviteCode.update");
+  assert.equal(callLog[2]!.method, "inviteCodeRedemption.create");
+
+  // The update should be the optimistic-lock update.
+  const updateArgs = callLog[1]!.args as { where: { id: string; usedCount: number }; data: { usedCount: { increment: 1 } } };
+  assert.equal(updateArgs.where.id, freshRow.id);
+  assert.equal(updateArgs.where.usedCount, freshRow.usedCount);
+  assert.deepEqual(updateArgs.data, { usedCount: { increment: 1 } });
+
+  // The redemption row should reference the correct invite + user.
+  const redemptionArgs = callLog[2]!.args as { data: { inviteCodeId: string; userId: string } };
+  assert.equal(redemptionArgs.data.inviteCodeId, freshRow.id);
+  assert.equal(redemptionArgs.data.userId, "user-1");
+
+  assert.equal(result.role, "owner");
+  assert.equal(result.invite.usedCount, 1);
+});
+
+test("redeemInviteCodeInTransaction throws INVALID when the invite is gone", async () => {
+  const tx = {
+    inviteCode: {
+      findUnique: mock.fn(async () => null),
+      update: mock.fn(),
+      create: mock.fn()
+    },
+    inviteCodeRedemption: {
+      create: mock.fn()
+    }
+  };
+
+  await assert.rejects(
+    () =>
+      redeemInviteCodeInTransaction(tx as never, {
+        invite: { id: "x", usedCount: 0, maxUses: 1, isRevoked: false, expiresAt: null, role: "viewer" },
+        userId: "user-1"
+      }),
+    (err: unknown) => err instanceof InviteCodeError && err.code === "INVALID"
+  );
+});
+
+test("redeemInviteCodeInTransaction throws REVOKED if the fresh row is revoked", async () => {
+  const tx = {
+    inviteCode: {
+      findUnique: mock.fn(async () => ({
+        id: "x",
+        code: "ABCD",
+        role: "owner",
+        maxUses: 1,
+        usedCount: 0,
+        isRevoked: true,
+        expiresAt: null,
+        note: null,
+        createdByUserId: "admin-1",
+        createdAt: new Date()
+      })),
+      update: mock.fn(),
+      create: mock.fn()
+    },
+    inviteCodeRedemption: {
+      create: mock.fn()
+    }
+  };
+
+  await assert.rejects(
+    () =>
+      redeemInviteCodeInTransaction(tx as never, {
+        invite: { id: "x", usedCount: 0, maxUses: 1, isRevoked: false, expiresAt: null, role: "viewer" },
+        userId: "user-1"
+      }),
+    (err: unknown) => err instanceof InviteCodeError && err.code === "REVOKED"
+  );
 });

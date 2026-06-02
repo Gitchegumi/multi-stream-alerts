@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { cookies } from "next/headers";
 import { authOptions } from "@/lib/auth";
@@ -34,7 +35,7 @@ export default async function RegisterPage() {
           <RegisterForm />
         )}
         <p className="muted small">
-          Already have an account? <a href="/signin">Sign in</a>.
+          Already have an account? <Link href="/signin">Sign in</Link>.
         </p>
       </section>
     </main>
