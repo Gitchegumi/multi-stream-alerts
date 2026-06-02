@@ -2,6 +2,11 @@ import type { UserRole } from "@prisma/client";
 import { prisma } from "./client";
 
 const editableRoles: UserRole[] = ["admin", "owner", "editor"];
+// Credentials grant platform power (Twitch EventSub subscription, YouTube
+// OAuth, Ko-fi webhook validation, etc.), so the manage-credentials
+// allowlist is tighter than the general edit allowlist: only admins
+// (unconditional) and channel owners. Editors and viewers cannot.
+const credentialManageRoles: UserRole[] = ["admin", "owner"];
 
 export async function getAuthorizedChannels(userId: string, userRole: UserRole) {
   await ensureInitialAdminChannelMembership(userId, userRole);
@@ -29,6 +34,18 @@ export async function canManageChannel(userId: string, userRole: UserRole, chann
   });
 
   return Boolean(membership && editableRoles.includes(membership.role));
+}
+
+export async function canManageChannelCredentials(userId: string, userRole: UserRole, channelId: string) {
+  if (userRole === "admin") {
+    return true;
+  }
+
+  const membership = await prisma.channelMembership.findUnique({
+    where: { channelId_userId: { channelId, userId } }
+  });
+
+  return Boolean(membership && credentialManageRoles.includes(membership.role));
 }
 
 export async function canViewChannel(userId: string, userRole: UserRole, channelId: string) {
