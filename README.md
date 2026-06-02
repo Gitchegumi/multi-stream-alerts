@@ -96,7 +96,14 @@ ENABLE_LOCAL_REGISTRATION=true
 PASSWORD_MIN_LENGTH=12
 ```
 
-With local registration enabled, the sign-in page shows two paths: email/password and OIDC. The OIDC path is unchanged. New users can self-register at `/register` with an email, password, and a valid invite code.
+Local password rules are:
+
+- At least `PASSWORD_MIN_LENGTH` characters (default 12, range 8–128).
+- Must include at least one uppercase letter, one lowercase letter, one digit, and one symbol.
+- Hashed with bcrypt at cost 12.
+- Compared in constant time inside the credentials provider.
+
+The OIDC path is unchanged. New users self-register at `/register` with an email, password, confirm-password, and a valid invite code.
 
 The first admin is still created by signing in through OIDC with the email in `INITIAL_ADMIN_EMAIL`. From there, that admin can mint invite codes at `/dashboard/admin/invites` for other users.
 

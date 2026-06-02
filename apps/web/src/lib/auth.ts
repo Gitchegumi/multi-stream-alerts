@@ -15,7 +15,7 @@ type OidcProfile = Profile & {
 
 const oidcIssuer = (process.env.AUTH_OIDC_ISSUER ?? "https://<your-oidc-provider>/<issuer-path>").replace(/\/+$/, "");
 
-const localRegistrationEnabled = process.env.ENABLE_LOCAL_REGISTRATION !== "false";
+const localRegistrationEnabled = process.env.ENABLE_LOCAL_REGISTRATION === "true";
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.AUTH_SECRET,
@@ -73,6 +73,12 @@ export const authOptions: NextAuthOptions = {
       }
 
       const oidcProfile = profile as OidcProfile | undefined;
+      // For OIDC, the OAuth `sub` claim (from the ID token) is the canonical
+      // stable identifier and is what Auth.js stores on `account.providerAccountId`.
+      // We prefer `profile.sub` because it is what the IdP actually asserted;
+      // `account.providerAccountId` is the same value re-exposed by Auth.js.
+      // If both are missing, sign-in is rejected below — we never key a local
+      // user record off an unverifiable identity.
       const authSubject = oidcProfile?.sub ?? account?.providerAccountId;
       const email = oidcProfile?.email;
 

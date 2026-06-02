@@ -2,6 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { generateInviteCode, assertInviteIsUsable, InviteCodeError } from "../invites.ts";
 
+// NOTE: `redeemInviteCode` is intentionally not covered here because it
+// requires a real Prisma client. The atomic-race-condition logic inside
+// its `$transaction` callback needs an integration test against a live
+// (or test-spun) Postgres. Track that as a follow-up — pure unit coverage
+// of validation + generation is enough to keep the public shape pinned.
+
 test("generateInviteCode returns a normalized, alphanumeric+dash string", () => {
   for (let i = 0; i < 50; i++) {
     const code = generateInviteCode();
@@ -58,4 +64,14 @@ test("assertInviteIsUsable rejects exhausted codes", () => {
     () => assertInviteIsUsable({ isRevoked: false, usedCount: 1, maxUses: 1, expiresAt: null }),
     (err: unknown) => err instanceof InviteCodeError && err.code === "EXHAUSTED"
   );
+});
+
+test("InviteCodeError carries a stable machine-readable code", () => {
+  for (const code of ["INVALID", "EXPIRED", "REVOKED", "EXHAUSTED"] as const) {
+    const err = new InviteCodeError(code, `Test ${code}`);
+    assert.equal(err.code, code);
+    assert.equal(err.message, `Test ${code}`);
+    assert.equal(err.name, "InviteCodeError");
+    assert.ok(err instanceof Error);
+  }
 });

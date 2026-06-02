@@ -9,10 +9,25 @@ const MIN_PASSWORD_LENGTH = Math.max(
 );
 const DEFAULT_INVITEE_ROLE: UserRole = "owner";
 
+// Complexity rule: each of the four character classes must appear at least once.
+// This pairs with the length minimum to keep password strength reasonable
+// while staying readable in error messages.
+const PASSWORD_COMPLEXITY_HINT =
+  "Password must include at least one uppercase letter, one lowercase letter, one digit, and one symbol";
+
+export const passwordSchema = z
+  .string()
+  .min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
+  .max(128, "Password must be at most 128 characters")
+  .refine((value) => /[A-Z]/.test(value), { message: PASSWORD_COMPLEXITY_HINT })
+  .refine((value) => /[a-z]/.test(value), { message: PASSWORD_COMPLEXITY_HINT })
+  .refine((value) => /[0-9]/.test(value), { message: PASSWORD_COMPLEXITY_HINT })
+  .refine((value) => /[^A-Za-z0-9]/.test(value), { message: PASSWORD_COMPLEXITY_HINT });
+
 export const registerSchema = z
   .object({
     email: z.string().trim().toLowerCase().email(),
-    password: z.string().min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`),
+    password: passwordSchema,
     confirmPassword: z.string(),
     inviteCode: z.string().trim(),
     displayName: z.string().trim().min(1).max(80).optional()
@@ -35,7 +50,7 @@ export type RegisterResult =
  * (the user's "workspace") and is added as the channel's owner.
  */
 export async function registerLocalUser(rawInput: unknown): Promise<RegisterResult> {
-  if (process.env.ENABLE_LOCAL_REGISTRATION === "false") {
+  if (process.env.ENABLE_LOCAL_REGISTRATION !== "true") {
     return { ok: false, code: "LOCAL_REGISTRATION_DISABLED", message: "Local registration is disabled" };
   }
 

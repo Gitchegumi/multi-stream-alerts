@@ -11,7 +11,7 @@ export default async function RegisterPage() {
     redirect("/dashboard");
   }
 
-  const localEnabled = process.env.ENABLE_LOCAL_REGISTRATION !== "false";
+  const localEnabled = process.env.ENABLE_LOCAL_REGISTRATION === "true";
 
   return (
     <main className="auth-shell">
