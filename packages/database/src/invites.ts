@@ -156,6 +156,58 @@ export async function redeemInviteCode(input: { code: string; userId: string }):
   }
 }
 
+/**
+ * In-transaction variant of `redeemInviteCode`. Runs the same atomic
+ * `usedCount` increment + redemption-row create on the supplied
+ * Prisma transaction client so the caller can compose the redemption
+ * into a larger atomic write (e.g. provisioning a new user + personal
+ * channel in a single transaction).
+ *
+ * The caller is responsible for finding the invite row (which gives it
+ * the chance to do its own pre-flight checks in the same transaction)
+ * and for surfacing `InviteCodeError` failures to its own caller. The
+ * variant does NOT wrap the operations in `prisma.$transaction` — that
+ * is the caller's job.
+ */
+export async function redeemInviteCodeInTransaction(
+  tx: Prisma.TransactionClient,
+  input: { invite: { id: string; usedCount: number; maxUses: number; isRevoked: boolean; expiresAt: Date | null; role: UserRole }; userId: string }
+): Promise<{ invite: InviteCodeSummary; role: UserRole }> {
+  try {
+    // Re-fetch the invite inside the caller's transaction so we see the
+    // same row version the rest of the transaction will write against.
+    // This handles the case where the invite was revoked or exhausted
+    // between the caller's pre-flight and the actual write.
+    const fresh = await tx.inviteCode.findUnique({ where: { id: input.invite.id } });
+    if (!fresh) {
+      throw new InviteCodeError("INVALID", "Invite code not found");
+    }
+    assertInviteIsUsable(fresh);
+
+    const updated = await tx.inviteCode.update({
+      where: { id: fresh.id, usedCount: fresh.usedCount },
+      data: { usedCount: { increment: 1 } }
+    });
+
+    await tx.inviteCodeRedemption.create({
+      data: { inviteCodeId: fresh.id, userId: input.userId }
+    });
+
+    return { invite: toSummary(updated), role: updated.role };
+  } catch (error) {
+    if (error instanceof InviteCodeError) {
+      throw error;
+    }
+    if (isUniqueConstraintError(error)) {
+      throw new InviteCodeError("EXHAUSTED", "This invite code has already been used by this account");
+    }
+    if (isOptimisticLockError(error)) {
+      throw new InviteCodeError("EXHAUSTED", "This invite code is no longer available");
+    }
+    throw error;
+  }
+}
+
 function toSummary(row: {
   id: string;
   code: string;

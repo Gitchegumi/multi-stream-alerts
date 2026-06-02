@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { SignInForm } from "@/components/SignInForm";
@@ -23,10 +24,10 @@ export default async function SignInPage({
     <main className="auth-shell">
       <section className="auth-card">
         <h1 className="auth-title">Sign in</h1>
-        <p className="muted">Use your GitchAlerts email and password, or sign in with your identity provider.</p>
-        <SignInForm callbackUrl={callbackUrl} initialError={error} localEnabled />
+        <p className="muted">Sign in with your identity provider to access the dashboard.</p>
+        <SignInForm callbackUrl={callbackUrl} initialError={error} />
         <p className="muted small">
-          New here? <a href="/register">Create an account with an invite code</a>.
+          New here? <Link href="/register">Create an account with an invite code</Link>.
         </p>
       </section>
     </main>

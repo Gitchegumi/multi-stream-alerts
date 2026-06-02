@@ -2,7 +2,7 @@ export * from "./authz";
 export * from "./bootstrap";
 export * from "./client";
 export * from "./invites";
-export * from "./passwords";
 export * from "./redis";
 
 export type { UserRole, AlertPlatform, AlertType } from "@prisma/client";
+export type { Prisma } from "@prisma/client";

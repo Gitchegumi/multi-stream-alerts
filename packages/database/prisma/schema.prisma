@@ -42,18 +42,17 @@ enum AlertType {
 }
 
 model User {
-  id              String               @id @default(cuid())
-  authProvider    String               @map("auth_provider")
-  authSubject     String               @map("auth_subject")
-  email           String               @unique
-  displayName     String?              @map("display_name")
-  passwordHash    String?              @map("password_hash")
-  role            UserRole             @default(viewer)
-  createdAt       DateTime             @default(now()) @map("created_at")
-  updatedAt       DateTime             @updatedAt @map("updated_at")
-  ownedChannels   Channel[]            @relation("ChannelOwner")
-  memberships     ChannelMembership[]
-  inviteCodes     InviteCode[]         @relation("InviteCodeCreator")
+  id                String                @id @default(cuid())
+  authProvider      String                @map("auth_provider")
+  authSubject       String                @map("auth_subject")
+  email             String                @unique
+  displayName       String?               @map("display_name")
+  role              UserRole              @default(viewer)
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+  ownedChannels     Channel[]             @relation("ChannelOwner")
+  memberships       ChannelMembership[]
+  inviteCodes       InviteCode[]          @relation("InviteCodeCreator")
   inviteRedemptions InviteCodeRedemption[]
 
   @@unique([authProvider, authSubject])
