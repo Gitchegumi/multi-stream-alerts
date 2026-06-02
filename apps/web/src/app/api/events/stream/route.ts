@@ -1,21 +1,23 @@
 import { prisma } from "@multi-stream-alerts/database";
 import { createRedisClient } from "@multi-stream-alerts/database";
-import { parseAlertEvent, redisAlertChannel, serializeAlertEvent } from "@multi-stream-alerts/shared";
+import { parseAlertEvent, redisAlertChannel, serializeAlertEvent, MemoryRateLimiter, getClientIp } from "@multi-stream-alerts/shared";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const rateLimitWindowMs = 60_000;
-const maxAttemptsPerWindow = 30;
-const streamRateLimits = new Map<string, { count: number; resetAt: number }>();
+const streamLimiter = new MemoryRateLimiter(30, 60_000);
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const displayKey = url.searchParams.get("displayKey");
   const clientIp = getClientIp(request);
 
-  if (isRateLimited(clientIp)) {
-    return new Response("Too many stream attempts", { status: 429 });
+  const limitResult = streamLimiter.attempt(clientIp);
+  if (limitResult.limited) {
+    return new Response("Too many stream attempts", {
+      status: 429,
+      headers: { "Retry-After": String(limitResult.retryAfterSeconds) }
+    });
   }
 
   if (!displayKey) {
@@ -95,31 +97,4 @@ export async function GET(request: Request) {
       "x-accel-buffering": "no"
     }
   });
-}
-
-function getClientIp(request: Request) {
-  const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return forwardedFor || request.headers.get("x-real-ip") || "unknown";
-}
-
-function isRateLimited(clientIp: string) {
-  const now = Date.now();
-  const existing = streamRateLimits.get(clientIp);
-
-  if (!existing || existing.resetAt <= now) {
-    streamRateLimits.set(clientIp, { count: 1, resetAt: now + rateLimitWindowMs });
-    cleanupExpiredRateLimits(now);
-    return false;
-  }
-
-  existing.count += 1;
-  return existing.count > maxAttemptsPerWindow;
-}
-
-function cleanupExpiredRateLimits(now: number) {
-  for (const [clientIp, limit] of streamRateLimits) {
-    if (limit.resetAt <= now) {
-      streamRateLimits.delete(clientIp);
-    }
-  }
 }
