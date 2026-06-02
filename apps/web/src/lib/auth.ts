@@ -44,7 +44,18 @@ export const authOptions: NextAuthOptions = {
       id: "oidc",
       name: process.env.AUTH_OIDC_PROVIDER_NAME ?? "OIDC",
       type: "oauth",
+      // Both `issuer` and `wellKnown` are required. NextAuth's
+      // openid-client adapter only runs OIDC discovery when a
+      // `wellKnown` URL is present; without it, next-auth constructs
+      // the Issuer from explicit fields (provider.authorization.url,
+      // provider.token.url, etc.) and throws
+      // "authorization_endpoint must be configured on the issuer" the
+      // moment we try to build the authorization URL. Setting
+      // `wellKnown` triggers the discovery fetch and pulls every
+      // endpoint (authorization, token, userinfo, jwks, end_session)
+      // from the IdP's well-known document.
       issuer: oidcIssuer,
+      wellKnown: `${oidcIssuer}/.well-known/openid-configuration`,
       clientId: process.env.AUTH_OIDC_CLIENT_ID ?? "<your-oidc-client-id>",
       clientSecret: process.env.AUTH_OIDC_CLIENT_SECRET ?? "<your-oidc-client-secret>",
       authorization: { params: { scope: "openid email profile" } },
