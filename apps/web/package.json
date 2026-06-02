@@ -9,7 +9,7 @@
     "lint": "next lint",
     "start": "next start --port 3000",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "node --import tsx --test \"src/**/__tests__/*.test.ts\""
+    "test": "node --import tsx --test $(find src -path '*/__tests__/*.test.ts' -type f)"
   },
   "dependencies": {
     "@multi-stream-alerts/database": "workspace:*",

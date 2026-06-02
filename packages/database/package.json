@@ -12,7 +12,7 @@
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "prisma:migrate": "prisma migrate deploy --schema prisma/schema.prisma",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/__tests__/*.test.ts",
+    "test": "node --import tsx --test $(find src -path '*/__tests__/*.test.ts' -type f)",
     "postinstall": "prisma generate --schema prisma/schema.prisma"
   },
   "dependencies": {
