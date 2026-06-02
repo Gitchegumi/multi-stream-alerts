@@ -2,6 +2,7 @@ import express from "express";
 import { parseIngressEnv } from "@multi-stream-alerts/shared";
 import { kofiWebhookExpressHandler } from "./kofi-webhook";
 import { twitchWebhookExpressHandler } from "./twitch-webhook";
+import { youtubeWebhookExpressHandler } from "./youtube-webhook";
 
 const env = parseIngressEnv(process.env);
 const app = express();
@@ -20,10 +21,11 @@ app.post(
 
 app.post("/api/webhooks/twitch", express.raw({ type: "*/*" }), twitchWebhookExpressHandler);
 
-app.post("/api/webhooks/youtube", express.json({ type: "*/*" }), (_request, response) => {
-  // TODO: Add YouTube webhook/live chat verification and normalize Super Chat, memberships, and related events.
-  response.status(501).json({ error: "YouTube ingestion is stubbed for future implementation" });
-});
+app.post(
+  "/api/webhooks/youtube/:channelSlug",
+  express.json({ type: "*/*" }),
+  youtubeWebhookExpressHandler
+);
 
 app.use((_request, response) => {
   response.status(404).json({ error: "Not found" });
