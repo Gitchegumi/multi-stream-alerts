@@ -1,6 +1,7 @@
 import express from "express";
 import { parseIngressEnv } from "@multi-stream-alerts/shared";
 import { kofiWebhookExpressHandler } from "./kofi-webhook";
+import { twitchWebhookExpressHandler } from "./twitch-webhook";
 
 const env = parseIngressEnv(process.env);
 const app = express();
@@ -17,14 +18,7 @@ app.post(
   kofiWebhookExpressHandler
 );
 
-app.post("/api/webhooks/twitch", express.raw({ type: "*/*" }), (_request, response) => {
-  // TODO(per-workspace-credentials): Resolve the receiving channel from the
-  // EventSub subscription and look up its stored secret. Task 9 will
-  // implement the new path-based handler.
-  response
-    .status(501)
-    .json({ error: "Twitch EventSub ingestion is stubbed pending per-workspace credential wiring" });
-});
+app.post("/api/webhooks/twitch", express.raw({ type: "*/*" }), twitchWebhookExpressHandler);
 
 app.post("/api/webhooks/youtube", express.json({ type: "*/*" }), (_request, response) => {
   // TODO: Add YouTube webhook/live chat verification and normalize Super Chat, memberships, and related events.
