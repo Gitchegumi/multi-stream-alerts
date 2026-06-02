@@ -11,7 +11,9 @@
     "lint": "corepack pnpm -r lint",
     "prisma:generate": "corepack pnpm --filter @multi-stream-alerts/database prisma:generate",
     "prisma:migrate": "corepack pnpm --filter @multi-stream-alerts/database prisma:migrate",
-    "typecheck": "corepack pnpm -r typecheck"
+    "secrets:staged": "if command -v gitleaks >/dev/null 2>&1; then gitleaks protect --staged --redact --no-banner; else echo 'gitleaks not installed; skipping staged scan (CI catches this)'; fi",
+    "typecheck": "corepack pnpm -r typecheck",
+    "prepare": "husky"
   },
   "engines": {
     "node": ">=20.11.0",
@@ -19,6 +21,8 @@
   },
   "packageManager": "pnpm@9.15.4",
   "devDependencies": {
+    "husky": "^9.1.0",
+    "lint-staged": "^15.2.0",
     "prettier": "^3.4.0"
   }
 }
