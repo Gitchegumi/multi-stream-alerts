@@ -207,7 +207,7 @@ test("clearChannelSecret sets the ciphertext to the empty string sentinel", asyn
   const credentialId = "cred-1";
 
   // Stub the credential find (to resolve the credentialId), the secret
-  // update, and the credential isEnabled-recompute update.
+  // updateMany, and the credential isEnabled-recompute update.
   const tx = {
     integrationCredential: {
       findFirst: mock.fn(async () => ({ id: credentialId, provider: "kofi" })),
@@ -215,9 +215,9 @@ test("clearChannelSecret sets the ciphertext to the empty string sentinel", asyn
       update: mock.fn(async () => ({ id: credentialId, isEnabled: false }))
     },
     integrationCredentialSecret: {
-      update: mock.fn(async (args: unknown) => {
-        calls.push({ method: "integrationCredentialSecret.update", args });
-        return { id: "secret-1", credentialId, key: "kofi.verification_token", ciphertext: "" };
+      updateMany: mock.fn(async (args: unknown) => {
+        calls.push({ method: "integrationCredentialSecret.updateMany", args });
+        return { count: 1 };
       })
     }
   };
@@ -232,15 +232,76 @@ test("clearChannelSecret sets the ciphertext to the empty string sentinel", asyn
       key: "kofi.verification_token"
     });
 
-    const updateCall = calls.find((c) => c.method === "integrationCredentialSecret.update");
-    assert.ok(updateCall, "expected integrationCredentialSecret.update to be called");
-    const updateArgs = updateCall!.args as {
-      where: { credentialId_key: { credentialId: string; key: string } };
+    const updateManyCall = calls.find((c) => c.method === "integrationCredentialSecret.updateMany");
+    assert.ok(updateManyCall, "expected integrationCredentialSecret.updateMany to be called");
+    const updateManyArgs = updateManyCall!.args as {
+      where: { credentialId: string; key: string };
       data: { ciphertext: string };
     };
-    assert.equal(updateArgs.where.credentialId_key.credentialId, credentialId);
-    assert.equal(updateArgs.where.credentialId_key.key, "kofi.verification_token");
-    assert.equal(updateArgs.data.ciphertext, "");
+    assert.equal(updateManyArgs.where.credentialId, credentialId);
+    assert.equal(updateManyArgs.where.key, "kofi.verification_token");
+    assert.equal(updateManyArgs.data.ciphertext, "");
+  } finally {
+    (prisma as unknown as { $transaction: unknown }).$transaction = originalTx;
+  }
+});
+
+test("clearChannelSecret does not throw when the secret row does not exist (P2025 regression)", async () => {
+  // Regression test: previously this code path used
+  // `integrationCredentialSecret.update`, which throws P2025 when the
+  // target row is missing. The function's docstring already promised
+  // missing rows should be a no-op, so the function must not throw and
+  // must not run the post-clear isEnabled update either.
+  const calls: { method: string; args: unknown }[] = [];
+  const credentialId = "cred-1";
+
+  const tx = {
+    integrationCredential: {
+      findFirst: mock.fn(async () => ({ id: credentialId, provider: "kofi" })),
+      findUnique: mock.fn(async () => ({ id: credentialId, isEnabled: false, secrets: [] })),
+      update: mock.fn(async (args: unknown) => {
+        calls.push({ method: "integrationCredential.update", args });
+        return { id: credentialId, isEnabled: false };
+      })
+    },
+    integrationCredentialSecret: {
+      // Simulate "no matching secret row": updateMany returns count: 0.
+      updateMany: mock.fn(async (args: unknown) => {
+        calls.push({ method: "integrationCredentialSecret.updateMany", args });
+        return { count: 0 };
+      })
+    }
+  };
+
+  const { prisma } = await import("../client.ts");
+  const originalTx = prisma.$transaction;
+  (prisma as unknown as { $transaction: unknown }).$transaction = async (fn: (tx: unknown) => Promise<unknown>) => fn(tx);
+  try {
+    // Must not throw. This is the whole point of the regression test.
+    await clearChannelSecret({
+      channelId: "channel-1",
+      provider: "kofi",
+      key: "kofi.verification_token"
+    });
+
+    // updateMany was called with the right where clause.
+    const updateManyCall = calls.find((c) => c.method === "integrationCredentialSecret.updateMany");
+    assert.ok(updateManyCall, "expected integrationCredentialSecret.updateMany to be called");
+    const updateManyArgs = updateManyCall!.args as {
+      where: { credentialId: string; key: string };
+      data: { ciphertext: string };
+    };
+    assert.equal(updateManyArgs.where.credentialId, credentialId);
+    assert.equal(updateManyArgs.where.key, "kofi.verification_token");
+    assert.equal(updateManyArgs.data.ciphertext, "");
+
+    // The isEnabled update must be skipped when there's nothing to clear.
+    const updateCall = calls.find((c) => c.method === "integrationCredential.update");
+    assert.equal(
+      updateCall,
+      undefined,
+      "expected integrationCredential.update to be skipped when clearChannelSecret is a no-op"
+    );
   } finally {
     (prisma as unknown as { $transaction: unknown }).$transaction = originalTx;
   }

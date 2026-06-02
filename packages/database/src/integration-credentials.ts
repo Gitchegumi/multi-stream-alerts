@@ -334,15 +334,19 @@ export async function clearChannelSecret(input: {
       return;
     }
 
-    await tx.integrationCredentialSecret.update({
-      where: {
-        credentialId_key: {
-          credentialId: credential.id,
-          key: input.key
-        }
-      },
+    // Use updateMany + count === 0 short-circuit: if the secret row
+    // doesn't exist (e.g. user clicks "clear" on a key that was never
+    // saved), we want this to be a no-op. Prisma's `update` throws
+    // P2025 when the target row is missing and would roll back the
+    // transaction. Matches the `clearAllChannelSecrets` pattern below.
+    const clearResult = await tx.integrationCredentialSecret.updateMany({
+      where: { credentialId: credential.id, key: input.key },
       data: { ciphertext: "" }
     });
+    if (clearResult.count === 0) {
+      // No matching secret row to clear. Nothing else to do.
+      return;
+    }
 
     // Re-evaluate isEnabled: clearing a required key always drops
     // isEnabled to false. Setting isEnabled to true again requires
