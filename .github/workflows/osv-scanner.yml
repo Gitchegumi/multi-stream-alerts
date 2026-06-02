@@ -1,0 +1,27 @@
+name: OSV Scanner
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '23 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Scan pnpm-lock.yaml
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Run OSV-Scanner
+        uses: google/osv-scanner-action/run-osv-scanner@v2
+        with:
+          scan-args: |-
+            --lockfile=pnpm-lock.yaml
+            --recursive
+            --format=table
