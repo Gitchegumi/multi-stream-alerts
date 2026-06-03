@@ -61,15 +61,30 @@ Set `INITIAL_DISPLAY_KEY` to a long random value before first startup. The defau
 
 ## Authentication Model
 
-Dashboard routes require OIDC through Auth.js/NextAuth. The provider is configured generically: set `AUTH_OIDC_ISSUER`, `AUTH_OIDC_CLIENT_ID`, and `AUTH_OIDC_CLIENT_SECRET` and the application will perform OIDC discovery against the issuer's well-known endpoint. This works with any OIDC-compliant provider (Authentik, Keycloak, Okta, Authing, Azure AD, Google, etc.).
+Dashboard routes require Auth.js/NextAuth. Authentication providers and onboarding policy are separate:
+
+- Auth providers decide how a known user proves identity (`AUTH_OIDC_ENABLED`, `AUTH_CREDENTIALS_ENABLED`).
+- Onboarding policy decides whether an unknown OIDC user may be provisioned (`ONBOARDING_ENABLED`, `ONBOARDING_REQUIRE_INVITE`, `ONBOARDING_DEFAULT_WORKSPACE_ROLE`).
+
+OIDC is configured generically: set `AUTH_OIDC_ISSUER`, `AUTH_OIDC_CLIENT_ID`, and `AUTH_OIDC_CLIENT_SECRET` and the application will perform OIDC discovery against the issuer's well-known endpoint. This works with any OIDC-compliant provider (Authentik, Keycloak, Okta, Authing, Azure AD, Google, etc.).
 
 ```env
 AUTH_SECRET=<long-random-auth-secret>
+AUTH_OIDC_ENABLED=true
 AUTH_OIDC_ISSUER=https://<your-oidc-provider>/<issuer-path>
 AUTH_OIDC_CLIENT_ID=<your-oidc-client-id>
 AUTH_OIDC_CLIENT_SECRET=<your-oidc-client-secret>
+AUTH_CREDENTIALS_ENABLED=false
+ONBOARDING_ENABLED=true
+ONBOARDING_REQUIRE_INVITE=true
+ONBOARDING_DEFAULT_WORKSPACE_ROLE=owner
+OIDC_ENROLLMENT_ENABLED=false
+# OIDC_ENROLLMENT_PROVIDER=authentik
+# OIDC_ENROLLMENT_URL=https://<your-oidc-provider>/<enrollment-path>
 INITIAL_ADMIN_EMAIL=<your-admin-email>
 ```
+
+Defaults are OIDC enabled, credentials disabled, onboarding enabled, and invite-required onboarding. `AUTH_CREDENTIALS_ENABLED=true` enables the legacy local email/password invite registration path; when it is `false`, `/register` still supports OIDC invite onboarding.
 
 For Authentik, set `AUTH_OIDC_ISSUER` to the canonical application issuer without a trailing slash, for example:
 
@@ -79,7 +94,7 @@ AUTH_OIDC_ISSUER=https://<your-authentik-domain>/application/o/<application-slug
 
 The discovery URL `AUTH_OIDC_ISSUER/.well-known/openid-configuration` must return `200 OK` directly. If Authentik or your reverse proxy redirects from `http` to `https`, from an IP address to a host name, or to a path with different slash formatting, NextAuth will fail sign-in with `expected 200 OK, got: 301 Moved Permanently`.
 
-The first admin is recognized by `INITIAL_ADMIN_EMAIL`. Every other first-time sign-in is gated by a valid invite code (see [Invite-Gated Signup](#invite-gated-signup-oidc-only) below).
+The first admin is recognized by `INITIAL_ADMIN_EMAIL` and does not need an invite. Every other first-time OIDC sign-in follows the onboarding policy below.
 
 Roles:
 
@@ -88,9 +103,9 @@ Roles:
 - `editor` can edit assigned channel templates and overlays.
 - `viewer` can view assigned dashboard content.
 
-### Invite-Gated Signup (OIDC only)
+### Invite-Gated Signup and OIDC Onboarding
 
-GitchAlerts uses a single sign-in path: every user signs in through the configured OIDC identity provider. There is no local email/password account option. To onboard a new user, an admin generates an invite code; on first successful OIDC sign-in, the code is redeemed and the new user is provisioned with a personal channel.
+In OIDC-first installs, users sign in through the configured identity provider, but GitchAlerts still controls app onboarding and workspace provisioning. To onboard a new user when invites are required, an admin generates an invite code; on first successful OIDC sign-in, the code is redeemed and the new user is provisioned with a personal channel.
 
 ```env
 # Optional display name for the OIDC sign-in button (defaults to "OIDC").
@@ -118,20 +133,40 @@ The first admin is still created by signing in through OIDC with the email in `I
 - Multi-use codes track per-user redemptions in `invite_code_redemptions` so a single user cannot burn a code's quota twice.
 - Codes use a Crockford-style alphabet that drops lookalike characters (no `0`, `O`, `1`, `I`, `L`).
 
+#### External IdP enrollment metadata
+
+GitchAlerts invite codes are not the same thing as an Authentik invitation token. The GitchAlerts code remains the app-level invite and is the only code the user should receive. Optional external provider metadata can be linked to that invite, such as an Authentik `itoken`, so the admin sends only:
+
+```text
+/register?invite=<GITCHALERTS_CODE>
+```
+
+When `OIDC_ENROLLMENT_ENABLED=true`, opening that link validates the GitchAlerts invite, sets the short-lived app invite cookie, and redirects to the linked provider enrollment URL. For `OIDC_ENROLLMENT_PROVIDER=authentik`, GitchAlerts appends the stored external token as the `itoken` query parameter. The token is provider metadata; it is encrypted at rest with `INSTANCE_ENCRYPTION_KEY`, not shown to users, and not used as the GitchAlerts invite code.
+
+Authentik enrollment flow setup is handled outside GitchAlerts for now. Create the Authentik invitation manually, paste its `itoken` into the GitchAlerts admin invite form, and optionally provide an enrollment URL override. A future enhancement may call the Authentik API automatically, but this implementation does not.
+
+#### Invite-free onboarding
+
+Set `ONBOARDING_REQUIRE_INVITE=false` to allow unknown OIDC users to be provisioned without an invite code. This is useful when your IdP already limits who can access the application. GitchAlerts still creates each new user with their own isolated channel; it does not add them to the initial admin/default workspace.
+
+Set `ONBOARDING_ENABLED=false` to disable provisioning for unknown OIDC users entirely. Existing users can still sign in through enabled auth providers.
+
 #### What the new user gets
 
-A successful first OIDC sign-in (with a valid invite code) creates:
+A successful first OIDC sign-in creates:
 
 - a `User` row keyed on `(authProvider, authSubject)` from the IdP,
-- a `InviteCodeRedemption` row tying the user to the code they used,
+- an `InviteCodeRedemption` row tying the user to the code they used, when an invite was supplied,
 - a personal `Channel` whose `ownerUserId` is the new user, and
 - a `ChannelMembership` granting the new user `owner` role on that channel.
 
-Users only see channels they are members of (or, for admins, every channel). Cross-user isolation is enforced by the existing `getAuthorizedChannels` and `canManageChannel` helpers; nothing in this change relaxes those checks.
+`ONBOARDING_DEFAULT_WORKSPACE_ROLE` controls the new user's app role and defaults to `owner`. The personal channel membership is always `owner` so the user can manage their own workspace/channel. New onboarded users are not added to the initial admin/default workspace.
+
+Users only see channels they are members of (or, for admins, every channel). Cross-user isolation is enforced by the existing `getAuthorizedChannels` and `canManageChannel` helpers.
 
 #### First-time sign-in without an invite code
 
-If a user attempts to sign in via OIDC without a valid invite cookie and they are not the initial admin, the `signIn` callback returns `false` and NextAuth redirects to `/signin?error=AccessDenied`. The user is never created and the IdP round-trip is harmless (no database side effects).
+If `ONBOARDING_REQUIRE_INVITE=true` and a user attempts to sign in via OIDC without a valid invite cookie, and they are not the initial admin or an existing user, the `signIn` callback returns `false` and NextAuth redirects to `/signin?error=AccessDenied`. The user is never created and the IdP round-trip is harmless (no database side effects).
 
 ## Instance secrets
 

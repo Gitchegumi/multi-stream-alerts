@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { SignInForm } from '@/components/SignInForm';
+import { canUseRegisterPage, readOnboardingConfig } from '@/lib/onboarding';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,13 @@ export default async function SignInPage({
   const error = params.error;
 
   const credentialsEnabled = process.env.AUTH_CREDENTIALS_ENABLED === 'true';
+  const oidcEnabled = process.env.AUTH_OIDC_ENABLED !== 'false';
+  const onboarding = readOnboardingConfig();
+  const registerAvailable = canUseRegisterPage({
+    credentialsEnabled,
+    oidcEnabled,
+    onboardingEnabled: onboarding.enabled,
+  });
 
   return (
     <main className="auth-shell">
@@ -30,9 +38,10 @@ export default async function SignInPage({
         <SignInForm
           callbackUrl={callbackUrl}
           initialError={error}
+          oidcEnabled={oidcEnabled}
           credentialsEnabled={credentialsEnabled}
         />
-        {credentialsEnabled && (
+        {registerAvailable && (
           <p className="muted small">
             New here? <Link href="/register">Create an account with an invite code</Link>.
           </p>

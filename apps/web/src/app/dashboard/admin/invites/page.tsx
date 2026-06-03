@@ -29,6 +29,18 @@ export default async function AdminInvitesPage() {
           ...code,
           expiresAt: code.expiresAt ? code.expiresAt.toISOString() : null,
           createdAt: code.createdAt.toISOString(),
+          identityProviderInvite: code.identityProviderInvite
+            ? {
+                ...code.identityProviderInvite,
+                expiresAt: code.identityProviderInvite.expiresAt
+                  ? code.identityProviderInvite.expiresAt.toISOString()
+                  : null,
+                usedAt: code.identityProviderInvite.usedAt
+                  ? code.identityProviderInvite.usedAt.toISOString()
+                  : null,
+                createdAt: code.identityProviderInvite.createdAt.toISOString(),
+              }
+            : null,
         }))}
         initialRedemptions={redemptions.map((r: (typeof redemptions)[0]) => ({
           id: r.id,

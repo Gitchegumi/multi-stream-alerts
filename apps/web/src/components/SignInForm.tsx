@@ -14,17 +14,19 @@ type AuthMode = 'oidc' | 'credentials';
 export function SignInForm({
   callbackUrl,
   initialError,
+  oidcEnabled = true,
   credentialsEnabled,
 }: {
   callbackUrl?: string;
   initialError?: string;
+  oidcEnabled?: boolean;
   credentialsEnabled?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const target = callbackUrl ?? searchParams.get('callbackUrl') ?? '/dashboard';
 
-  const [mode, setMode] = useState<AuthMode>('oidc');
+  const [mode, setMode] = useState<AuthMode>(oidcEnabled ? 'oidc' : 'credentials');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(
@@ -80,7 +82,7 @@ export function SignInForm({
         </p>
       )}
 
-      {credentialsEnabled && (
+      {oidcEnabled && credentialsEnabled && (
         <div className="auth-mode-toggle" role="tablist">
           <button
             type="button"
@@ -111,7 +113,7 @@ export function SignInForm({
         </div>
       )}
 
-      {mode === 'oidc' || !credentialsEnabled ? (
+      {mode === 'oidc' && oidcEnabled ? (
         <>
           <button
             type="button"
@@ -125,7 +127,7 @@ export function SignInForm({
             You will be redirected to your identity provider to complete sign-in.
           </p>
         </>
-      ) : (
+      ) : credentialsEnabled ? (
         <form onSubmit={handleCredentialsSubmit}>
           <label className="auth-field">
             <span>Email</span>
@@ -155,7 +157,7 @@ export function SignInForm({
             {pending ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
-      )}
+      ) : null}
     </div>
   );
 }
