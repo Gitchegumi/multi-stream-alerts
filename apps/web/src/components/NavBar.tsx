@@ -44,7 +44,10 @@ export function NavBar({ user, defaultChannelSlug }: NavBarProps) {
       label: 'Settings',
       href: channelSlug ? `/dashboard/${encodeURIComponent(channelSlug)}/settings` : '/dashboard',
     },
-    { label: 'Overlay', href: '/overlay' },
+    {
+      label: 'Overlay',
+      href: channelSlug ? `/dashboard/${encodeURIComponent(channelSlug)}/overlay` : '/dashboard',
+    },
   ];
 
   const isActive = (href: string): boolean => {

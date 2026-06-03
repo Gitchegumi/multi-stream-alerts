@@ -5,6 +5,7 @@ export * from './bootstrap';
 export * from './client';
 export * from './integration-credentials';
 export * from './invites';
+export * from './password';
 export * from './redis';
 export * from './secrets';
 

@@ -44,21 +44,6 @@ export default async function IntegrationsPage({
 
   return (
     <main className="dashboard-shell">
-      <header className="dashboard-header">
-        <div>
-          <h1 className="dashboard-title">Integrations</h1>
-          <p className="muted">
-            Managing <strong>{channel.name}</strong> ({channel.slug}).
-            {canManage
-              ? ' Configure platform credentials below.'
-              : ' You can view settings but not edit them.'}
-          </p>
-        </div>
-        <a className="button" href="/dashboard">
-          ← Back to dashboard
-        </a>
-      </header>
-
       <section className="grid">
         {statuses.map(({ provider, status }) => (
           <div className="panel" key={provider}>

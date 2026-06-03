@@ -4,11 +4,12 @@ import { useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 
+type AuthMode = 'oidc' | 'credentials';
+
 /**
- * Renders the OIDC sign-in button. The sign-in path itself is identical
- * for both /signin (existing user) and /register (new user with a code);
- * the only thing that differs is the cookie set by /register, which the
- * server-side `signIn` callback reads.
+ * Renders the sign-in form with support for both OIDC and
+ * email/password (credentials) authentication. A toggle switches
+ * between the two modes.
  */
 export function SignInForm({
   callbackUrl,
@@ -21,6 +22,9 @@ export function SignInForm({
   const searchParams = useSearchParams();
   const target = callbackUrl ?? searchParams.get('callbackUrl') ?? '/dashboard';
 
+  const [mode, setMode] = useState<AuthMode>('oidc');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(
     initialError ? errorMessage(initialError) : null,
   );
@@ -34,8 +38,29 @@ export function SignInForm({
         setError(errorMessage(result.error));
         return;
       }
-      // signIn with redirect:false still returns the URL; let next-auth
-      // perform the actual navigation.
+      if (result?.url) {
+        window.location.href = result.url;
+        return;
+      }
+      router.push(target);
+      router.refresh();
+    });
+  }
+
+  function handleCredentialsSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    startTransition(async () => {
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+        callbackUrl: target,
+      });
+      if (result?.error) {
+        setError('Invalid email or password.');
+        return;
+      }
       if (result?.url) {
         window.location.href = result.url;
         return;
@@ -52,12 +77,81 @@ export function SignInForm({
           {error}
         </p>
       )}
-      <button type="button" className="button primary" onClick={handleSignIn} disabled={pending}>
-        {pending ? 'Redirecting…' : 'Sign in with OIDC'}
-      </button>
-      <p className="muted small">
-        You will be redirected to your identity provider to complete sign-in.
-      </p>
+
+      <div className="auth-mode-toggle" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'oidc'}
+          className={mode === 'oidc' ? 'active' : ''}
+          onClick={() => {
+            setMode('oidc');
+            setError(null);
+          }}
+          disabled={pending}
+        >
+          OIDC
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'credentials'}
+          className={mode === 'credentials' ? 'active' : ''}
+          onClick={() => {
+            setMode('credentials');
+            setError(null);
+          }}
+          disabled={pending}
+        >
+          Email & Password
+        </button>
+      </div>
+
+      {mode === 'oidc' ? (
+        <>
+          <button
+            type="button"
+            className="button primary"
+            onClick={handleSignIn}
+            disabled={pending}
+          >
+            {pending ? 'Redirecting…' : 'Sign in with OIDC'}
+          </button>
+          <p className="muted small">
+            You will be redirected to your identity provider to complete sign-in.
+          </p>
+        </>
+      ) : (
+        <form onSubmit={handleCredentialsSubmit}>
+          <label className="auth-field">
+            <span>Email</span>
+            <input
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={pending}
+              placeholder="you@example.com"
+            />
+          </label>
+          <label className="auth-field">
+            <span>Password</span>
+            <input
+              type="password"
+              required
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={pending}
+              placeholder="••••••••"
+            />
+          </label>
+          <button type="submit" className="button primary" disabled={pending}>
+            {pending ? 'Signing in…' : 'Sign in'}
+          </button>
+        </form>
+      )}
     </div>
   );
 }

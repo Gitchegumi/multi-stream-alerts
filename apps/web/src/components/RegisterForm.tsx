@@ -2,21 +2,20 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import { validateInviteCodeForCookie } from '@/lib/oidc-state';
 
 /**
- * Client-side form for the first step of registration: paste the invite
- * code, validate it client-side, set a short-lived cookie via the
- * /api/auth/signup endpoint, then call next-auth `signIn("oidc")` which
- * redirects the browser to the configured OIDC provider.
- *
- * The cookie is the round-trip mechanism for the invite code: the
- * server-side `signIn` callback (apps/web/src/lib/auth.ts) reads and
- * clears it during the OIDC callback.
+ * Client-side registration form. Collects invite code, email, and
+ * password, then POSTs to /api/auth/register. On success, the user
+ * is automatically signed in via credentials and redirected to the
+ * dashboard.
  */
 export function RegisterForm() {
   const router = useRouter();
   const [inviteCode, setInviteCode] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -34,17 +33,46 @@ export function RegisterForm() {
       return;
     }
 
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
+
     startTransition(async () => {
-      const response = await fetch('/api/auth/signup', {
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ inviteCode: validation.inviteCode }),
+        body: JSON.stringify({
+          inviteCode: validation.inviteCode,
+          email: email.trim().toLowerCase(),
+          password,
+        }),
       });
+
       if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(data.message ?? 'Could not save invite code.');
+        const data = (await response.json().catch(() => ({}))) as { error?: string };
+        setError(data.error ?? 'Registration failed. Please try again.');
         return;
       }
+
+      const signInResult = await signIn('credentials', {
+        email: email.trim().toLowerCase(),
+        password,
+        redirect: false,
+        callbackUrl: '/dashboard',
+      });
+
+      if (signInResult?.error) {
+        setError('Account created, but automatic sign-in failed. Please sign in manually.');
+        return;
+      }
+
+      if (signInResult?.url) {
+        window.location.href = signInResult.url;
+        return;
+      }
+
+      router.push('/dashboard');
       router.refresh();
     });
   }
@@ -65,17 +93,46 @@ export function RegisterForm() {
           aria-invalid={error ? true : undefined}
         />
       </label>
+
+      <label className="auth-field">
+        <span>Email</span>
+        <input
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={pending}
+          placeholder="you@example.com"
+          autoComplete="email"
+        />
+      </label>
+
+      <label className="auth-field">
+        <span>Password</span>
+        <input
+          type="password"
+          required
+          minLength={8}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={pending}
+          placeholder="At least 8 characters"
+          autoComplete="new-password"
+        />
+      </label>
+
       {error && (
         <p className="error" role="alert">
           {error}
         </p>
       )}
+
       <button type="submit" className="button primary" disabled={pending}>
-        {pending ? 'Working…' : 'Continue to sign in'}
+        {pending ? 'Working…' : 'Create account'}
       </button>
+
       <p className="muted small">
-        After you continue, you will be redirected to your identity provider. Your first successful
-        sign-in will create your account.
+        Your account will be created immediately; no external identity provider is needed.
       </p>
     </form>
   );
