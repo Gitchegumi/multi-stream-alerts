@@ -23,7 +23,7 @@ app.post('/api/webhooks/twitch', express.raw({ type: '*/*' }), twitchWebhookExpr
 
 app.post(
   '/api/webhooks/youtube/:channelSlug',
-  express.json({ type: '*/*' }),
+  express.raw({ type: '*/*' }),
   youtubeWebhookExpressHandler,
 );
 

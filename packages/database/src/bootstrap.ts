@@ -62,6 +62,12 @@ export async function createStoredAlertEvent(input: {
   });
 
   if (!config) {
+    console.info('alert suppressed', {
+      channelId: input.channelId,
+      platform: input.platform,
+      type: input.type,
+      reason: 'no_config_or_disabled',
+    });
     return null;
   }
 
@@ -102,6 +108,15 @@ export async function createStoredAlertEvent(input: {
       rawPayloadJson:
         input.rawPayload === undefined ? undefined : JSON.parse(JSON.stringify(input.rawPayload)),
     },
+  });
+
+  console.info('alert fired', {
+    channelId: input.channelId,
+    eventId: row.id,
+    platform: input.platform,
+    type: input.type,
+    eventKey: eventType.eventKey,
+    layoutId: layout?.id,
   });
 
   return toAlertEvent(row);

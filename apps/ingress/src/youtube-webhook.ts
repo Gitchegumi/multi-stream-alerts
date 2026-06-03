@@ -1,5 +1,12 @@
 import type { Request, NextFunction } from 'express';
-import { prisma, getChannelDecryptedSecret } from '@multi-stream-alerts/database';
+import {
+  getChannelDecryptedSecret,
+  claimDeduplicationKey,
+  storeAndPublishAlertEvent,
+} from '@multi-stream-alerts/database';
+import { prisma } from '@multi-stream-alerts/database';
+import type { AlertEvent } from '@multi-stream-alerts/shared';
+import { normalizeYoutubePubSub } from './youtube';
 
 /**
  * Structural shape for the Express `Response` that the handler uses.
@@ -16,17 +23,27 @@ export type YoutubeRejectionReason = 'channel_not_found' | 'not_configured';
 
 /**
  * Dependency-injection seam for tests. Each field is optional; defaults
- * pull from the live database. Tests pass in a stub `deps` object to
- * avoid touching a real Prisma client.
+ * pull from the live database / normalizer. Tests pass in a stub `deps`
+ * object to avoid touching a real Prisma client or Redis.
  *
  * - `findChannelBySlug` resolves the channel from the URL slug.
  * - `getDecryptedClientId` / `getDecryptedClientSecret` load the
  *   channel's stored YouTube OAuth credentials.
+ * - `normalizeEvent` parses the Atom XML body into an internal alert event.
+ * - `claimDedup` deduplicates by raw event id.
+ * - `storeAndPublish` persists the event and pushes it to Redis.
  */
 export interface YoutubeWebhookDeps {
   findChannelBySlug?: (slug: string) => Promise<{ id: string; slug: string } | null>;
   getDecryptedClientId?: (channelId: string) => Promise<string | null>;
   getDecryptedClientSecret?: (channelId: string) => Promise<string | null>;
+  normalizeEvent?: typeof normalizeYoutubePubSub;
+  claimDedup?: (input: {
+    provider: string;
+    rawEventId: string;
+    channelId: string;
+  }) => Promise<boolean>;
+  storeAndPublish?: typeof storeAndPublishAlertEvent;
 }
 
 const defaultDeps: Required<YoutubeWebhookDeps> = {
@@ -46,27 +63,23 @@ const defaultDeps: Required<YoutubeWebhookDeps> = {
       provider: 'youtube',
       key: 'youtube.client_secret',
     }),
+  normalizeEvent: normalizeYoutubePubSub,
+  claimDedup: claimDeduplicationKey,
+  storeAndPublish: storeAndPublishAlertEvent,
 };
 
 /**
  * Express handler for the path-based YouTube Pub/Sub hub callback:
  *   POST /api/webhooks/youtube/:channelSlug
  *
- * Resolves the channel from the URL slug and loads its stored
- * YouTube OAuth client_id / client_secret (encrypted at rest). The
- * actual Pub/Sub hub challenge verification and event normalization
- * are future work; v1 returns a 501 stub once credentials are present
- * to prove the resolution + decryption paths work end-to-end.
+ * Resolves the channel from the URL slug, loads its stored
+ * YouTube OAuth client_id / client_secret (encrypted at rest),
+ * parses the inbound Atom XML, normalizes it to an internal alert
+ * event, deduplicates by `rawEventId`, and stores + publishes the event.
  *
  * Never logs the client_id or client_secret value. The only
- * identifiers it emits are `channelSlug`, `channelId`, and the
- * opaque rejection reason.
- *
- * Note: the route-level integration is exercised manually via the
- * README's `curl` recipe. The unit tests in
- * `apps/ingress/src/__tests__/youtube-webhook.test.ts` cover the
- * handler directly by invoking it with stub `deps` and stub
- * Express req/response objects.
+ * identifiers it emits are `channelSlug`, `channelId`, `rawEventId`,
+ * and the opaque rejection reason.
  */
 export async function handleYoutubeWebhook(
   request: Pick<Request, 'params' | 'body'>,
@@ -83,6 +96,9 @@ export async function handleYoutubeWebhook(
   const findChannel = resolved.findChannelBySlug;
   const getClientId = resolved.getDecryptedClientId;
   const getClientSecret = resolved.getDecryptedClientSecret;
+  const normalizeEvent = resolved.normalizeEvent;
+  const claimKey = resolved.claimDedup;
+  const publish = resolved.storeAndPublish;
 
   const channel = await findChannel(channelSlug);
   if (!channel) {
@@ -104,11 +120,41 @@ export async function handleYoutubeWebhook(
     return;
   }
 
-  // Future OAuth verification would happen here. For v1 we return the
-  // same 501 stub the old global route did, but only AFTER successfully
-  // resolving + decrypting the channel's credentials.
   console.info('youtube webhook accepted', { channelSlug, channelId: channel.id });
-  response.status(501).json({ error: 'YouTube ingestion is stubbed for future implementation' });
+
+  // The server.ts route uses express.raw({ type: '*/*' }) so body is a
+  // Buffer. If tests inject a string we accept that too.
+  const rawBody = Buffer.isBuffer(request.body)
+    ? request.body.toString('utf8')
+    : typeof request.body === 'string'
+      ? request.body
+      : '';
+
+  const normalized = normalizeEvent(rawBody);
+
+  if (normalized === null) {
+    console.warn('youtube webhook suppressed', { channelSlug, reason: 'unmapped' });
+    response.status(204).json({});
+    return;
+  }
+
+  const fresh = await claimKey({
+    provider: 'youtube',
+    rawEventId: normalized.rawEventId,
+    channelId: channel.id,
+  });
+  if (!fresh) {
+    response.status(200).json({ ok: true, duplicate: true });
+    return;
+  }
+
+  const event: AlertEvent | null = await publish({ ...normalized, channelId: channel.id });
+  if (!event) {
+    response.status(200).json({ ok: true, suppressed: true });
+    return;
+  }
+
+  response.status(200).json({ ok: true, event });
 }
 
 /**
