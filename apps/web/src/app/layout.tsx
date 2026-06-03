@@ -8,6 +8,13 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'GitcheGumi Alerts',
   description: 'Self-hosted stream alerts and overlays',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '16x16 32x32 48x48' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    apple: { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+  },
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
