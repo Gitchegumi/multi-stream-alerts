@@ -43,13 +43,14 @@ export function OverlayClient({ displayKey, profile }: { displayKey: string; pro
 
     activeRef.current = true;
     setActiveAlert(nextAlert);
-    if (nextAlert.soundAssetUrl && nextAlert.volume !== 0) {
-      const audio = new Audio(nextAlert.soundAssetUrl);
+    const soundAssetUrl = resolveOverlayAssetUrl(nextAlert.soundAssetUrl, displayKey);
+    if (soundAssetUrl && nextAlert.volume !== 0) {
+      const audio = new Audio(soundAssetUrl);
       audio.volume = Math.max(0, Math.min(1, (nextAlert.volume ?? 80) / 100));
       void audio.play().catch((error) => {
         console.warn('alert sound playback failed', {
           eventId: nextAlert.id,
-          soundAssetUrl: nextAlert.soundAssetUrl,
+          soundAssetUrl,
           error,
         });
       });
@@ -69,14 +70,30 @@ export function OverlayClient({ displayKey, profile }: { displayKey: string; pro
     <main className="overlay-stage" aria-live="polite">
       {activeAlert ? (
         <section className={`alert-card alert-card-${activeAlert.layoutStyle ?? 'vertical'}`}>
-          {activeAlert.visualAssetUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img className="alert-asset" alt="" src={activeAlert.visualAssetUrl} />
-          ) : null}
+          <VisualAsset url={resolveOverlayAssetUrl(activeAlert.visualAssetUrl, displayKey)} />
           <h1 className="alert-title">{activeAlert.displayName}</h1>
           <p className="alert-message">{overlayMessage(activeAlert)}</p>
         </section>
       ) : null}
     </main>
   );
+}
+
+function VisualAsset({ url }: { url?: string }) {
+  if (!url) return null;
+
+  if (/\.(mp4|webm)(\?|$)/i.test(url)) {
+    return <video className="alert-asset" src={url} autoPlay muted loop playsInline />;
+  }
+
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img className="alert-asset" alt="" src={url} />;
+}
+
+function resolveOverlayAssetUrl(url: string | undefined, displayKey: string) {
+  if (!url) return undefined;
+  if (!url.startsWith('/api/assets/')) return url;
+
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}displayKey=${encodeURIComponent(displayKey)}`;
 }

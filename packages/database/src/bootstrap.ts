@@ -85,8 +85,12 @@ export async function createStoredAlertEvent(input: {
       durationMs: config.durationMs ?? layout?.defaultDurationMs,
       volume: config.volume ?? layout?.defaultVolume,
       templateText: config.templateText,
-      visualAssetUrl: layout?.visualAssetUrl,
-      soundAssetUrl: layout?.soundAssetUrl,
+      visualAssetUrl: layout?.visualAssetId
+        ? `/api/assets/${layout.visualAssetId}/content`
+        : layout?.visualAssetUrl,
+      soundAssetUrl: layout?.soundAssetId
+        ? `/api/assets/${layout.soundAssetId}/content`
+        : layout?.soundAssetUrl,
       displayName: input.displayName,
       amount: input.amount,
       currency: input.currency,

@@ -1,4 +1,5 @@
 export * from './authz';
+export * from './assets';
 export * from './alert-catalog';
 export * from './bootstrap';
 export * from './client';

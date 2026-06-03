@@ -2,6 +2,8 @@ import {
   ensureDefaultChannel,
   getWorkspaceAlertSetup,
   getAuthorizedChannels,
+  getWorkspaceStorageSettings,
+  getWorkspaceStorageUsage,
   prisma,
   toAlertEvent,
 } from '@multi-stream-alerts/database';
@@ -80,9 +82,33 @@ export default async function DashboardPage({
     style: layout.style,
     visualAssetUrl: layout.visualAssetUrl,
     soundAssetUrl: layout.soundAssetUrl,
+    visualAssetId: layout.visualAssetId,
+    soundAssetId: layout.soundAssetId,
     defaultDurationMs: layout.defaultDurationMs,
     defaultVolume: layout.defaultVolume,
     isSystemPreset: layout.isSystemPreset,
+  }));
+  const [assets, storageSettings, storageUsage] = await Promise.all([
+    prisma.workspaceAsset.findMany({
+      where: { channelId: selectedChannel.id },
+      orderBy: { createdAt: 'desc' },
+      include: { _count: { select: { visualLayouts: true, soundLayouts: true } } },
+    }),
+    getWorkspaceStorageSettings(selectedChannel.id),
+    getWorkspaceStorageUsage(selectedChannel.id),
+  ]);
+  const assetLibrary = assets.map((asset) => ({
+    id: asset.id,
+    sourceType: asset.sourceType,
+    assetType: asset.assetType,
+    originalFilename: asset.originalFilename,
+    externalUrl: asset.externalUrl,
+    mimeType: asset.mimeType,
+    fileSizeBytes: asset.fileSizeBytes?.toString() ?? null,
+    storageProvider: asset.storageProvider,
+    createdAt: asset.createdAt.toISOString(),
+    usageCount: asset._count.visualLayouts + asset._count.soundLayouts,
+    previewUrl: asset.externalUrl ?? `/api/assets/${encodeURIComponent(asset.id)}/content`,
   }));
 
   return (
@@ -137,6 +163,12 @@ export default async function DashboardPage({
           channelSlug={selectedChannel.slug}
           initialConfigs={alertConfigs}
           initialLayouts={alertLayouts}
+          initialAssets={assetLibrary}
+          initialStorageUsage={{
+            usedBytes: storageUsage.usedBytes.toString(),
+            quotaBytes: storageSettings.quotaBytes.toString(),
+            maxFileSizeBytes: storageSettings.maxFileSizeBytes.toString(),
+          }}
         />
       </section>
 
