@@ -13,7 +13,8 @@ const KEYLEN = 64;
  */
 export function hashPassword(plain: string): string {
   const salt = randomBytes(16);
-  const hash = scryptSync(plain, salt, KEYLEN, SCRYPT_PARAMS);
+  const plainBuffer = Buffer.from(plain, 'utf-8');
+  const hash = scryptSync(plainBuffer, salt, KEYLEN, SCRYPT_PARAMS);
   return `scrypt$${salt.toString('base64')}$${hash.toString('base64')}`;
 }
 
@@ -42,7 +43,8 @@ export function verifyPassword(plain: string, stored: string): boolean {
 
   if (salt.length === 0 || expectedHash.length === 0) return false;
 
-  const actualHash = scryptSync(plain, salt, expectedHash.length, SCRYPT_PARAMS);
+  const plainBuffer = Buffer.from(plain, 'utf-8');
+  const actualHash = scryptSync(plainBuffer, salt, expectedHash.length, SCRYPT_PARAMS);
 
   try {
     return timingSafeEqual(actualHash, expectedHash);

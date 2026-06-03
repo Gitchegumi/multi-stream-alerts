@@ -45,5 +45,5 @@ test('hashPassword handles unicode passwords', () => {
   const plain = '🔐 pässwörd 日本語';
   const hashed = hashPassword(plain);
   assert.equal(verifyPassword(plain, hashed), true);
-  assert.equal(verifyPassword('🔐 pässwörd 日本語', hashed), false);
+  assert.equal(verifyPassword('wrong unicode 🔐', hashed), false);
 });
