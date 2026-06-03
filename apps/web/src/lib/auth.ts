@@ -1,14 +1,16 @@
 import type { NextAuthOptions, Profile } from 'next-auth';
+import CredentialsProvider from 'next-auth/providers/credentials';
 import { cookies } from 'next/headers';
 import {
   prisma,
   redeemInviteCodeInTransaction,
   assertInviteIsUsable,
   InviteCodeError,
+  verifyPassword,
   type Prisma,
 } from '@multi-stream-alerts/database';
 import { INVITE_CODE_COOKIE, validateInviteCodeForCookie } from './oidc-state';
-import { generateUniqueChannelSlugSync } from './channel-slug';
+import { createChannelWithUniqueSlug } from './channel-slug';
 
 type OidcProfile = Profile & {
   sub?: string;
@@ -37,6 +39,27 @@ export const authOptions: NextAuthOptions = {
     signIn: '/signin',
   },
   providers: [
+    CredentialsProvider({
+      name: 'Email & Password',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null;
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+        });
+        if (!user || !user.passwordHash) return null;
+        if (!verifyPassword(credentials.password, user.passwordHash)) return null;
+        return {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          name: user.displayName,
+        };
+      },
+    }),
     // Generic OIDC provider. NextAuth's `oauth.js` base provider does
     // OIDC discovery automatically when given an `issuer` (or
     // `wellKnown`) field, so this single config works with any
@@ -73,6 +96,10 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ account, profile }) {
+      if (account?.provider === 'credentials') {
+        return true;
+      }
+
       const oidcProfile = profile as OidcProfile | undefined;
       if (oidcProfile?.email_verified === false) {
         // Visibility-only; we don't deny the sign-in for the reason
@@ -217,6 +244,23 @@ export const authOptions: NextAuthOptions = {
         return token;
       }
 
+      // If this is a credentials sign-in, the `authorize` callback already
+      // returned an object with id/email/role/name. NextAuth puts those
+      // into the user object, not the account/profile, but we can still
+      // hydrate from the token email if needed.
+      if (token.email) {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: token.email },
+        });
+        if (dbUser) {
+          token.userId = dbUser.id;
+          token.role = dbUser.role;
+          token.email = dbUser.email;
+          token.name = dbUser.displayName ?? dbUser.email;
+          return token;
+        }
+      }
+
       const oidcProfile = profile as OidcProfile | undefined;
       const authSubject = oidcProfile?.sub ?? account?.providerAccountId;
 
@@ -226,9 +270,7 @@ export const authOptions: NextAuthOptions = {
               authProvider_authSubject: { authProvider: account?.provider ?? 'oidc', authSubject },
             },
           })
-        : token.email
-          ? await prisma.user.findUnique({ where: { email: token.email } })
-          : null;
+        : null;
 
       if (dbUser) {
         token.userId = dbUser.id;
@@ -250,53 +292,3 @@ export const authOptions: NextAuthOptions = {
     },
   },
 };
-
-/**
- * Maximum number of slug-generation attempts before giving up. The
- * random suffix is 8 hex chars (32 bits of entropy) so a collision
- * probability per attempt is ~1 in 4 billion; 5 attempts makes the
- * total probability of giving up astronomically small. If we ever do
- * hit the cap, we let the underlying P2002 propagate and fail the
- * transaction — we'd rather refuse a signup than ever return a
- * non-unique slug.
- */
-const MAX_CHANNEL_SLUG_ATTEMPTS = 5;
-
-/**
- * Create a Channel row with a slug guaranteed to be unique in the
- * database, retrying on P2002 (unique-violation) collisions. Must be
- * called inside a `prisma.$transaction` so the `findUnique` + `create`
- * pair sees a consistent view of the channel table.
- */
-async function createChannelWithUniqueSlug(
-  tx: Prisma.TransactionClient,
-  preferredName: string,
-  email: string,
-  ownerUserId: string,
-) {
-  for (let attempt = 0; attempt < MAX_CHANNEL_SLUG_ATTEMPTS; attempt += 1) {
-    const slug = generateUniqueChannelSlugSync(email);
-    try {
-      return await tx.channel.create({
-        data: { name: preferredName, slug, ownerUserId },
-      });
-    } catch (error) {
-      if (isUniqueConstraintError(error) && attempt < MAX_CHANNEL_SLUG_ATTEMPTS - 1) {
-        continue;
-      }
-      throw error;
-    }
-  }
-  // Unreachable: the loop either returns or throws on the last
-  // iteration. Belt-and-suspenders to satisfy the type checker.
-  throw new Error('channel slug collision retry exhausted');
-}
-
-function isUniqueConstraintError(error: unknown): boolean {
-  return Boolean(
-    error &&
-    typeof error === 'object' &&
-    'code' in error &&
-    (error as { code?: string }).code === 'P2002',
-  );
-}

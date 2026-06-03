@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { Prisma } from '@multi-stream-alerts/database';
 
 /**
  * Pure slug normalizer for a new user's personal channel.
@@ -24,4 +25,45 @@ export function generateUniqueChannelSlugSync(email: string): string {
   // the dashes keeps the slug URL-friendly.
   const suffix = randomUUID().replace(/-/g, '').slice(0, 8);
   return `${base}-${suffix}`;
+}
+
+const MAX_CHANNEL_SLUG_ATTEMPTS = 5;
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    (error as { code?: string }).code === 'P2002',
+  );
+}
+
+/**
+ * Create a Channel row with a slug guaranteed to be unique in the
+ * database, retrying on P2002 (unique-violation) collisions. Must be
+ * called inside a `prisma.$transaction` so the `findUnique` + `create`
+ * pair sees a consistent view of the channel table.
+ */
+export async function createChannelWithUniqueSlug(
+  tx: Prisma.TransactionClient,
+  preferredName: string,
+  email: string,
+  ownerUserId: string,
+) {
+  for (let attempt = 0; attempt < MAX_CHANNEL_SLUG_ATTEMPTS; attempt += 1) {
+    const slug = generateUniqueChannelSlugSync(email);
+    try {
+      return await tx.channel.create({
+        data: { name: preferredName, slug, ownerUserId },
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error) && attempt < MAX_CHANNEL_SLUG_ATTEMPTS - 1) {
+        continue;
+      }
+      throw error;
+    }
+  }
+  // Unreachable: the loop either returns or throws on the last
+  // iteration. Belt-and-suspenders to satisfy the type checker.
+  throw new Error('channel slug collision retry exhausted');
 }

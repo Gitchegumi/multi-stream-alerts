@@ -24,25 +24,13 @@ export default async function AdminInvitesPage() {
 
   return (
     <main className="dashboard-shell">
-      <header className="dashboard-header">
-        <div>
-          <h1 className="dashboard-title">Invite codes</h1>
-          <p className="muted">
-            Create invite codes for new users to register with email and password.
-          </p>
-        </div>
-        <a className="button" href="/dashboard">
-          Back to dashboard
-        </a>
-      </header>
-
       <InviteManager
         initialCodes={codes.map((code) => ({
           ...code,
           expiresAt: code.expiresAt ? code.expiresAt.toISOString() : null,
           createdAt: code.createdAt.toISOString(),
         }))}
-        initialRedemptions={redemptions.map((r) => ({
+        initialRedemptions={redemptions.map((r: (typeof redemptions)[0]) => ({
           id: r.id,
           inviteCodeId: r.inviteCodeId,
           redeemedAt: r.redeemedAt.toISOString(),
