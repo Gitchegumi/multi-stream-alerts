@@ -52,8 +52,15 @@ export async function POST(request: Request) {
   });
 
   if (!event) {
+    console.info('test alert suppressed', {
+      channelId: body.channelId,
+      eventKey: body.eventKey ?? 'manual.test',
+      reason: 'disabled_or_unmapped',
+    });
     return NextResponse.json({ error: 'Alert type is disabled or unmapped' }, { status: 409 });
   }
+
+  console.info('test alert fired', { channelId: body.channelId, eventId: event.id });
 
   return NextResponse.json({ ok: true, event });
 }

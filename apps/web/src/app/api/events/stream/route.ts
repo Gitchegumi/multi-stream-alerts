@@ -35,6 +35,11 @@ export async function GET(request: Request) {
     return new Response('Invalid displayKey', { status: 403 });
   }
 
+  console.info('overlay connected', {
+    channelId: profile.channelId,
+    displayKeyPrefix: displayKey.slice(0, 8),
+  });
+
   const encoder = new TextEncoder();
   const redis = createRedisClient();
   let closed = false;
@@ -47,6 +52,7 @@ export async function GET(request: Request) {
     closed = true;
     request.signal.removeEventListener('abort', cleanup);
     redis.disconnect();
+    console.info('overlay disconnected', { channelId: profile.channelId });
   };
 
   const stream = new ReadableStream({

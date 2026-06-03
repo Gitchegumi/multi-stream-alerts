@@ -376,6 +376,39 @@ https://<your-alerts-domain>/overlay/main?displayKey=<valid-display-key>
 
 Use a transparent browser source background. Overlay pages are full-screen, display-only, and do not expose dashboard controls.
 
+## Overlay Setup
+
+Overlay URLs are managed from the dashboard at **Dashboard → Overlay Profiles**. Each profile (e.g., `main`, `vertical`, `test`) has a dedicated overlay URL with a unique `displayKey`.
+
+### Display keys
+
+- A `displayKey` is a long random string scoped to one overlay profile and its channel.
+- It grants **overlay-only access**: the browser source can connect to the SSE event stream and load assets, but it cannot open dashboard pages or act as a session.
+- Display keys are **not** user passwords or OIDC tokens. They are separate credentials meant for OBS / Meld browser sources.
+
+### Getting the overlay URL
+
+1. Open the dashboard and select a channel.
+2. Navigate to **Dashboard → Overlay Profiles**.
+3. Copy the overlay URL for the profile you want (e.g., `main`).
+4. Paste it into an OBS or Meld browser source.
+
+### Rotating display keys
+
+Rotating a display key is a **hard cutover**:
+
+1. In **Dashboard → Overlay Profiles**, click **Rotate Key** for the profile.
+2. The old key is immediately invalid. Existing browser sources will stop receiving events.
+3. Copy the new overlay URL and update every browser source using the old one.
+
+There is no grace period or dual-key window. Plan rotations around stream downtime or update sources quickly.
+
+### Security model
+
+- `displayKey` ≠ dashboard session auth. Knowing a display key does not grant dashboard access, and a dashboard session cookie is never accepted by overlay or SSE routes.
+- Overlay routes validate the `displayKey` query parameter. SSE routes validate it and then filter events to the matching channel.
+- If a display key leaks, rotate it. The leaked key cannot be used to modify channel settings, view other channels, or access the dashboard.
+
 ## Testing
 
 Run local validation:
