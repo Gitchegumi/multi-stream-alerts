@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { usePathname, useParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 
 type NavUser = {
   email: string;
@@ -61,7 +62,9 @@ export function NavBar({ user, defaultChannelSlug }: NavBarProps) {
   return (
     <nav className="nav-bar" aria-label="Main">
       <div className="nav-brand">
-        <Link href="/dashboard">GitcheGumi Alerts</Link>
+        <Link href="/" aria-label="GitcheGumi Alerts – Home">
+          <Image src="/logo.svg" alt="GitcheGumi Alerts logo" width={160} height={40} priority />
+        </Link>
       </div>
 
       <button
