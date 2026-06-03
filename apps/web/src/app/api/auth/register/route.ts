@@ -12,7 +12,7 @@ import { createChannelWithUniqueSlug } from '@/lib/channel-slug';
 
 export const dynamic = 'force-dynamic';
 
-const credentialsEnabled = process.env.AUTH_CREDENTIALS_ENABLED=*** 'true';
+const credentialsEnabled = process.env.AUTH_CREDENTIALS_ENABLED === 'true';
 
 const rateLimitWindowMs = 60_000;
 const maxAttemptsPerWindow = 10;
