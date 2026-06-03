@@ -43,6 +43,8 @@ jobs:
 
       - name: Test (web)
         run: pnpm --filter @multi-stream-alerts/web test
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Test (ingress)
         # ingress has no test script yet — assert at least a typecheck pass here.
