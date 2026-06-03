@@ -1,5 +1,5 @@
 # Pre-commit: fast checks only. Heavy scans (CodeQL, Trivy, Semgrep, OSV,
 # Gitleaks full-repo) live in CI. See .github/workflows/.
 
-corepack pnpm exec lint-staged
-corepack pnpm secrets:staged
+pnpm exec lint-staged
+pnpm secrets:staged
