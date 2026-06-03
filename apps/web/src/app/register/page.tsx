@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { RegisterForm } from '@/components/RegisterForm';
+import { canUseRegisterPage, readOnboardingConfig } from '@/lib/onboarding';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,9 +13,17 @@ export default async function RegisterPage() {
     redirect('/dashboard');
   }
 
+  const oidcEnabled = process.env.AUTH_OIDC_ENABLED !== 'false';
   const credentialsEnabled = process.env.AUTH_CREDENTIALS_ENABLED === 'true';
+  const onboarding = readOnboardingConfig();
 
-  if (!credentialsEnabled) {
+  if (
+    !canUseRegisterPage({
+      credentialsEnabled,
+      oidcEnabled,
+      onboardingEnabled: onboarding.enabled,
+    })
+  ) {
     redirect('/signin');
   }
 
@@ -23,7 +32,7 @@ export default async function RegisterPage() {
       <section className="auth-card">
         <h1 className="auth-title">Create an account</h1>
         <p className="muted">Registration requires a valid invite code from an administrator.</p>
-        <RegisterForm />
+        <RegisterForm oidcEnabled={oidcEnabled} credentialsEnabled={credentialsEnabled} />
         <p className="muted small">
           Already have an account? <Link href="/signin">Sign in</Link>.
         </p>

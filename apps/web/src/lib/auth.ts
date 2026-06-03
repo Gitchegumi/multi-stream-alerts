@@ -11,6 +11,7 @@ import {
 } from '@multi-stream-alerts/database';
 import { INVITE_CODE_COOKIE, validateInviteCodeForCookie } from './oidc-state';
 import { createChannelWithUniqueSlug } from './channel-slug';
+import { readOnboardingConfig } from './onboarding';
 
 type OidcProfile = Profile & {
   sub?: string;
@@ -34,6 +35,48 @@ const oidcIssuer = (
 
 const oidcEnabled = process.env.AUTH_OIDC_ENABLED !== 'false';
 const credentialsEnabled = process.env.AUTH_CREDENTIALS_ENABLED === 'true';
+
+type OidcAccount = {
+  provider: string;
+  providerAccountId?: string;
+};
+
+export type OidcSignInDeps = {
+  prisma: {
+    user: {
+      findFirst: typeof prisma.user.findFirst;
+      create: typeof prisma.user.create;
+      update: typeof prisma.user.update;
+    };
+    $transaction: typeof prisma.$transaction;
+  };
+  getInviteCookie: () => Promise<string | undefined> | string | undefined;
+  deleteInviteCookie: () => Promise<void> | void;
+  createChannelWithUniqueSlug: typeof createChannelWithUniqueSlug;
+  redeemInviteCodeInTransaction: typeof redeemInviteCodeInTransaction;
+  assertInviteIsUsable: typeof assertInviteIsUsable;
+  env: NodeJS.ProcessEnv;
+};
+
+const oidcSignInDeps: OidcSignInDeps = {
+  prisma,
+  async getInviteCookie() {
+    const cookieJar = await cookies();
+    return cookieJar.get(INVITE_CODE_COOKIE)?.value;
+  },
+  async deleteInviteCookie() {
+    try {
+      const cookieJar = await cookies();
+      cookieJar.delete(INVITE_CODE_COOKIE);
+    } catch {
+      /* cookie may be in a different request scope; safe to ignore */
+    }
+  },
+  createChannelWithUniqueSlug,
+  redeemInviteCodeInTransaction,
+  assertInviteIsUsable,
+  env: process.env,
+};
 
 function buildOidcProvider() {
   return {
@@ -77,10 +120,7 @@ function buildCredentialsProvider() {
       if (!user || !user.localCredential) {
         return null;
       }
-      const valid = await verifyPassword(
-        credentials.password,
-        user.localCredential.passwordHash,
-      );
+      const valid = await verifyPassword(credentials.password, user.localCredential.passwordHash);
       if (!valid) {
         return null;
       }
@@ -125,109 +165,7 @@ export const authOptions: NextAuthOptions = {
         return true;
       }
 
-      const authSubject = oidcProfile?.sub ?? account?.providerAccountId;
-      const email = oidcProfile?.email;
-
-      if (!account || !authSubject || !email) {
-        return false;
-      }
-
-      const existingUser = await prisma.user.findFirst({
-        where: {
-          OR: [{ authProvider: account.provider, authSubject }, { email }],
-        },
-      });
-
-      if (existingUser) {
-        await prisma.user.update({
-          where: { id: existingUser.id },
-          data: {
-            authProvider: account.provider,
-            authSubject,
-            displayName: oidcProfile?.name ?? existingUser.displayName,
-          },
-        });
-        return true;
-      }
-
-      // First-time OIDC login for an unknown user.
-      const isInitialAdmin = email === process.env.INITIAL_ADMIN_EMAIL;
-      if (isInitialAdmin) {
-        await prisma.user.create({
-          data: {
-            authProvider: account.provider,
-            authSubject,
-            email,
-            displayName: oidcProfile?.name ?? email,
-            role: 'admin',
-          },
-        });
-        return true;
-      }
-
-      const cookieJar = await cookies();
-      const rawInvite = cookieJar.get(INVITE_CODE_COOKIE)?.value;
-      const inviteValidation = validateInviteCodeForCookie(rawInvite);
-      if (!inviteValidation.ok) {
-        return false;
-      }
-      try {
-        cookieJar.delete(INVITE_CODE_COOKIE);
-      } catch {
-        /* cookie may be in a different request scope; safe to ignore */
-      }
-
-      try {
-        await prisma.$transaction(async (tx) => {
-          const invite = await tx.inviteCode.findUnique({
-            where: { code: inviteValidation.inviteCode },
-          });
-          if (!invite) {
-            throw new InviteCodeError('INVALID', 'Invite code not found');
-          }
-          assertInviteIsUsable(invite);
-
-          const user = await tx.user.create({
-            data: {
-              authProvider: account.provider,
-              authSubject,
-              email,
-              displayName: oidcProfile?.name ?? email,
-              role: 'viewer',
-            },
-          });
-
-          const redeemed = await redeemInviteCodeInTransaction(tx, {
-            invite,
-            userId: user.id,
-          });
-
-          if (redeemed.role !== 'viewer') {
-            await tx.user.update({
-              where: { id: user.id },
-              data: { role: redeemed.role },
-            });
-          }
-
-          const channel = await createChannelWithUniqueSlug(
-            tx,
-            oidcProfile?.name ?? email.split('@')[0] ?? 'My Channel',
-            email,
-            user.id,
-          );
-
-          await tx.channelMembership.create({
-            data: { channelId: channel.id, userId: user.id, role: 'owner' },
-          });
-        });
-      } catch (error) {
-        if (error instanceof InviteCodeError) {
-          return false;
-        }
-        throw error;
-      }
-
-      return true;
+      return handleOidcSignIn({ account, profile: oidcProfile }, oidcSignInDeps);
     },
     async jwt({ token, account, profile }) {
       if (token.userId && token.role) {
@@ -283,3 +221,123 @@ export const authOptions: NextAuthOptions = {
 };
 
 export { oidcEnabled, credentialsEnabled };
+
+export async function handleOidcSignIn(
+  {
+    account,
+    profile,
+  }: {
+    account: OidcAccount | null | undefined;
+    profile: OidcProfile | undefined;
+  },
+  deps: OidcSignInDeps = oidcSignInDeps,
+) {
+  const authSubject = profile?.sub ?? account?.providerAccountId;
+  const email = profile?.email;
+
+  if (!account || !authSubject || !email) {
+    return false;
+  }
+
+  const existingUser = await deps.prisma.user.findFirst({
+    where: {
+      OR: [{ authProvider: account.provider, authSubject }, { email }],
+    },
+  });
+
+  if (existingUser) {
+    await deps.prisma.user.update({
+      where: { id: existingUser.id },
+      data: {
+        authProvider: account.provider,
+        authSubject,
+        displayName: profile?.name ?? existingUser.displayName,
+      },
+    });
+    return true;
+  }
+
+  const isInitialAdmin = email === deps.env.INITIAL_ADMIN_EMAIL;
+  if (isInitialAdmin) {
+    await deps.prisma.user.create({
+      data: {
+        authProvider: account.provider,
+        authSubject,
+        email,
+        displayName: profile?.name ?? email,
+        role: 'admin',
+      },
+    });
+    return true;
+  }
+
+  const onboarding = readOnboardingConfig(deps.env);
+  if (!onboarding.enabled) {
+    return false;
+  }
+
+  const rawInvite = await deps.getInviteCookie();
+  const inviteValidation = validateInviteCodeForCookie(rawInvite);
+
+  if (onboarding.requireInvite && !inviteValidation.ok) {
+    return false;
+  }
+
+  if (inviteValidation.ok) {
+    await deps.deleteInviteCookie();
+  }
+
+  try {
+    await deps.prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          authProvider: account.provider,
+          authSubject,
+          email,
+          displayName: profile?.name ?? email,
+          role: onboarding.defaultWorkspaceRole,
+        },
+      });
+
+      if (inviteValidation.ok) {
+        const invite = await tx.inviteCode.findUnique({
+          where: { code: inviteValidation.inviteCode },
+        });
+        if (!invite) {
+          throw new InviteCodeError('INVALID', 'Invite code not found');
+        }
+        deps.assertInviteIsUsable(invite);
+
+        const redeemed = await deps.redeemInviteCodeInTransaction(tx, {
+          invite,
+          userId: user.id,
+        });
+
+        if (redeemed.role !== onboarding.defaultWorkspaceRole) {
+          await tx.user.update({
+            where: { id: user.id },
+            data: { role: redeemed.role },
+          });
+        }
+      }
+
+      const channel = await deps.createChannelWithUniqueSlug(
+        tx,
+        profile?.name ?? email.split('@')[0] ?? 'My Channel',
+        email,
+        user.id,
+      );
+
+      await tx.channelMembership.create({
+        data: { channelId: channel.id, userId: user.id, role: 'owner' },
+      });
+    });
+  } catch (error) {
+    if (error instanceof InviteCodeError) {
+      return false;
+    }
+    throw error;
+  }
+
+  return true;
+}
