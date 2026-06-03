@@ -33,9 +33,7 @@ export type HandlerDeps = {
       } | null>;
     };
     localCredential: {
-      create: (args: {
-        data: { userId: string; passwordHash: string };
-      }) => Promise<{ id: string }>;
+      create: (args: { data: { userId: string; passwordHash: string } }) => Promise<{ id: string }>;
     };
     $transaction: <T>(fn: (tx: Prisma.TransactionClient) => Promise<T>) => Promise<T>;
   };
