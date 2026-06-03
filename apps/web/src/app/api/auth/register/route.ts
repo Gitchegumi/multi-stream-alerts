@@ -152,8 +152,8 @@ export async function handleRegister(
   return NextResponse.json({ ok: true });
 }
 
-export async function POST(request: Request, deps?: HandlerDeps) {
-  return handleRegister(request, deps);
+export async function POST(request: Request) {
+  return handleRegister(request, defaultDeps);
 }
 
 function getClientIp(request: Request) {
