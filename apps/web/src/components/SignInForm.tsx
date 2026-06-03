@@ -9,14 +9,16 @@ type AuthMode = 'oidc' | 'credentials';
 /**
  * Renders the sign-in form with support for both OIDC and
  * email/password (credentials) authentication. A toggle switches
- * between the two modes.
+ * between the two modes, but only when credentials are enabled.
  */
 export function SignInForm({
   callbackUrl,
   initialError,
+  credentialsEnabled,
 }: {
   callbackUrl?: string;
   initialError?: string;
+  credentialsEnabled?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -78,36 +80,38 @@ export function SignInForm({
         </p>
       )}
 
-      <div className="auth-mode-toggle" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'oidc'}
-          className={mode === 'oidc' ? 'active' : ''}
-          onClick={() => {
-            setMode('oidc');
-            setError(null);
-          }}
-          disabled={pending}
-        >
-          OIDC
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'credentials'}
-          className={mode === 'credentials' ? 'active' : ''}
-          onClick={() => {
-            setMode('credentials');
-            setError(null);
-          }}
-          disabled={pending}
-        >
-          Email & Password
-        </button>
-      </div>
+      {credentialsEnabled && (
+        <div className="auth-mode-toggle" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'oidc'}
+            className={mode === 'oidc' ? 'active' : ''}
+            onClick={() => {
+              setMode('oidc');
+              setError(null);
+            }}
+            disabled={pending}
+          >
+            OIDC
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'credentials'}
+            className={mode === 'credentials' ? 'active' : ''}
+            onClick={() => {
+              setMode('credentials');
+              setError(null);
+            }}
+            disabled={pending}
+          >
+            Email & Password
+          </button>
+        </div>
+      )}
 
-      {mode === 'oidc' ? (
+      {mode === 'oidc' || !credentialsEnabled ? (
         <>
           <button
             type="button"

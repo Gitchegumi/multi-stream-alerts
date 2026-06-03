@@ -20,15 +20,19 @@ export default async function SignInPage({
   const callbackUrl = params.callbackUrl ?? '/dashboard';
   const error = params.error;
 
+  const credentialsEnabled = process.env.AUTH_CREDENTIALS_ENABLED=*** 'true';
+
   return (
     <main className="auth-shell">
       <section className="auth-card">
         <h1 className="auth-title">Sign in</h1>
         <p className="muted">Sign in with your identity provider to access the dashboard.</p>
-        <SignInForm callbackUrl={callbackUrl} initialError={error} />
-        <p className="muted small">
-          New here? <Link href="/register">Create an account with an invite code</Link>.
-        </p>
+        <SignInForm callbackUrl={callbackUrl} initialError={error} credentialsEnabled={credentialsEnabled} />
+        {credentialsEnabled && (
+          <p className="muted small">
+            New here? <Link href="/register">Create an account with an invite code</Link>.
+          </p>
+        )}
       </section>
     </main>
   );

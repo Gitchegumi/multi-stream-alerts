@@ -12,6 +12,8 @@ import { createChannelWithUniqueSlug } from '@/lib/channel-slug';
 
 export const dynamic = 'force-dynamic';
 
+const credentialsEnabled = process.env.AUTH_CREDENTIALS_ENABLED=*** 'true';
+
 const rateLimitWindowMs = 60_000;
 const maxAttemptsPerWindow = 10;
 const registerRateLimits = new Map<string, { count: number; resetAt: number }>();
@@ -28,8 +30,12 @@ export type HandlerDeps = {
       findUnique: (args: { where: { email: string } }) => Promise<{
         id: string;
         email: string;
-        passwordHash: string | null;
       } | null>;
+    };
+    localCredential: {
+      create: (args: {
+        data: { userId: string; passwordHash: string };
+      }) => Promise<{ id: string }>;
     };
     $transaction: <T>(fn: (tx: Prisma.TransactionClient) => Promise<T>) => Promise<T>;
   };
@@ -60,16 +66,18 @@ type InviteCodeRow = {
   createdAt: Date;
 };
 
-// Suppress Next.js typegen complaint: when this module is imported with
-// `typeof import("...")`, Next 15 treats *every* export as a route-handler
-// candidate and rejects named exports that don't match the POST signature.
-// Since handleRegister is only used by tests and other internal call-sites,
-// excluding it from type-level route-handler validation is safe.
 // @ts-ignore
 export async function handleRegister(
   request: Request,
   deps: HandlerDeps = defaultDeps,
 ): Promise<NextResponse> {
+  if (!credentialsEnabled) {
+    return NextResponse.json(
+      { ok: false, error: 'Local credentials registration is disabled.' },
+      { status: 403 },
+    );
+  }
+
   const clientIp = getClientIp(request);
   if (isRateLimited(clientIp)) {
     return NextResponse.json(
@@ -119,9 +127,15 @@ export async function handleRegister(
           authProvider: 'credentials',
           authSubject: email,
           email,
-          passwordHash: deps.hashPassword(password),
           displayName: email.split('@')[0] ?? 'User',
           role: 'viewer',
+        },
+      });
+
+      await tx.localCredential.create({
+        data: {
+          userId: user.id,
+          passwordHash: deps.hashPassword(password),
         },
       });
 
@@ -150,6 +164,13 @@ export async function handleRegister(
       return NextResponse.json(
         { ok: false, error: 'Invalid or expired invite code.' },
         { status: 400 },
+      );
+    }
+    // Unique constraint on localCredential.userId or race creating user
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
+      return NextResponse.json(
+        { ok: false, error: 'An account with this email already exists.' },
+        { status: 409 },
       );
     }
     throw error;

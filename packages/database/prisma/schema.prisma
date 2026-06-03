@@ -64,7 +64,6 @@ model User {
   authSubject       String                 @map("auth_subject")
   email             String                 @unique
   displayName       String?                @map("display_name")
-  passwordHash      String?                @map("password_hash")
   role              UserRole               @default(viewer)
   createdAt         DateTime               @default(now()) @map("created_at")
   updatedAt         DateTime               @updatedAt @map("updated_at")
@@ -73,9 +72,22 @@ model User {
   assets            WorkspaceAsset[]
   inviteCodes       InviteCode[]           @relation("InviteCodeCreator")
   inviteRedemptions InviteCodeRedemption[]
+  localCredential   LocalCredential?
 
   @@unique([authProvider, authSubject])
   @@map("users")
+}
+
+model LocalCredential {
+  id           String   @id @default(cuid())
+  userId       String   @unique @map("user_id")
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("local_credentials")
 }
 
 model InviteCode {
