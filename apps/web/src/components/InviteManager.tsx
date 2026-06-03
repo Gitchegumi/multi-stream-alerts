@@ -14,6 +14,14 @@ type CodeSummary = {
   note: string | null;
   createdByUserId: string;
   createdAt: string;
+  identityProviderInvite: {
+    id: string;
+    provider: string;
+    enrollmentUrl: string | null;
+    expiresAt: string | null;
+    usedAt: string | null;
+    createdAt: string;
+  } | null;
 };
 
 type Redemption = {
@@ -49,6 +57,10 @@ export function InviteManager({
   const [maxUses, setMaxUses] = useState(1);
   const [expiresAt, setExpiresAt] = useState('');
   const [note, setNote] = useState('');
+  const [externalProvider, setExternalProvider] = useState('');
+  const [externalToken, setExternalToken] = useState('');
+  const [externalEnrollmentUrl, setExternalEnrollmentUrl] = useState('');
+  const [externalExpiresAt, setExternalExpiresAt] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -64,6 +76,17 @@ export function InviteManager({
           maxUses: Math.max(1, Math.floor(maxUses)),
           expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
           note: note.trim() || undefined,
+          identityProviderInvite:
+            externalProvider.trim() || externalToken.trim()
+              ? {
+                  provider: externalProvider.trim().toLowerCase(),
+                  externalToken: externalToken.trim(),
+                  enrollmentUrl: externalEnrollmentUrl.trim() || undefined,
+                  expiresAt: externalExpiresAt
+                    ? new Date(externalExpiresAt).toISOString()
+                    : undefined,
+                }
+              : undefined,
         }),
       });
       const data = (await response.json().catch(() => ({}))) as {
@@ -79,11 +102,27 @@ export function InviteManager({
           ...data.code!,
           expiresAt: data.code!.expiresAt ? new Date(data.code!.expiresAt).toISOString() : null,
           createdAt: new Date(data.code!.createdAt).toISOString(),
+          identityProviderInvite: data.code!.identityProviderInvite
+            ? {
+                ...data.code!.identityProviderInvite,
+                expiresAt: data.code!.identityProviderInvite.expiresAt
+                  ? new Date(data.code!.identityProviderInvite.expiresAt).toISOString()
+                  : null,
+                usedAt: data.code!.identityProviderInvite.usedAt
+                  ? new Date(data.code!.identityProviderInvite.usedAt).toISOString()
+                  : null,
+                createdAt: new Date(data.code!.identityProviderInvite.createdAt).toISOString(),
+              }
+            : null,
         },
         ...current,
       ]);
       setExpiresAt('');
       setNote('');
+      setExternalProvider('');
+      setExternalToken('');
+      setExternalEnrollmentUrl('');
+      setExternalExpiresAt('');
       router.refresh();
     });
   }
@@ -159,6 +198,48 @@ export function InviteManager({
               disabled={pending}
             />
           </div>
+          <div className="auth-field">
+            <span>External enrollment provider (optional)</span>
+            <input
+              type="text"
+              maxLength={64}
+              value={externalProvider}
+              onChange={(e) => setExternalProvider(e.target.value)}
+              placeholder="authentik"
+              disabled={pending}
+            />
+          </div>
+          <div className="auth-field">
+            <span>External enrollment token (optional)</span>
+            <input
+              type="password"
+              maxLength={2048}
+              value={externalToken}
+              onChange={(e) => setExternalToken(e.target.value)}
+              placeholder="Paste provider token"
+              disabled={pending}
+              autoComplete="off"
+            />
+          </div>
+          <div className="auth-field">
+            <span>Enrollment URL override (optional)</span>
+            <input
+              type="url"
+              value={externalEnrollmentUrl}
+              onChange={(e) => setExternalEnrollmentUrl(e.target.value)}
+              placeholder="https://idp.example.com/if/flow/enrollment/"
+              disabled={pending}
+            />
+          </div>
+          <div className="auth-field">
+            <span>External token expires (optional)</span>
+            <input
+              type="datetime-local"
+              value={externalExpiresAt}
+              onChange={(e) => setExternalExpiresAt(e.target.value)}
+              disabled={pending}
+            />
+          </div>
           {error && (
             <p className="error" role="alert">
               {error}
@@ -196,6 +277,24 @@ export function InviteManager({
                       {code.expiresAt
                         ? ` · Expires ${new Date(code.expiresAt).toLocaleString()}`
                         : ''}
+                    </div>
+                    {code.identityProviderInvite && (
+                      <div className="muted small">
+                        External enrollment: {code.identityProviderInvite.provider}
+                        {code.identityProviderInvite.expiresAt
+                          ? ` · Token expires ${new Date(
+                              code.identityProviderInvite.expiresAt,
+                            ).toLocaleString()}`
+                          : ''}
+                        {code.identityProviderInvite.usedAt
+                          ? ` · Token used ${new Date(
+                              code.identityProviderInvite.usedAt,
+                            ).toLocaleString()}`
+                          : ''}
+                      </div>
+                    )}
+                    <div className="muted small">
+                      Invite link: <code>{`/register?invite=${code.code}`}</code>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>

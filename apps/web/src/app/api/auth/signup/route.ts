@@ -1,11 +1,9 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { z } from 'zod';
 import {
-  INVITE_CODE_COOKIE,
-  INVITE_CODE_COOKIE_MAX_AGE_SECONDS,
   validateInviteCodeForCookie,
 } from '@/lib/oidc-state';
+import { buildInviteCookieOptions } from '@/lib/invite-cookie';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,18 +61,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const cookieJar = await cookies();
-  cookieJar.set({
-    name: INVITE_CODE_COOKIE,
-    value: validation.inviteCode,
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: INVITE_CODE_COOKIE_MAX_AGE_SECONDS,
-  });
-
-  return NextResponse.json({ ok: true });
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set(buildInviteCookieOptions(validation.inviteCode));
+  return response;
 }
 
 function getClientIp(request: Request) {

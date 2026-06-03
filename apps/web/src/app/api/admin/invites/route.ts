@@ -16,6 +16,14 @@ const createSchema = z.object({
   maxUses: z.number().int().positive().max(1000).optional(),
   expiresAt: z.string().datetime().optional(),
   note: z.string().max(200).optional(),
+  identityProviderInvite: z
+    .object({
+      provider: z.string().trim().min(1).max(64),
+      externalToken: z.string().trim().min(1).max(2048),
+      enrollmentUrl: z.string().trim().url().optional(),
+      expiresAt: z.string().datetime().optional(),
+    })
+    .optional(),
 });
 
 const revokeSchema = z.object({
@@ -66,12 +74,23 @@ export async function POST(request: Request) {
   }
 
   const expiresAt = parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null;
+  const identityProviderInvite = parsed.data.identityProviderInvite
+    ? {
+        provider: parsed.data.identityProviderInvite.provider.toLowerCase(),
+        externalToken: parsed.data.identityProviderInvite.externalToken,
+        enrollmentUrl: parsed.data.identityProviderInvite.enrollmentUrl ?? null,
+        expiresAt: parsed.data.identityProviderInvite.expiresAt
+          ? new Date(parsed.data.identityProviderInvite.expiresAt)
+          : null,
+      }
+    : null;
   const code = await createInviteCode({
     createdByUserId: guard.userId,
     role: parsed.data.role,
     maxUses: parsed.data.maxUses,
     expiresAt,
     note: parsed.data.note,
+    identityProviderInvite,
   });
   return NextResponse.json({ code }, { status: 201 });
 }

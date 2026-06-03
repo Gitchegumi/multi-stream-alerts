@@ -6,6 +6,8 @@ import {
   assertInviteIsUsable,
   InviteCodeError,
   redeemInviteCodeInTransaction,
+  buildInviteCodeCreateData,
+  sanitizeIdentityProviderInviteForSummary,
 } from '../invites.ts';
 
 // NOTE: `redeemInviteCode` is intentionally not covered here because it
@@ -37,6 +39,49 @@ test('generateInviteCode rejects absurd lengths by clamping', () => {
   const huge = generateInviteCode(9999);
   assert.ok(tiny.length >= 8);
   assert.ok(huge.length <= 64);
+});
+
+test('buildInviteCodeCreateData stores linked external enrollment metadata', () => {
+  const expiresAt = new Date('2026-06-04T00:00:00.000Z');
+  const data = buildInviteCodeCreateData(
+    {
+      createdByUserId: 'admin-1',
+      role: 'owner',
+      maxUses: 1,
+      identityProviderInvite: {
+        provider: 'authentik',
+        externalToken: 'secret-itoken',
+        enrollmentUrl: 'https://idp.example.com/enroll?flow=default',
+        expiresAt,
+      },
+    },
+    'ABCD-EFGH',
+  );
+
+  assert.deepEqual(data.identityProviderInvite, {
+    create: {
+      provider: 'authentik',
+      externalToken: 'secret-itoken',
+      enrollmentUrl: 'https://idp.example.com/enroll?flow=default',
+      expiresAt,
+    },
+  });
+  assert.deepEqual(data.createdBy, { connect: { id: 'admin-1' } });
+});
+
+test('sanitizeIdentityProviderInviteForSummary does not expose external token', () => {
+  const summary = sanitizeIdentityProviderInviteForSummary({
+    id: 'idp-invite-1',
+    provider: 'authentik',
+    enrollmentUrl: 'https://idp.example.com/enroll',
+    expiresAt: null,
+    usedAt: null,
+    createdAt: new Date('2026-06-03T00:00:00.000Z'),
+    externalToken: 'secret-itoken',
+  } as never);
+
+  assert.equal('externalToken' in (summary as Record<string, unknown>), false);
+  assert.equal(summary?.provider, 'authentik');
 });
 
 test('assertInviteIsUsable accepts a fresh code', () => {

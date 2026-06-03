@@ -37,6 +37,9 @@ export const authEnvSchema = z.object({
   ONBOARDING_ENABLED: z.enum(['true', 'false']).default('true'),
   ONBOARDING_REQUIRE_INVITE: z.enum(['true', 'false']).default('true'),
   ONBOARDING_DEFAULT_WORKSPACE_ROLE: z.enum(['owner', 'editor', 'viewer']).default('owner'),
+  OIDC_ENROLLMENT_ENABLED: z.enum(['true', 'false']).default('false'),
+  OIDC_ENROLLMENT_PROVIDER: z.string().min(1).optional(),
+  OIDC_ENROLLMENT_URL: z.string().min(1).optional(),
   // Optional display name override for the OIDC sign-in button. Defaults
   // to "OIDC" when unset.
   AUTH_OIDC_PROVIDER_NAME: z.string().min(1).optional(),

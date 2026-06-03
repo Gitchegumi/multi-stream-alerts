@@ -78,6 +78,9 @@ AUTH_CREDENTIALS_ENABLED=false
 ONBOARDING_ENABLED=true
 ONBOARDING_REQUIRE_INVITE=true
 ONBOARDING_DEFAULT_WORKSPACE_ROLE=owner
+OIDC_ENROLLMENT_ENABLED=false
+# OIDC_ENROLLMENT_PROVIDER=authentik
+# OIDC_ENROLLMENT_URL=https://<your-oidc-provider>/<enrollment-path>
 INITIAL_ADMIN_EMAIL=<your-admin-email>
 ```
 
@@ -129,6 +132,18 @@ The first admin is still created by signing in through OIDC with the email in `I
 - A code can be revoked at any time. Revoked or expired codes are rejected at sign-in.
 - Multi-use codes track per-user redemptions in `invite_code_redemptions` so a single user cannot burn a code's quota twice.
 - Codes use a Crockford-style alphabet that drops lookalike characters (no `0`, `O`, `1`, `I`, `L`).
+
+#### External IdP enrollment metadata
+
+GitchAlerts invite codes are not the same thing as an Authentik invitation token. The GitchAlerts code remains the app-level invite and is the only code the user should receive. Optional external provider metadata can be linked to that invite, such as an Authentik `itoken`, so the admin sends only:
+
+```text
+/register?invite=<GITCHALERTS_CODE>
+```
+
+When `OIDC_ENROLLMENT_ENABLED=true`, opening that link validates the GitchAlerts invite, sets the short-lived app invite cookie, and redirects to the linked provider enrollment URL. For `OIDC_ENROLLMENT_PROVIDER=authentik`, GitchAlerts appends the stored external token as the `itoken` query parameter. The token is provider metadata; it is not shown to users and it is not used as the GitchAlerts invite code.
+
+Authentik enrollment flow setup is handled outside GitchAlerts for now. Create the Authentik invitation manually, paste its `itoken` into the GitchAlerts admin invite form, and optionally provide an enrollment URL override. A future enhancement may call the Authentik API automatically, but this implementation does not.
 
 #### Invite-free onboarding
 

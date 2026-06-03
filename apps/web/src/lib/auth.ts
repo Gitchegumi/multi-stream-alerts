@@ -55,6 +55,10 @@ export type OidcSignInDeps = {
   createChannelWithUniqueSlug: typeof createChannelWithUniqueSlug;
   redeemInviteCodeInTransaction: typeof redeemInviteCodeInTransaction;
   assertInviteIsUsable: typeof assertInviteIsUsable;
+  markIdentityProviderInviteUsed?: (
+    tx: Prisma.TransactionClient,
+    inviteCodeId: string,
+  ) => Promise<void>;
   env: NodeJS.ProcessEnv;
 };
 
@@ -75,6 +79,12 @@ const oidcSignInDeps: OidcSignInDeps = {
   createChannelWithUniqueSlug,
   redeemInviteCodeInTransaction,
   assertInviteIsUsable,
+  async markIdentityProviderInviteUsed(tx, inviteCodeId) {
+    await tx.identityProviderInvite.updateMany({
+      where: { inviteCodeId, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+  },
   env: process.env,
 };
 
@@ -319,6 +329,8 @@ export async function handleOidcSignIn(
             data: { role: redeemed.role },
           });
         }
+
+        await deps.markIdentityProviderInviteUsed?.(tx, invite.id);
       }
 
       const channel = await deps.createChannelWithUniqueSlug(

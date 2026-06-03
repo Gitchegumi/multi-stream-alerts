@@ -17,6 +17,23 @@ export type InviteCodeSummary = {
   note: string | null;
   createdByUserId: string;
   createdAt: Date;
+  identityProviderInvite: IdentityProviderInviteSummary | null;
+};
+
+export type IdentityProviderInviteInput = {
+  provider: string;
+  externalToken: string;
+  enrollmentUrl?: string | null;
+  expiresAt?: Date | null;
+};
+
+export type IdentityProviderInviteSummary = {
+  id: string;
+  provider: string;
+  enrollmentUrl: string | null;
+  expiresAt: Date | null;
+  usedAt: Date | null;
+  createdAt: Date;
 };
 
 export class InviteCodeError extends Error {
@@ -50,20 +67,46 @@ export async function createInviteCode(input: {
   maxUses?: number;
   expiresAt?: Date | null;
   note?: string | null;
+  identityProviderInvite?: IdentityProviderInviteInput | null;
 }): Promise<InviteCodeSummary> {
-  const maxUses = Math.max(1, Math.floor(input.maxUses ?? 1));
   const code = generateInviteCode();
   const created = await prisma.inviteCode.create({
-    data: {
-      code,
-      role: input.role ?? 'owner',
-      maxUses,
-      expiresAt: input.expiresAt ?? null,
-      note: input.note ?? null,
-      createdByUserId: input.createdByUserId,
-    },
+    data: buildInviteCodeCreateData(input, code),
+    include: { identityProviderInvite: true },
   });
   return toSummary(created);
+}
+
+export function buildInviteCodeCreateData(
+  input: {
+    createdByUserId: string;
+    role?: UserRole;
+    maxUses?: number;
+    expiresAt?: Date | null;
+    note?: string | null;
+    identityProviderInvite?: IdentityProviderInviteInput | null;
+  },
+  code: string,
+): Prisma.InviteCodeCreateInput {
+  const maxUses = Math.max(1, Math.floor(input.maxUses ?? 1));
+  return {
+    code,
+    role: input.role ?? 'owner',
+    maxUses,
+    expiresAt: input.expiresAt ?? null,
+    note: input.note ?? null,
+    createdBy: { connect: { id: input.createdByUserId } },
+    identityProviderInvite: input.identityProviderInvite
+      ? {
+          create: {
+            provider: input.identityProviderInvite.provider,
+            externalToken: input.identityProviderInvite.externalToken,
+            enrollmentUrl: input.identityProviderInvite.enrollmentUrl ?? null,
+            expiresAt: input.identityProviderInvite.expiresAt ?? null,
+          },
+        }
+      : undefined,
+  };
 }
 
 export async function listInviteCodes(createdByUserId?: string): Promise<InviteCodeSummary[]> {
@@ -71,6 +114,7 @@ export async function listInviteCodes(createdByUserId?: string): Promise<InviteC
     where: createdByUserId ? { createdByUserId } : undefined,
     orderBy: { createdAt: 'desc' },
     take: 200,
+    include: { identityProviderInvite: true },
   });
   return rows.map(toSummary);
 }
@@ -79,6 +123,7 @@ export async function revokeInviteCode(id: string): Promise<InviteCodeSummary | 
   const updated = await prisma.inviteCode.update({
     where: { id },
     data: { isRevoked: true },
+    include: { identityProviderInvite: true },
   });
   return toSummary(updated);
 }
@@ -243,6 +288,14 @@ function toSummary(row: {
   note: string | null;
   createdByUserId: string;
   createdAt: Date;
+  identityProviderInvite?: {
+    id: string;
+    provider: string;
+    enrollmentUrl: string | null;
+    expiresAt: Date | null;
+    usedAt: Date | null;
+    createdAt: Date;
+  } | null;
 }): InviteCodeSummary {
   return {
     id: row.id,
@@ -254,6 +307,33 @@ function toSummary(row: {
     isRevoked: row.isRevoked,
     note: row.note,
     createdByUserId: row.createdByUserId,
+    createdAt: row.createdAt,
+    identityProviderInvite: sanitizeIdentityProviderInviteForSummary(row.identityProviderInvite),
+  };
+}
+
+export function sanitizeIdentityProviderInviteForSummary(
+  row:
+    | {
+        id: string;
+        provider: string;
+        enrollmentUrl: string | null;
+        expiresAt: Date | null;
+        usedAt: Date | null;
+        createdAt: Date;
+      }
+    | null
+    | undefined,
+): IdentityProviderInviteSummary | null {
+  if (!row) {
+    return null;
+  }
+  return {
+    id: row.id,
+    provider: row.provider,
+    enrollmentUrl: row.enrollmentUrl,
+    expiresAt: row.expiresAt,
+    usedAt: row.usedAt,
     createdAt: row.createdAt,
   };
 }

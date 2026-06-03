@@ -16,12 +16,14 @@ type AuthMode = 'oidc' | 'credentials';
 export function RegisterForm({
   oidcEnabled,
   credentialsEnabled,
+  initialInviteCode = '',
 }: {
   oidcEnabled: boolean;
   credentialsEnabled: boolean;
+  initialInviteCode?: string;
 }) {
   const router = useRouter();
-  const [inviteCode, setInviteCode] = useState('');
+  const [inviteCode, setInviteCode] = useState(initialInviteCode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);

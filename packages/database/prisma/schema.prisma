@@ -104,10 +104,28 @@ model InviteCode {
   updatedAt       DateTime               @updatedAt @map("updated_at")
   createdBy       User                   @relation("InviteCodeCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
   redemptions     InviteCodeRedemption[]
+  identityProviderInvite IdentityProviderInvite?
 
   @@index([createdByUserId])
   @@index([expiresAt])
   @@map("invite_codes")
+}
+
+model IdentityProviderInvite {
+  id            String     @id @default(cuid())
+  inviteCodeId  String     @unique @map("invite_code_id")
+  provider      String
+  externalToken String     @map("external_token")
+  enrollmentUrl String?    @map("enrollment_url")
+  expiresAt     DateTime?  @map("expires_at")
+  usedAt        DateTime?  @map("used_at")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  inviteCode    InviteCode @relation(fields: [inviteCodeId], references: [id], onDelete: Cascade)
+
+  @@index([provider])
+  @@index([expiresAt])
+  @@map("identity_provider_invites")
 }
 
 model InviteCodeRedemption {

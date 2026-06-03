@@ -27,6 +27,7 @@ function makeDeps({
     inviteLookups: [],
     redemptions: [],
     channelsCreated: [],
+    usedMarks: [],
   };
 
   const invite = {
@@ -95,6 +96,9 @@ function makeDeps({
       return { invite, role: 'owner' };
     }),
     assertInviteIsUsable: mock.fn(() => undefined),
+    markIdentityProviderInviteUsed: mock.fn(async (_tx: unknown, inviteCodeId: string) => {
+      calls.usedMarks.push(inviteCodeId);
+    }),
     env: {
       INITIAL_ADMIN_EMAIL: 'admin@example.com',
       ...env,
@@ -118,6 +122,7 @@ test('OIDC-only invite onboarding provisions an unknown user', async () => {
   assert.equal(allowed, true);
   assert.equal(calls.usersCreated.length, 1);
   assert.equal(calls.redemptions.length, 1);
+  assert.deepEqual(calls.usedMarks, ['invite-1']);
   assert.equal(calls.channelsCreated.length, 1);
   assert.deepEqual(calls.membershipsCreated[0], {
     data: { channelId: 'channel-1', userId: 'user-1', role: 'owner' },
