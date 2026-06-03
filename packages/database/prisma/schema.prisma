@@ -46,18 +46,31 @@ enum AlertType {
   redemption
 }
 
+enum AssetSourceType {
+  local
+  s3
+  external_url
+}
+
+enum AssetType {
+  image
+  video
+  audio
+}
+
 model User {
-  id                String                @id @default(cuid())
-  authProvider      String                @map("auth_provider")
-  authSubject       String                @map("auth_subject")
-  email             String                @unique
-  displayName       String?               @map("display_name")
-  role              UserRole              @default(viewer)
-  createdAt         DateTime              @default(now()) @map("created_at")
-  updatedAt         DateTime              @updatedAt @map("updated_at")
-  ownedChannels     Channel[]             @relation("ChannelOwner")
+  id                String                 @id @default(cuid())
+  authProvider      String                 @map("auth_provider")
+  authSubject       String                 @map("auth_subject")
+  email             String                 @unique
+  displayName       String?                @map("display_name")
+  role              UserRole               @default(viewer)
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+  ownedChannels     Channel[]              @relation("ChannelOwner")
   memberships       ChannelMembership[]
-  inviteCodes       InviteCode[]          @relation("InviteCodeCreator")
+  assets            WorkspaceAsset[]
+  inviteCodes       InviteCode[]           @relation("InviteCodeCreator")
   inviteRedemptions InviteCodeRedemption[]
 
   @@unique([authProvider, authSubject])
@@ -65,18 +78,18 @@ model User {
 }
 
 model InviteCode {
-  id              String               @id @default(cuid())
-  code            String               @unique
-  role            UserRole             @default(owner)
-  maxUses         Int                  @default(1) @map("max_uses")
-  usedCount       Int                  @default(0) @map("used_count")
-  expiresAt       DateTime?            @map("expires_at")
-  isRevoked       Boolean              @default(false) @map("is_revoked")
+  id              String                 @id @default(cuid())
+  code            String                 @unique
+  role            UserRole               @default(owner)
+  maxUses         Int                    @default(1) @map("max_uses")
+  usedCount       Int                    @default(0) @map("used_count")
+  expiresAt       DateTime?              @map("expires_at")
+  isRevoked       Boolean                @default(false) @map("is_revoked")
   note            String?
-  createdByUserId String               @map("created_by_user_id")
-  createdAt       DateTime             @default(now()) @map("created_at")
-  updatedAt       DateTime             @updatedAt @map("updated_at")
-  createdBy       User                 @relation("InviteCodeCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  createdByUserId String                 @map("created_by_user_id")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+  createdBy       User                   @relation("InviteCodeCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
   redemptions     InviteCodeRedemption[]
 
   @@index([createdByUserId])
@@ -98,18 +111,20 @@ model InviteCodeRedemption {
 }
 
 model Channel {
-  id                  String              @id @default(cuid())
-  name                String
-  slug                String              @unique
-  ownerUserId         String?             @map("owner_user_id")
-  createdAt           DateTime            @default(now()) @map("created_at")
-  updatedAt           DateTime            @updatedAt @map("updated_at")
-  owner               User?               @relation("ChannelOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  id                     String                    @id @default(cuid())
+  name                   String
+  slug                   String                    @unique
+  ownerUserId            String?                   @map("owner_user_id")
+  createdAt              DateTime                  @default(now()) @map("created_at")
+  updatedAt              DateTime                  @updatedAt @map("updated_at")
+  owner                  User?                     @relation("ChannelOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   memberships            ChannelMembership[]
   alertEvents            AlertEvent[]
   alertTemplates         AlertTemplate[]
   alertConfigs           WorkspaceAlertConfig[]
   alertLayouts           WorkspaceAlertLayout[]
+  assets                 WorkspaceAsset[]
+  storageSettings        WorkspaceStorageSettings?
   overlayProfiles        OverlayProfile[]
   integrationCredentials IntegrationCredential[]
   deduplicationKeys      DeduplicationKey[]
@@ -164,16 +179,16 @@ model AlertEvent {
 }
 
 model AlertEventType {
-  id          String        @id @default(cuid())
+  id          String                 @id @default(cuid())
   platform    AlertPlatform
-  eventKey    String        @unique @map("event_key")
-  displayName String        @map("display_name")
-  legacyType  AlertType     @map("legacy_type")
+  eventKey    String                 @unique @map("event_key")
+  displayName String                 @map("display_name")
+  legacyType  AlertType              @map("legacy_type")
   description String?
-  sortOrder   Int           @default(0) @map("sort_order")
-  isActive    Boolean       @default(true) @map("is_active")
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
+  sortOrder   Int                    @default(0) @map("sort_order")
+  isActive    Boolean                @default(true) @map("is_active")
+  createdAt   DateTime               @default(now()) @map("created_at")
+  updatedAt   DateTime               @updatedAt @map("updated_at")
   configs     WorkspaceAlertConfig[]
 
   @@index([platform, sortOrder])
@@ -187,6 +202,8 @@ model WorkspaceAlertLayout {
   style             String                 @default("vertical")
   visualAssetUrl    String?                @map("visual_asset_url")
   soundAssetUrl     String?                @map("sound_asset_url")
+  visualAssetId     String?                @map("visual_asset_id")
+  soundAssetId      String?                @map("sound_asset_id")
   animationSettings Json                   @default("{}") @map("animation_settings")
   defaultDurationMs Int                    @default(6500) @map("default_duration_ms")
   defaultVolume     Int                    @default(80) @map("default_volume")
@@ -194,29 +211,76 @@ model WorkspaceAlertLayout {
   createdAt         DateTime               @default(now()) @map("created_at")
   updatedAt         DateTime               @updatedAt @map("updated_at")
   channel           Channel                @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  visualAsset       WorkspaceAsset?        @relation("LayoutVisualAsset", fields: [visualAssetId], references: [id], onDelete: SetNull)
+  soundAsset        WorkspaceAsset?        @relation("LayoutSoundAsset", fields: [soundAssetId], references: [id], onDelete: SetNull)
   configs           WorkspaceAlertConfig[]
 
   @@unique([channelId, name])
   @@index([channelId])
+  @@index([visualAssetId])
+  @@index([soundAssetId])
   @@map("workspace_alert_layouts")
 }
 
+model WorkspaceAsset {
+  id               String                 @id @default(cuid())
+  channelId        String                 @map("channel_id")
+  ownerUserId      String?                @map("owner_user_id")
+  sourceType       AssetSourceType        @map("source_type")
+  assetType        AssetType              @map("asset_type")
+  originalFilename String?                @map("original_filename")
+  storedFilename   String?                @map("stored_filename")
+  storageKey       String?                @map("storage_key")
+  externalUrl      String?                @map("external_url")
+  mimeType         String                 @map("mime_type")
+  fileSizeBytes    BigInt?                @map("file_size_bytes")
+  durationSeconds  Int?                   @map("duration_seconds")
+  storageProvider  String                 @map("storage_provider")
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+  channel          Channel                @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  owner            User?                  @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
+  visualLayouts    WorkspaceAlertLayout[] @relation("LayoutVisualAsset")
+  soundLayouts     WorkspaceAlertLayout[] @relation("LayoutSoundAsset")
+
+  @@index([channelId, assetType])
+  @@index([channelId, createdAt])
+  @@map("workspace_assets")
+}
+
+model WorkspaceStorageSettings {
+  id                           String   @id @default(cuid())
+  channelId                    String   @unique @map("channel_id")
+  quotaBytes                   BigInt   @default(536870912) @map("quota_bytes")
+  maxFileSizeBytes             BigInt   @default(52428800) @map("max_file_size_bytes")
+  allowedMimeTypes             String[] @default([]) @map("allowed_mime_types")
+  serverUploadsEnabled         Boolean  @default(true) @map("server_uploads_enabled")
+  nonAdminServerUploadsEnabled Boolean  @default(true) @map("non_admin_server_uploads_enabled")
+  externalUrlsEnabled          Boolean  @default(true) @map("external_urls_enabled")
+  s3Enabled                    Boolean  @default(false) @map("s3_enabled")
+  createdAt                    DateTime @default(now()) @map("created_at")
+  updatedAt                    DateTime @updatedAt @map("updated_at")
+  channel                      Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@map("workspace_storage_settings")
+}
+
 model WorkspaceAlertConfig {
-  id              String                @id @default(cuid())
-  channelId       String                @map("channel_id")
-  alertEventTypeId String               @map("alert_event_type_id")
-  enabled         Boolean               @default(false)
-  layoutId        String?               @map("layout_id")
-  displayName     String?               @map("display_name")
-  templateText    String?               @map("template_text")
-  durationMs      Int?                  @map("duration_ms")
-  volume          Int?
-  configJson      Json                  @default("{}") @map("config_json")
-  createdAt       DateTime              @default(now()) @map("created_at")
-  updatedAt       DateTime              @updatedAt @map("updated_at")
-  channel         Channel               @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  alertEventType  AlertEventType        @relation(fields: [alertEventTypeId], references: [id], onDelete: Cascade)
-  layout          WorkspaceAlertLayout? @relation(fields: [layoutId], references: [id], onDelete: Restrict)
+  id               String                @id @default(cuid())
+  channelId        String                @map("channel_id")
+  alertEventTypeId String                @map("alert_event_type_id")
+  enabled          Boolean               @default(false)
+  layoutId         String?               @map("layout_id")
+  displayName      String?               @map("display_name")
+  templateText     String?               @map("template_text")
+  durationMs       Int?                  @map("duration_ms")
+  volume           Int?
+  configJson       Json                  @default("{}") @map("config_json")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+  channel          Channel               @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  alertEventType   AlertEventType        @relation(fields: [alertEventTypeId], references: [id], onDelete: Cascade)
+  layout           WorkspaceAlertLayout? @relation(fields: [layoutId], references: [id], onDelete: Restrict)
 
   @@unique([channelId, alertEventTypeId])
   @@index([channelId, enabled])
@@ -259,7 +323,7 @@ model OverlayProfile {
 model IntegrationCredential {
   id                  String                        @id @default(cuid())
   channelId           String                        @map("channel_id")
-  provider            String                        // "kofi" | "twitch" | "youtube"
+  provider            String // "kofi" | "twitch" | "youtube"
   isEnabled           Boolean                       @default(false) @map("is_enabled")
   // Public, non-secret fields. Empty/null = not set.
   twitchBroadcasterId String?                       @map("twitch_broadcaster_id")

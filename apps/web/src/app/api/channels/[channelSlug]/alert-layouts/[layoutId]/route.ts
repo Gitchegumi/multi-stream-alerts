@@ -23,6 +23,8 @@ const layoutSchema = z.object({
   style: z.enum(['vertical', 'horizontal', 'compact', 'custom']).optional(),
   visualAssetUrl: nullableAssetUrlSchema,
   soundAssetUrl: nullableAssetUrlSchema,
+  visualAssetId: z.string().min(1).nullable().optional(),
+  soundAssetId: z.string().min(1).nullable().optional(),
   defaultDurationMs: z.number().int().min(500).max(60000).optional(),
   defaultVolume: z.number().int().min(0).max(100).optional(),
 });
@@ -67,13 +69,42 @@ export async function PATCH(
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid layout payload' }, { status: 400 });
   }
+  const assetError = await validateLayoutAssets(auth.channel.id, parsed.data);
+  if (assetError) {
+    return NextResponse.json({ error: assetError }, { status: 400 });
+  }
 
   const layout = await prisma.workspaceAlertLayout.update({
     where: { id: layoutId },
-    data: parsed.data,
+    data: {
+      ...parsed.data,
+      visualAssetUrl: parsed.data.visualAssetId ? null : parsed.data.visualAssetUrl,
+      soundAssetUrl: parsed.data.soundAssetId ? null : parsed.data.soundAssetUrl,
+    },
   });
 
   return NextResponse.json({ ok: true, layout });
+}
+
+async function validateLayoutAssets(
+  channelId: string,
+  data: { visualAssetId?: string | null; soundAssetId?: string | null },
+) {
+  if (data.visualAssetId) {
+    const asset = await prisma.workspaceAsset.findFirst({
+      where: { id: data.visualAssetId, channelId },
+    });
+    if (!asset || asset.assetType === 'audio') return 'Visual asset must be an image or video.';
+  }
+
+  if (data.soundAssetId) {
+    const asset = await prisma.workspaceAsset.findFirst({
+      where: { id: data.soundAssetId, channelId },
+    });
+    if (!asset || asset.assetType !== 'audio') return 'Sound asset must be audio.';
+  }
+
+  return null;
 }
 
 export async function DELETE(
@@ -125,7 +156,7 @@ export async function DELETE(
   return NextResponse.json({
     ok: true,
     fallbackLayoutId: fallback
-      ? (await getDefaultWorkspaceAlertLayout(auth.channel.id, layoutId))?.id ?? null
+      ? ((await getDefaultWorkspaceAlertLayout(auth.channel.id, layoutId))?.id ?? null)
       : null,
   });
 }

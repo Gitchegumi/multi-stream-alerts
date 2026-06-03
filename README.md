@@ -48,7 +48,9 @@ PUBLIC_BASE_URL=https://<your-alerts-domain>
 INGRESS_PUBLIC_BASE_URL=https://<your-alerts-domain>
 NEXTAUTH_URL=https://<your-alerts-domain>
 APP_DATA_PATH=/path/to/your/app/data
-ASSETS_PATH=/path/to/your/app/data/assets
+UPLOADS_PATH=/path/to/your/app/data/uploads
+UPLOAD_DIR=/app/uploads
+STORAGE_PROVIDER=local
 WEB_PORT=3000
 INGRESS_PORT=8080
 ```
@@ -229,7 +231,57 @@ manual.test
 
 Workspace owners/admins/editors can configure alert types from the dashboard. Each alert type has an enabled flag, display-name override, assigned layout, optional message template, duration override, volume override, and test button. Disabled alert types are not stored or published. Unknown or unmapped incoming events are logged with opaque metadata and can fall back to the platform's `*.widget_event` handler or `generic.widget_event` when that handler is enabled.
 
-Layouts can be created and edited independently. Each layout has a name, style (`vertical`, `horizontal`, `compact`, or `custom`), optional visual asset URL, optional sound asset URL, default duration, default volume, and preview button. Deleting a layout is blocked while active alert configs use it unless the request explicitly falls back those configs to the default layout first.
+Layouts can be created and edited independently. Each layout has a name, style (`vertical`, `horizontal`, `compact`, or `custom`), optional visual asset, optional sound asset, default duration, default volume, and preview button. Assets can come from the workspace asset library or from a direct URL fallback. Deleting a layout is blocked while active alert configs use it unless the request explicitly falls back those configs to the default layout first.
+
+## Asset Storage
+
+Uploaded media is never stored as large Postgres blobs. The database stores metadata, ownership, usage, and storage references in `workspace_assets`; bytes live in a storage backend.
+
+Supported MVP sources:
+
+- Local server storage, the default for self-hosted installs.
+- S3-compatible storage such as MinIO or AIStor.
+- User-managed external `http`/`https` asset URLs.
+
+Supported uploaded types are PNG, JPEG, WebP, GIF, safely checked SVG, MP4, WebM, MP3, WAV, and OGG. Upload validation checks file extension and detected file signature where practical, enforces per-workspace quota and max file size, sanitizes original filenames, and generates server-side storage names. Local and S3 assets are served through `/api/assets/:assetId/content`; dashboard sessions can preview them, and overlay browser sources must include a valid display key for the asset's workspace.
+
+Local storage example:
+
+```env
+STORAGE_PROVIDER=local
+UPLOAD_DIR=/app/uploads
+UPLOADS_PATH=/mnt/homelab/apps/gitchalerts/uploads
+DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES=536870912
+MAX_UPLOAD_SIZE_BYTES=52428800
+SERVER_UPLOADS_ENABLED=true
+NON_ADMIN_SERVER_UPLOADS_ENABLED=true
+EXTERNAL_ASSET_URLS_ENABLED=true
+```
+
+In Docker Compose, mount `${UPLOADS_PATH}` to `/app/uploads`. On TrueNAS or another homelab host, keep that path on persistent storage, not inside the container filesystem.
+
+S3-compatible storage example:
+
+```env
+STORAGE_PROVIDER=s3
+S3_ENDPOINT=https://minio.example.com
+S3_BUCKET=gitchalerts-assets
+S3_REGION=us-east-1
+S3_ACCESS_KEY_ID=<access-key>
+S3_SECRET_ACCESS_KEY=<secret-key>
+S3_FORCE_PATH_STYLE=true
+```
+
+The S3 mode uses ordinary SigV4 requests and works with path-style MinIO/AIStor deployments. The database still stores only metadata and object keys.
+
+External URLs:
+
+- Must be `http://` or `https://`.
+- `file://` URLs are rejected for browser-source security.
+- The app stores the URL and metadata but does not download or copy the file.
+- The URL must be reachable by the OBS/Meld browser source; if it breaks, the alert asset breaks.
+
+Raw local-machine file storage is intentionally not the MVP model. Browser `file://` references do not generalize to hosted dashboards or shared workspaces, and an OBS browser source usually cannot access another user's local files. A user-run local HTTP server can work when OBS can reach that machine, and a future desktop companion/local agent could sync or serve files, but those are separate features.
 
 ## Docker Compose
 
@@ -254,7 +306,7 @@ Postgres and Redis are not exposed publicly. Host storage is configured with env
 ```yaml
 ${APP_DATA_PATH}/postgres:/var/lib/postgresql/data
 ${APP_DATA_PATH}/redis:/data
-${ASSETS_PATH}:/app/assets
+${UPLOADS_PATH}:/app/uploads
 ```
 
 ## Reverse Proxy
@@ -367,4 +419,4 @@ The form field `data` should contain a JSON payload with a matching `verificatio
 - YouTube Super Chat, membership, and live chat support.
 - TikTok adapter research.
 - Dashboard controls for templates, overlay settings, and display key rotation.
-- Asset management for alert sounds/images.
+- Richer admin UI for per-workspace quotas, asset allowlists, and signed URL policies.
