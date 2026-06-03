@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mock } from 'node:test';
-import { handleRegister, type HandlerDeps } from '../route.ts';
+import { handleRegister, type HandlerDeps, setCredentialsEnabled } from '../route.ts';
 import { InviteCodeError } from '@multi-stream-alerts/database';
 
 function makeRequest(body: unknown): Request {
@@ -80,6 +80,9 @@ function makeTx() {
       })),
       update: mock.fn(async () => null),
     },
+    localCredential: {
+      create: mock.fn(async () => ({ id: 'lc-1' })),
+    },
     channelMembership: {
       create: mock.fn(async () => ({
         id: 'membership-1',
@@ -107,6 +110,7 @@ function makeTx() {
 // ---------------------------------------------------------------------------
 
 test('POST returns 200 and { ok: true } for valid registration', async () => {
+  setCredentialsEnabled(true);
   const deps = makeDeps();
   const request = makeRequest({
     inviteCode: 'ABCD-EFGH',
@@ -124,6 +128,7 @@ test('POST returns 200 and { ok: true } for valid registration', async () => {
 // ---------------------------------------------------------------------------
 
 test('POST returns 409 when the email is already taken', async () => {
+  setCredentialsEnabled(true);
   const deps = makeDeps({
     prisma: {
       ...makeDeps().prisma,
@@ -154,6 +159,7 @@ test('POST returns 409 when the email is already taken', async () => {
 // ---------------------------------------------------------------------------
 
 test('POST returns 400 when the invite code is not found', async () => {
+  setCredentialsEnabled(true);
   const deps = makeDeps({
     prisma: {
       ...makeDeps().prisma,
@@ -187,6 +193,7 @@ test('POST returns 400 when the invite code is not found', async () => {
 // ---------------------------------------------------------------------------
 
 test('POST returns 400 for missing invite code', async () => {
+  setCredentialsEnabled(true);
   const deps = makeDeps();
   const request = makeRequest({
     inviteCode: '',
@@ -198,6 +205,7 @@ test('POST returns 400 for missing invite code', async () => {
 });
 
 test('POST returns 400 for malformed email', async () => {
+  setCredentialsEnabled(true);
   const deps = makeDeps();
   const request = makeRequest({
     inviteCode: 'ABCD-EFGH',
@@ -209,6 +217,7 @@ test('POST returns 400 for malformed email', async () => {
 });
 
 test('POST returns 400 for short password', async () => {
+  setCredentialsEnabled(true);
   const deps = makeDeps();
   const request = makeRequest({
     inviteCode: 'ABCD-EFGH',
@@ -224,6 +233,7 @@ test('POST returns 400 for short password', async () => {
 // ---------------------------------------------------------------------------
 
 test('POST returns 429 after repeated requests from the same IP', async () => {
+  setCredentialsEnabled(true);
   const deps = makeDeps();
   const body = {
     inviteCode: 'ABCD-EFGH',

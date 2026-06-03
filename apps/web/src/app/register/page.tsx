@@ -12,6 +12,12 @@ export default async function RegisterPage() {
     redirect('/dashboard');
   }
 
+  const credentialsEnabled = process.env.AUTH_CREDENTIALS_ENABLED === 'true';
+
+  if (!credentialsEnabled) {
+    redirect('/signin');
+  }
+
   return (
     <main className="auth-shell">
       <section className="auth-card">
