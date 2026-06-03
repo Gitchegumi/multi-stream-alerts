@@ -12,7 +12,15 @@ import { createChannelWithUniqueSlug } from '@/lib/channel-slug';
 
 export const dynamic = 'force-dynamic';
 
-const credentialsEnabled = process.env.AUTH_CREDENTIALS_ENABLED === 'true';
+let credentialsEnabled = process.env.AUTH_CREDENTIALS_ENABLED === 'true';
+
+export function setCredentialsEnabled(enabled: boolean) {
+  credentialsEnabled = enabled;
+}
+
+export function getCredentialsEnabled() {
+  return credentialsEnabled;
+}
 
 const rateLimitWindowMs = 60_000;
 const maxAttemptsPerWindow = 10;
@@ -69,7 +77,7 @@ export async function handleRegister(
   request: Request,
   deps: HandlerDeps = defaultDeps,
 ): Promise<NextResponse> {
-  if (!credentialsEnabled) {
+  if (!getCredentialsEnabled()) {
     return NextResponse.json(
       { ok: false, error: 'Local credentials registration is disabled.' },
       { status: 403 },
