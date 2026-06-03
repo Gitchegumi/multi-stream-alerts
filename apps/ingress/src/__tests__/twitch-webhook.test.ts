@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mock } from 'node:test';
 import { createHmac } from 'node:crypto';
+import type { AlertEvent } from '@multi-stream-alerts/shared';
 import { verifyTwitchEventSubSignature } from '../twitch.js';
 import { handleTwitchWebhook } from '../twitch-webhook.js';
 
@@ -266,16 +267,32 @@ test('twitch webhook handler returns 401 when no candidate matches', async () =>
 });
 
 // ---------------------------------------------------------------------------
-// 6. Handler: 501 when a candidate matches (stub for future event normalization)
+// 6. Handler: 200 + event when a candidate matches and event normalizes
 // ---------------------------------------------------------------------------
 
-test('twitch webhook handler returns 501 when a candidate matches (stub for future event normalization)', async () => {
+test('twitch webhook handler returns 200 + event when a candidate matches', async () => {
   const messageId = 'msg-6';
   const timestamp = '2026-06-02T12:00:00Z';
-  const rawBody = Buffer.from('{"event":"stream.online"}');
+  const rawBody = Buffer.from(
+    JSON.stringify({
+      subscription: { type: 'channel.follow' },
+      event: { id: 'evt-1', user_name: 'StreamerFan' },
+    }),
+  );
 
   const storedSecret = 'channel-b-stored-secret';
   const signature = buildSignature({ secret: storedSecret, messageId, timestamp, rawBody });
+
+  const fakeEvent = {
+    id: 'alert-1',
+    channelId: 'channel-b',
+    platform: 'twitch',
+    type: 'follow',
+    eventKey: 'twitch.followed',
+    displayName: 'StreamerFan',
+    rawEventId: 'evt-1',
+    createdAt: '2026-06-02T12:00:00Z',
+  } as AlertEvent;
 
   const req = {
     headers: {
@@ -292,12 +309,12 @@ test('twitch webhook handler returns 501 when a candidate matches (stub for futu
       { channelId: 'channel-a', secret: 'stored-a' },
       { channelId: 'channel-b', secret: storedSecret },
     ]),
+    claimDedup: mock.fn(async () => true),
+    storeAndPublish: mock.fn(async () => fakeEvent),
   });
 
-  assert.equal(res.lastStatus, 501);
-  assert.deepEqual(res.lastBody, {
-    error: 'Twitch EventSub ingestion is stubbed pending per-workspace credential wiring',
-  });
+  assert.equal(res.lastStatus, 200);
+  assert.deepEqual(res.lastBody, { ok: true, event: fakeEvent });
 
   // Audit log line: info with the channelId.
   const info = captured.find((c) => c.method === 'info');
@@ -315,7 +332,12 @@ test('twitch webhook handler returns 501 when a candidate matches (stub for futu
 test('twitch webhook handler never logs the secret value', async () => {
   const messageId = 'msg-7';
   const timestamp = '2026-06-02T12:00:00Z';
-  const rawBody = Buffer.from('{"event":"stream.online"}');
+  const rawBody = Buffer.from(
+    JSON.stringify({
+      subscription: { type: 'channel.follow' },
+      event: { id: 'evt-2', user_name: 'FanTwo' },
+    }),
+  );
 
   const storedSecretA = 'stored-secret-ALPHA-AAAAA';
   const storedSecretB = 'stored-secret-BETA-BBBBB';
@@ -342,6 +364,20 @@ test('twitch webhook handler never logs the secret value', async () => {
       { channelId: 'channel-a', secret: storedSecretA },
       { channelId: 'channel-b', secret: storedSecretB },
     ]),
+    claimDedup: mock.fn(async () => true),
+    storeAndPublish: mock.fn(
+      async () =>
+        ({
+          id: 'alert-2',
+          channelId: 'channel-b',
+          platform: 'twitch',
+          type: 'follow',
+          eventKey: 'twitch.followed',
+          displayName: 'FanTwo',
+          rawEventId: 'evt-2',
+          createdAt: '2026-06-02T12:00:00Z',
+        }) as AlertEvent,
+    ),
   });
 
   // The handler accepted the request (signature matched storedSecretB).
@@ -368,4 +404,118 @@ test('twitch webhook handler never logs the secret value', async () => {
     // its full length — the secret checks above already cover the
     // substring of the signature that includes a real secret value.
   }
+});
+
+// ---------------------------------------------------------------------------
+// 8. Handler: 204 for unmapped event type
+// ---------------------------------------------------------------------------
+
+test('twitch webhook handler returns 204 for unmapped event type', async () => {
+  const messageId = 'msg-8';
+  const timestamp = '2026-06-02T12:00:00Z';
+  const rawBody = Buffer.from(
+    JSON.stringify({
+      subscription: { type: 'stream.online' },
+      event: { id: 'evt-3' },
+    }),
+  );
+
+  const storedSecret = 'channel-b-stored-secret';
+  const signature = buildSignature({ secret: storedSecret, messageId, timestamp, rawBody });
+
+  const req = {
+    headers: {
+      'twitch-eventsub-message-id': messageId,
+      'twitch-eventsub-message-timestamp': timestamp,
+      'twitch-eventsub-message-signature': signature,
+    },
+    body: rawBody,
+  };
+  const res = makeStubResponse();
+
+  await handleTwitchWebhook(req, res, {
+    getCandidates: mock.fn(async () => [{ channelId: 'channel-b', secret: storedSecret }]),
+  });
+
+  assert.equal(res.lastStatus, 204);
+
+  const warn = captured.find((c) => c.method === 'warn');
+  assert.ok(warn, 'expected a console.warn call');
+  assert.deepEqual(warn!.args, [
+    'twitch webhook suppressed',
+    { channelId: 'channel-b', reason: 'unmapped' },
+  ]);
+});
+
+// ---------------------------------------------------------------------------
+// 9. Handler: 200 + duplicate flag for duplicate event
+// ---------------------------------------------------------------------------
+
+test('twitch webhook handler returns 200 + duplicate flag for duplicate event', async () => {
+  const messageId = 'msg-9';
+  const timestamp = '2026-06-02T12:00:00Z';
+  const rawBody = Buffer.from(
+    JSON.stringify({
+      subscription: { type: 'channel.follow' },
+      event: { id: 'evt-4', user_name: 'DupUser' },
+    }),
+  );
+
+  const storedSecret = 'channel-b-stored-secret';
+  const signature = buildSignature({ secret: storedSecret, messageId, timestamp, rawBody });
+
+  const req = {
+    headers: {
+      'twitch-eventsub-message-id': messageId,
+      'twitch-eventsub-message-timestamp': timestamp,
+      'twitch-eventsub-message-signature': signature,
+    },
+    body: rawBody,
+  };
+  const res = makeStubResponse();
+
+  await handleTwitchWebhook(req, res, {
+    getCandidates: mock.fn(async () => [{ channelId: 'channel-b', secret: storedSecret }]),
+    claimDedup: mock.fn(async () => false),
+  });
+
+  assert.equal(res.lastStatus, 200);
+  assert.deepEqual(res.lastBody, { ok: true, duplicate: true });
+});
+
+// ---------------------------------------------------------------------------
+// 10. Handler: 200 + suppressed flag for disabled alert type
+// ---------------------------------------------------------------------------
+
+test('twitch webhook handler returns 200 + suppressed flag for disabled alert type', async () => {
+  const messageId = 'msg-10';
+  const timestamp = '2026-06-02T12:00:00Z';
+  const rawBody = Buffer.from(
+    JSON.stringify({
+      subscription: { type: 'channel.follow' },
+      event: { id: 'evt-5', user_name: 'SuppressedUser' },
+    }),
+  );
+
+  const storedSecret = 'channel-b-stored-secret';
+  const signature = buildSignature({ secret: storedSecret, messageId, timestamp, rawBody });
+
+  const req = {
+    headers: {
+      'twitch-eventsub-message-id': messageId,
+      'twitch-eventsub-message-timestamp': timestamp,
+      'twitch-eventsub-message-signature': signature,
+    },
+    body: rawBody,
+  };
+  const res = makeStubResponse();
+
+  await handleTwitchWebhook(req, res, {
+    getCandidates: mock.fn(async () => [{ channelId: 'channel-b', secret: storedSecret }]),
+    claimDedup: mock.fn(async () => true),
+    storeAndPublish: mock.fn(async () => null),
+  });
+
+  assert.equal(res.lastStatus, 200);
+  assert.deepEqual(res.lastBody, { ok: true, suppressed: true });
 });
