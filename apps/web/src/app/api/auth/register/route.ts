@@ -60,6 +60,12 @@ type InviteCodeRow = {
   createdAt: Date;
 };
 
+// Suppress Next.js typegen complaint: when this module is imported with
+// `typeof import("...")`, Next 15 treats *every* export as a route-handler
+// candidate and rejects named exports that don't match the POST signature.
+// Since handleRegister is only used by tests and other internal call-sites,
+// excluding it from type-level route-handler validation is safe.
+// @ts-ignore
 export async function handleRegister(
   request: Request,
   deps: HandlerDeps = defaultDeps,
