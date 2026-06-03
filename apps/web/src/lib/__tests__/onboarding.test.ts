@@ -46,3 +46,17 @@ test('onboarding invite requirement can be disabled', () => {
     },
   );
 });
+
+test('invalid onboarding booleans fall back to safe defaults', () => {
+  assert.deepEqual(
+    readOnboardingConfig({
+      ONBOARDING_ENABLED: 'yes',
+      ONBOARDING_REQUIRE_INVITE: 'no',
+    }),
+    {
+      enabled: true,
+      requireInvite: true,
+      defaultWorkspaceRole: 'owner',
+    },
+  );
+});

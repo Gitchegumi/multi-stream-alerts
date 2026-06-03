@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import type { Prisma, UserRole } from '@prisma/client';
 import { prisma } from './client';
+import { encryptSecret } from './secrets';
 
 const DEFAULT_CODE_LENGTH = 16;
 // Skip lookalikes: 0/O, 1/I/L.
@@ -100,7 +101,7 @@ export function buildInviteCodeCreateData(
       ? {
           create: {
             provider: input.identityProviderInvite.provider,
-            externalToken: input.identityProviderInvite.externalToken,
+            externalToken: encryptSecret(input.identityProviderInvite.externalToken),
             enrollmentUrl: input.identityProviderInvite.enrollmentUrl ?? null,
             expiresAt: input.identityProviderInvite.expiresAt ?? null,
           },

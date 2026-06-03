@@ -9,6 +9,7 @@ import {
   buildInviteCodeCreateData,
   sanitizeIdentityProviderInviteForSummary,
 } from '../invites.ts';
+import { decryptSecret } from '../secrets.ts';
 
 // NOTE: `redeemInviteCode` is intentionally not covered here because it
 // requires a real Prisma client. The atomic-race-condition logic inside
@@ -42,6 +43,7 @@ test('generateInviteCode rejects absurd lengths by clamping', () => {
 });
 
 test('buildInviteCodeCreateData stores linked external enrollment metadata', () => {
+  process.env.INSTANCE_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
   const expiresAt = new Date('2026-06-04T00:00:00.000Z');
   const data = buildInviteCodeCreateData(
     {
@@ -58,14 +60,12 @@ test('buildInviteCodeCreateData stores linked external enrollment metadata', () 
     'ABCD-EFGH',
   );
 
-  assert.deepEqual(data.identityProviderInvite, {
-    create: {
-      provider: 'authentik',
-      externalToken: 'secret-itoken',
-      enrollmentUrl: 'https://idp.example.com/enroll?flow=default',
-      expiresAt,
-    },
-  });
+  const create = data.identityProviderInvite?.create;
+  assert.equal(create?.provider, 'authentik');
+  assert.notEqual(create?.externalToken, 'secret-itoken');
+  assert.equal(decryptSecret(create?.externalToken ?? ''), 'secret-itoken');
+  assert.equal(create?.enrollmentUrl, 'https://idp.example.com/enroll?flow=default');
+  assert.equal(create?.expiresAt, expiresAt);
   assert.deepEqual(data.createdBy, { connect: { id: 'admin-1' } });
 });
 

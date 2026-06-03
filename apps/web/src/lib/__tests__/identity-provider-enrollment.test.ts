@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildExternalEnrollmentRedirectUrl,
+  isExternalEnrollmentExpired,
   readEnrollmentConfig,
 } from '../identity-provider-enrollment.ts';
 
@@ -48,4 +49,28 @@ test('readEnrollmentConfig defaults to disabled enrollment', () => {
     provider: null,
     enrollmentUrl: null,
   });
+});
+
+test('isExternalEnrollmentExpired returns true for past expiration', () => {
+  assert.equal(
+    isExternalEnrollmentExpired(
+      { expiresAt: new Date('2026-06-02T00:00:00.000Z') },
+      Date.parse('2026-06-03T00:00:00.000Z'),
+    ),
+    true,
+  );
+});
+
+test('isExternalEnrollmentExpired returns false for future expiration', () => {
+  assert.equal(
+    isExternalEnrollmentExpired(
+      { expiresAt: new Date('2026-06-04T00:00:00.000Z') },
+      Date.parse('2026-06-03T00:00:00.000Z'),
+    ),
+    false,
+  );
+});
+
+test('isExternalEnrollmentExpired returns false when expiration is null', () => {
+  assert.equal(isExternalEnrollmentExpired({ expiresAt: null }), false);
 });

@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import { mock } from 'node:test';
 import { handleInviteLink, type InviteLinkDeps } from '../route.ts';
 
-function makeRequest(invite = 'ABCD-EFGH') {
-  return new Request(`http://localhost/register/accept?invite=${encodeURIComponent(invite)}`);
+function makeRequest(invite = 'ABCD-EFGH', headers?: HeadersInit) {
+  return new Request(`http://localhost/register/accept?invite=${encodeURIComponent(invite)}`, {
+    headers,
+  });
 }
 
 function makeInvite(overrides: Partial<Awaited<ReturnType<InviteLinkDeps['findInvite']>>> = {}) {
@@ -34,6 +36,7 @@ function makeDeps(overrides: Partial<InviteLinkDeps> = {}): InviteLinkDeps {
       provider: 'authentik',
       enrollmentUrl: 'https://idp.example.com/fallback',
     },
+    decryptExternalToken: (value) => value,
     ...overrides,
   };
 }
@@ -69,7 +72,10 @@ test('/register invite link returns useful error when enrollment metadata is mis
   );
 
   assert.equal(response.status, 307);
-  assert.equal(response.headers.get('location'), 'http://localhost/register?error=missingEnrollment');
+  assert.equal(
+    response.headers.get('location'),
+    'http://localhost/register?error=missingEnrollment',
+  );
 });
 
 test('/register invite link can accept an invite without external enrollment mode', async () => {
@@ -81,9 +87,18 @@ test('/register invite link can accept an invite without external enrollment mod
   );
 
   assert.equal(response.status, 307);
-  assert.equal(
-    response.headers.get('location'),
-    'http://localhost/register?inviteReady=1&code=ABCD-EFGH',
-  );
+  assert.equal(response.headers.get('location'), 'http://localhost/register?inviteReady=1');
   assert.match(response.headers.get('set-cookie') ?? '', /ga_signup_invite=ABCD-EFGH/);
+});
+
+test('/register invite link rate limits repeated attempts', async () => {
+  const deps = makeDeps();
+  const headers = { 'x-forwarded-for': '203.0.113.44' };
+
+  for (let i = 0; i < 10; i += 1) {
+    await handleInviteLink(makeRequest('BAD-CODE', headers), deps);
+  }
+
+  const response = await handleInviteLink(makeRequest('BAD-CODE', headers), deps);
+  assert.equal(response.headers.get('location'), 'http://localhost/register?error=rateLimited');
 });

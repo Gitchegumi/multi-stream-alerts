@@ -18,6 +18,7 @@ CREATE TABLE "identity_provider_invites" (
 CREATE UNIQUE INDEX "identity_provider_invites_invite_code_id_key" ON "identity_provider_invites"("invite_code_id");
 CREATE INDEX "identity_provider_invites_provider_idx" ON "identity_provider_invites"("provider");
 CREATE INDEX "identity_provider_invites_expires_at_idx" ON "identity_provider_invites"("expires_at");
+CREATE INDEX "identity_provider_invites_used_at_idx" ON "identity_provider_invites"("used_at");
 
 ALTER TABLE "identity_provider_invites"
 ADD CONSTRAINT "identity_provider_invites_invite_code_id_fkey"

@@ -141,7 +141,7 @@ GitchAlerts invite codes are not the same thing as an Authentik invitation token
 /register?invite=<GITCHALERTS_CODE>
 ```
 
-When `OIDC_ENROLLMENT_ENABLED=true`, opening that link validates the GitchAlerts invite, sets the short-lived app invite cookie, and redirects to the linked provider enrollment URL. For `OIDC_ENROLLMENT_PROVIDER=authentik`, GitchAlerts appends the stored external token as the `itoken` query parameter. The token is provider metadata; it is not shown to users and it is not used as the GitchAlerts invite code.
+When `OIDC_ENROLLMENT_ENABLED=true`, opening that link validates the GitchAlerts invite, sets the short-lived app invite cookie, and redirects to the linked provider enrollment URL. For `OIDC_ENROLLMENT_PROVIDER=authentik`, GitchAlerts appends the stored external token as the `itoken` query parameter. The token is provider metadata; it is encrypted at rest with `INSTANCE_ENCRYPTION_KEY`, not shown to users, and not used as the GitchAlerts invite code.
 
 Authentik enrollment flow setup is handled outside GitchAlerts for now. Create the Authentik invitation manually, paste its `itoken` into the GitchAlerts admin invite form, and optionally provide an enrollment URL override. A future enhancement may call the Authentik API automatically, but this implementation does not.
 

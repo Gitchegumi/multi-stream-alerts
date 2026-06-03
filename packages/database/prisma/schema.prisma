@@ -125,6 +125,7 @@ model IdentityProviderInvite {
 
   @@index([provider])
   @@index([expiresAt])
+  @@index([usedAt])
   @@map("identity_provider_invites")
 }
 

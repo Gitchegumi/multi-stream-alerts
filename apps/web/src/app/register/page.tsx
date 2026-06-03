@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export default async function RegisterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ invite?: string; inviteReady?: string; code?: string; error?: string }>;
+  searchParams: Promise<{ invite?: string; inviteReady?: string; error?: string }>;
 }) {
   const session = await getServerSession(authOptions);
   if (session?.user?.id) {
@@ -52,7 +52,7 @@ export default async function RegisterPage({
         <RegisterForm
           oidcEnabled={oidcEnabled}
           credentialsEnabled={credentialsEnabled}
-          initialInviteCode={params.code}
+          inviteAccepted={params.inviteReady === '1'}
         />
         <p className="muted small">
           Already have an account? <Link href="/signin">Sign in</Link>.
@@ -70,6 +70,8 @@ function registerErrorMessage(error: string) {
       return 'This external enrollment link has expired. Ask an administrator for a new invite link.';
     case 'invalidInvite':
       return 'This invite code is invalid, expired, revoked, or already exhausted.';
+    case 'rateLimited':
+      return 'Too many invite attempts. Try again shortly.';
     default:
       return 'This invite link could not be used. Ask an administrator for a new invite link.';
   }

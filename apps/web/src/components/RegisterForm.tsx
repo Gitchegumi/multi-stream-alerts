@@ -16,14 +16,14 @@ type AuthMode = 'oidc' | 'credentials';
 export function RegisterForm({
   oidcEnabled,
   credentialsEnabled,
-  initialInviteCode = '',
+  inviteAccepted = false,
 }: {
   oidcEnabled: boolean;
   credentialsEnabled: boolean;
-  initialInviteCode?: string;
+  inviteAccepted?: boolean;
 }) {
   const router = useRouter();
-  const [inviteCode, setInviteCode] = useState(initialInviteCode);
+  const [inviteCode, setInviteCode] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +35,7 @@ export function RegisterForm({
     setError(null);
 
     const validation = validateInviteCodeForCookie(inviteCode);
-    if (!validation.ok) {
+    if (!validation.ok && !(mode === 'oidc' && inviteAccepted)) {
       setError(
         validation.reason === 'MISSING'
           ? 'Invite code is required.'
@@ -46,16 +46,18 @@ export function RegisterForm({
 
     if (mode === 'oidc') {
       startTransition(async () => {
-        const response = await fetch('/api/auth/signup', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ inviteCode: validation.inviteCode }),
-        });
+        if (validation.ok) {
+          const response = await fetch('/api/auth/signup', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ inviteCode: validation.inviteCode }),
+          });
 
-        if (!response.ok) {
-          const data = (await response.json().catch(() => ({}))) as { message?: string };
-          setError(data.message ?? 'Unable to continue with this invite code.');
-          return;
+          if (!response.ok) {
+            const data = (await response.json().catch(() => ({}))) as { message?: string };
+            setError(data.message ?? 'Unable to continue with this invite code.');
+            return;
+          }
         }
 
         const signInResult = await signIn('oidc', {
@@ -76,6 +78,11 @@ export function RegisterForm({
         router.push('/dashboard');
         router.refresh();
       });
+      return;
+    }
+
+    if (!validation.ok) {
+      setError('Invite code is required.');
       return;
     }
 
@@ -156,20 +163,22 @@ export function RegisterForm({
         </div>
       )}
 
-      <label className="auth-field">
-        <span>Invite code</span>
-        <input
-          type="text"
-          required
-          value={inviteCode}
-          onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-          disabled={pending}
-          placeholder="ABCD-EFGH-JKLM"
-          autoComplete="off"
-          spellCheck={false}
-          aria-invalid={error ? true : undefined}
-        />
-      </label>
+      {!(mode === 'oidc' && inviteAccepted) && (
+        <label className="auth-field">
+          <span>Invite code</span>
+          <input
+            type="text"
+            required
+            value={inviteCode}
+            onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+            disabled={pending}
+            placeholder="ABCD-EFGH-JKLM"
+            autoComplete="off"
+            spellCheck={false}
+            aria-invalid={error ? true : undefined}
+          />
+        </label>
+      )}
 
       {mode === 'credentials' && (
         <>

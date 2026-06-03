@@ -32,7 +32,13 @@ function readBoolean(value: string | undefined, defaultValue: boolean) {
   if (value === undefined || value === '') {
     return defaultValue;
   }
-  return value === 'true';
+  if (value === 'true') {
+    return true;
+  }
+  if (value === 'false') {
+    return false;
+  }
+  return defaultValue;
 }
 
 function readUserRole(value: string | undefined, defaultValue: UserRole): UserRole {

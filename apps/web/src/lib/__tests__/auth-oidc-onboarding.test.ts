@@ -142,6 +142,52 @@ test('unknown OIDC user without invite is rejected when invites are required', a
   assert.equal(calls.channelsCreated.length, 0);
 });
 
+test('initial admin OIDC user is created without an invite', async () => {
+  const { deps, calls } = makeDeps({
+    inviteCookie: null,
+    env: {
+      INITIAL_ADMIN_EMAIL: 'admin@example.com',
+      ONBOARDING_REQUIRE_INVITE: 'true',
+    },
+  });
+
+  const allowed = await handleOidcSignIn(
+    {
+      account: { provider: 'oidc', providerAccountId: 'admin-subject' },
+      profile: { sub: 'admin-subject', email: 'admin@example.com', name: 'Admin User' },
+    },
+    deps,
+  );
+
+  assert.equal(allowed, true);
+  assert.deepEqual(calls.usersCreated[0], {
+    data: {
+      authProvider: 'oidc',
+      authSubject: 'admin-subject',
+      email: 'admin@example.com',
+      displayName: 'Admin User',
+      role: 'admin',
+    },
+  });
+  assert.equal(calls.redemptions.length, 0);
+  assert.equal(calls.channelsCreated.length, 0);
+});
+
+test('non-admin unknown OIDC user follows normal invite policy', async () => {
+  const { deps, calls } = makeDeps({
+    inviteCookie: null,
+    env: {
+      INITIAL_ADMIN_EMAIL: 'admin@example.com',
+      ONBOARDING_REQUIRE_INVITE: 'true',
+    },
+  });
+
+  const allowed = await handleOidcSignIn({ account, profile }, deps);
+
+  assert.equal(allowed, false);
+  assert.equal(calls.usersCreated.length, 0);
+});
+
 test('unknown OIDC user without invite is created when invites are optional', async () => {
   const { deps, calls } = makeDeps({
     inviteCookie: null,
