@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mock } from 'node:test';
-import { POST, type HandlerDeps } from '../route.ts';
+import { handleRegister, type HandlerDeps } from '../route.ts';
 import { InviteCodeError } from '@multi-stream-alerts/database';
 
 function makeRequest(body: unknown): Request {
@@ -113,7 +113,7 @@ test('POST returns 200 and { ok: true } for valid registration', async () => {
     email: 'test@example.com',
     password: 'secure-password',
   });
-  const response = await POST(request, deps);
+  const response = await handleRegister(request, deps);
   assert.equal(response.status, 200);
   const json = (await response.json()) as { ok: boolean };
   assert.equal(json.ok, true);
@@ -143,7 +143,7 @@ test('POST returns 409 when the email is already taken', async () => {
     password: 'secure-password',
   });
 
-  const response = await POST(request, deps);
+  const response = await handleRegister(request, deps);
   assert.equal(response.status, 409);
   const json = (await response.json()) as { error: string };
   assert.ok(json.error.toLowerCase().includes('already exists'));
@@ -176,7 +176,7 @@ test('POST returns 400 when the invite code is not found', async () => {
     password: 'secure-password',
   });
 
-  const response = await POST(request, deps);
+  const response = await handleRegister(request, deps);
   assert.equal(response.status, 400);
   const json = (await response.json()) as { error: string };
   assert.ok(json.error.toLowerCase().includes('invite code'));
@@ -193,7 +193,7 @@ test('POST returns 400 for missing invite code', async () => {
     email: 'new@example.com',
     password: 'secure-password',
   });
-  const response = await POST(request, deps);
+  const response = await handleRegister(request, deps);
   assert.equal(response.status, 400);
 });
 
@@ -204,7 +204,7 @@ test('POST returns 400 for malformed email', async () => {
     email: 'not-an-email',
     password: 'secure-password',
   });
-  const response = await POST(request, deps);
+  const response = await handleRegister(request, deps);
   assert.equal(response.status, 400);
 });
 
@@ -215,7 +215,7 @@ test('POST returns 400 for short password', async () => {
     email: 'new@example.com',
     password: '123',
   });
-  const response = await POST(request, deps);
+  const response = await handleRegister(request, deps);
   assert.equal(response.status, 400);
 });
 
@@ -234,11 +234,11 @@ test('POST returns 429 after repeated requests from the same IP', async () => {
   // Burn through the 10-attempt window.
   for (let i = 0; i < 10; i += 1) {
     const req = makeRequest(body);
-    await POST(req, deps);
+    await handleRegister(req, deps);
   }
 
   const req = makeRequest(body);
-  const response = await POST(req, deps);
+  const response = await handleRegister(req, deps);
   assert.equal(response.status, 429);
   const json = (await response.json()) as { error: string };
   assert.ok(json.error.toLowerCase().includes('too many'));
