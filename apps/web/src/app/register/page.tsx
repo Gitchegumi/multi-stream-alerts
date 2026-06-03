@@ -12,7 +12,7 @@ export default async function RegisterPage() {
     redirect('/dashboard');
   }
 
-  const credentialsEnabled = process.env.AUTH_CREDENTIALS_ENABLED=*** 'true';
+  const credentialsEnabled = process.env.AUTH_CREDENTIALS_ENABLED === 'true';
 
   if (!credentialsEnabled) {
     redirect('/signin');
