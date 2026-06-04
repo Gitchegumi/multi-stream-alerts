@@ -378,6 +378,7 @@ export function OverlayLayoutEditor({
                   }`}
                   key={element.id}
                   role="button"
+                  aria-label={element.name}
                   tabIndex={0}
                   onPointerDown={(event) => startDrag(event, element)}
                   onClick={() => setSelectedId(element.id)}
@@ -596,23 +597,38 @@ function ElementPreview({
 function normalizeEditorLayout(settings: Record<string, unknown>): EditorLayout {
   const candidate = settings.editorLayout as Partial<EditorLayout> | undefined;
   if (candidate?.resolution?.width && Array.isArray(candidate.elements)) {
+    const resolution = {
+      width: coerceNumber(candidate.resolution.width, 1920, 1, 7680),
+      height: coerceNumber(candidate.resolution.height, 1080, 1, 4320),
+    };
+
     return {
-      resolution: {
-        width: Number(candidate.resolution.width) || 1920,
-        height: Number(candidate.resolution.height) || 1080,
-      },
+      resolution,
       elements: candidate.elements.flatMap((element, index) => {
         if (!element || typeof element !== 'object') return [];
         const parsed = element as Partial<OverlayElement>;
         const type = isElementType(parsed.type) ? parsed.type : 'alert-box';
         const base = createElement(type, index + 1, index + 1);
+        const width = coerceNumber(parsed.width, base.width, 1, resolution.width);
+        const height = coerceNumber(parsed.height, base.height, 1, resolution.height);
+        const properties = isRecord(parsed.properties) ? parsed.properties : {};
+        const assets = isRecord(parsed.assets) ? parsed.assets : {};
+
         return [
           {
             ...base,
-            ...parsed,
+            id: typeof parsed.id === 'string' && parsed.id.trim() ? parsed.id : base.id,
             type,
-            properties: { ...base.properties, ...(parsed.properties ?? {}) },
-            assets: { ...base.assets, ...(parsed.assets ?? {}) },
+            name: typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name : base.name,
+            x: coerceNumber(parsed.x, base.x, 0, resolution.width - width),
+            y: coerceNumber(parsed.y, base.y, 0, resolution.height - height),
+            width,
+            height,
+            zIndex: coerceNumber(parsed.zIndex, base.zIndex, 0, 10000),
+            visible: typeof parsed.visible === 'boolean' ? parsed.visible : base.visible,
+            locked: typeof parsed.locked === 'boolean' ? parsed.locked : base.locked,
+            properties: { ...base.properties, ...properties },
+            assets: { ...base.assets, ...assets },
           },
         ];
       }),
@@ -703,6 +719,15 @@ function isElementType(value: unknown): value is ElementType {
     value === 'alert-box' ||
     value === 'goal-bar'
   );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function coerceNumber(value: unknown, fallback: number, min: number, max: number) {
+  const numeric = typeof value === 'number' || typeof value === 'string' ? Number(value) : fallback;
+  return clamp(Math.round(Number.isFinite(numeric) ? numeric : fallback), min, max);
 }
 
 function clamp(value: number, min: number, max: number) {
