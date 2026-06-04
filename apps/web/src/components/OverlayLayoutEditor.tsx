@@ -1,6 +1,6 @@
 'use client';
 
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { useMemo, useRef, useState, useTransition } from 'react';
 
 type ElementType = 'text' | 'image' | 'video' | 'alert-box' | 'goal-bar';
@@ -194,12 +194,20 @@ export function OverlayLayoutEditor({
     function stop() {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
       setHistory((current) => [...current.slice(-24), draft]);
       setFuture([]);
     }
 
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+  }
+
+  function selectElementWithKeyboard(event: ReactKeyboardEvent<HTMLDivElement>, elementId: string) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    setSelectedId(elementId);
   }
 
   return (
@@ -327,6 +335,7 @@ export function OverlayLayoutEditor({
                   tabIndex={0}
                   onPointerDown={(event) => startDrag(event, element)}
                   onClick={() => setSelectedId(element.id)}
+                  onKeyDown={(event) => selectElementWithKeyboard(event, element.id)}
                   style={{
                     left: element.x * zoom,
                     top: element.y * zoom,
