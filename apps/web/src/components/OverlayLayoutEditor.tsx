@@ -154,7 +154,6 @@ export function OverlayLayoutEditor({
               editorLayout: draft,
             },
           }),
-          }),
         },
       );
       setResult(response.ok ? 'Saved.' : 'Could not save layout.');
@@ -532,9 +531,6 @@ function ElementPreview({
     return asset ? (
       <video src={asset.previewUrl} muted loop playsInline autoPlay />
     ) : (
-      <span>Missing Asset</span>
-    );
-  }
       <span>Missing Asset</span>
     );
   }
