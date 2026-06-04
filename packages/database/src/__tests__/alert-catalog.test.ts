@@ -47,6 +47,7 @@ test('getDefaultWorkspaceAlertLayout prefers a vertical system preset without na
     visualAssetUrl: null,
     soundAssetUrl: null,
     animationSettings: {},
+    editorLayout: {},
     defaultDurationMs: 6500,
     defaultVolume: 80,
     isSystemPreset: true,

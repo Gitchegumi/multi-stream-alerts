@@ -26,6 +26,7 @@ export default async function OverlayEditorPage({
         id: true,
         name: true,
         animationSettings: true,
+        editorLayout: true,
       },
     }),
     prisma.workspaceAsset.findMany({
@@ -50,6 +51,7 @@ export default async function OverlayEditorPage({
           id: layout.id,
           name: layout.name,
           animationSettings: asSettingsObject(layout.animationSettings),
+          editorLayout: asSettingsObject(layout.editorLayout),
         }}
         assets={assets.map((asset) => ({
           id: asset.id,

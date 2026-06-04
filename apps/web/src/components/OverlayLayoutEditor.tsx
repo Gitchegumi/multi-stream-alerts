@@ -3,9 +3,9 @@
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { useMemo, useRef, useState, useTransition } from 'react';
 
-type ElementType = 'text' | 'image' | 'video' | 'alert-box' | 'goal-bar';
+export type ElementType = 'text' | 'image' | 'video' | 'alert-box' | 'goal-bar';
 
-type OverlayElement = {
+export type OverlayElement = {
   id: string;
   type: ElementType;
   name: string;
@@ -34,9 +34,15 @@ type OverlayElement = {
   };
 };
 
-type EditorLayout = {
+export type EditorLayout = {
+  version: 1;
   resolution: { width: number; height: number };
   elements: OverlayElement[];
+};
+
+export type NormalizedEditorLayout = {
+  layout: EditorLayout;
+  warnings: string[];
 };
 
 type WorkspaceAsset = {
@@ -51,6 +57,7 @@ type AlertLayout = {
   id: string;
   name: string;
   animationSettings: Record<string, unknown>;
+  editorLayout: Record<string, unknown>;
 };
 
 const palette: Array<{ type: ElementType; label: string }> = [
@@ -60,6 +67,7 @@ const palette: Array<{ type: ElementType; label: string }> = [
   { type: 'alert-box', label: 'Alert Box' },
   { type: 'goal-bar', label: 'Goal Bar' },
 ];
+const EDITOR_LAYOUT_VERSION = 1;
 
 export function OverlayLayoutEditor({
   channelSlug,
@@ -72,7 +80,11 @@ export function OverlayLayoutEditor({
   assets: WorkspaceAsset[];
   canManage: boolean;
 }) {
-  const initialLayout = useMemo(() => normalizeEditorLayout(layout.animationSettings), [layout]);
+  const normalized = useMemo(
+    () => normalizeEditorLayout(layout.editorLayout, layout.animationSettings),
+    [layout],
+  );
+  const initialLayout = normalized.layout;
   const [draft, setDraft] = useState(initialLayout);
   const [selectedId, setSelectedId] = useState(draft.elements[0]?.id ?? '');
   const [history, setHistory] = useState<EditorLayout[]>([]);
@@ -151,10 +163,7 @@ export function OverlayLayoutEditor({
             method: 'PATCH',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({
-              animationSettings: {
-                ...layout.animationSettings,
-                editorLayout: draft,
-              },
+              editorLayout: serializeEditorLayout(draft),
             }),
           },
         );
@@ -318,6 +327,11 @@ export function OverlayLayoutEditor({
 
       {result ? <p className="overlay-editor-result muted">{result}</p> : null}
       {!canManage ? <p className="overlay-editor-result muted">Read-only access.</p> : null}
+      {normalized.warnings.length ? (
+        <p className="overlay-editor-result muted">
+          Layout data was repaired while loading: {normalized.warnings.join('; ')}
+        </p>
+      ) : null}
 
       <div className="overlay-editor-grid">
         <aside className="overlay-editor-sidebar">
@@ -594,47 +608,118 @@ function ElementPreview({
   return <span>{text}</span>;
 }
 
-function normalizeEditorLayout(settings: Record<string, unknown>): EditorLayout {
-  const candidate = settings.editorLayout as Partial<EditorLayout> | undefined;
-  if (candidate?.resolution?.width && Array.isArray(candidate.elements)) {
+export function normalizeEditorLayout(
+  editorLayout: unknown,
+  legacySettings: Record<string, unknown> = {},
+): NormalizedEditorLayout {
+  const warnings: string[] = [];
+  const candidate =
+    isRecord(editorLayout) && Object.keys(editorLayout).length
+      ? editorLayout
+      : isRecord(legacySettings.editorLayout)
+        ? legacySettings.editorLayout
+        : null;
+
+  if (candidate) {
+    const version = candidate.version ?? 1;
+    if (!('version' in candidate)) {
+      warnings.push('missing editor layout version');
+    }
+    if (version !== EDITOR_LAYOUT_VERSION) {
+      warnings.push(
+        typeof version === 'number' && version > EDITOR_LAYOUT_VERSION
+          ? `unsupported editor layout version ${version}`
+          : 'missing or invalid editor layout version',
+      );
+      if (typeof version === 'number' && version > EDITOR_LAYOUT_VERSION) {
+        return { layout: createDefaultLayout(), warnings };
+      }
+    }
+
+    if (!isRecord(candidate.resolution) || !Array.isArray(candidate.elements)) {
+      warnings.push('invalid layout shape');
+      return { layout: createDefaultLayout(), warnings };
+    }
+
     const resolution = {
       width: coerceNumber(candidate.resolution.width, 1920, 1, 7680),
       height: coerceNumber(candidate.resolution.height, 1080, 1, 4320),
     };
+    if (
+      resolution.width !== Number(candidate.resolution.width) ||
+      resolution.height !== Number(candidate.resolution.height)
+    ) {
+      warnings.push('resolution values were normalized');
+    }
 
     return {
-      resolution,
-      elements: candidate.elements.flatMap((element, index) => {
-        if (!element || typeof element !== 'object') return [];
-        const parsed = element as Partial<OverlayElement>;
-        const type = isElementType(parsed.type) ? parsed.type : 'alert-box';
-        const base = createElement(type, index + 1, index + 1);
-        const width = coerceNumber(parsed.width, base.width, 1, resolution.width);
-        const height = coerceNumber(parsed.height, base.height, 1, resolution.height);
-        const properties = isRecord(parsed.properties) ? parsed.properties : {};
-        const assets = isRecord(parsed.assets) ? parsed.assets : {};
+      layout: {
+        version: EDITOR_LAYOUT_VERSION,
+        resolution,
+        elements: candidate.elements.flatMap((element, index) => {
+          if (!isRecord(element)) {
+            warnings.push(`element ${index + 1} was skipped because it is not an object`);
+            return [];
+          }
+          const parsed = element as Partial<OverlayElement>;
+          if (!isElementType(parsed.type)) {
+            warnings.push(`element ${index + 1} was skipped because its type is unsupported`);
+            return [];
+          }
+          const type = parsed.type;
+          const base = createElement(type, index + 1, index + 1);
+          const width = coerceNumber(parsed.width, base.width, 1, resolution.width);
+          const height = coerceNumber(parsed.height, base.height, 1, resolution.height);
+          const properties = isRecord(parsed.properties) ? parsed.properties : {};
+          const assets = isRecord(parsed.assets) ? parsed.assets : {};
+          if (
+            parsed.x !== undefined &&
+            parsed.y !== undefined &&
+            parsed.width !== undefined &&
+            parsed.height !== undefined &&
+            (width !== Number(parsed.width) ||
+              height !== Number(parsed.height) ||
+              coerceNumber(parsed.x, base.x, 0, resolution.width - width) !== Number(parsed.x) ||
+              coerceNumber(parsed.y, base.y, 0, resolution.height - height) !== Number(parsed.y))
+          ) {
+            warnings.push(`${base.name} transform values were normalized`);
+          }
 
-        return [
-          {
-            ...base,
-            id: typeof parsed.id === 'string' && parsed.id.trim() ? parsed.id : base.id,
-            type,
-            name: typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name : base.name,
-            x: coerceNumber(parsed.x, base.x, 0, resolution.width - width),
-            y: coerceNumber(parsed.y, base.y, 0, resolution.height - height),
-            width,
-            height,
-            zIndex: coerceNumber(parsed.zIndex, base.zIndex, 0, 10000),
-            visible: typeof parsed.visible === 'boolean' ? parsed.visible : base.visible,
-            locked: typeof parsed.locked === 'boolean' ? parsed.locked : base.locked,
-            properties: { ...base.properties, ...properties },
-            assets: { ...base.assets, ...assets },
-          },
-        ];
-      }),
+          return [
+            {
+              ...base,
+              id: typeof parsed.id === 'string' && parsed.id.trim() ? parsed.id : base.id,
+              type,
+              name: typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name : base.name,
+              x: coerceNumber(parsed.x, base.x, 0, resolution.width - width),
+              y: coerceNumber(parsed.y, base.y, 0, resolution.height - height),
+              width,
+              height,
+              zIndex: coerceNumber(parsed.zIndex, base.zIndex, 0, 10000),
+              visible: typeof parsed.visible === 'boolean' ? parsed.visible : base.visible,
+              locked: typeof parsed.locked === 'boolean' ? parsed.locked : base.locked,
+              properties: { ...base.properties, ...properties },
+              assets: { ...base.assets, ...assets },
+            },
+          ];
+        }),
+      },
+      warnings,
     };
   }
+  return { layout: createDefaultLayout(), warnings };
+}
+
+export function serializeEditorLayout(layout: EditorLayout): EditorLayout {
   return {
+    ...layout,
+    version: EDITOR_LAYOUT_VERSION,
+  };
+}
+
+function createDefaultLayout(): EditorLayout {
+  return {
+    version: EDITOR_LAYOUT_VERSION,
     resolution: { width: 1920, height: 1080 },
     elements: [createElement('alert-box', 1, 1)],
   };

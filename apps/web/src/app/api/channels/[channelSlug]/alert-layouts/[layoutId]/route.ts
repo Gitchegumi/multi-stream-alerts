@@ -27,6 +27,7 @@ const layoutSchema = z.object({
   visualAssetId: z.string().min(1).nullable().optional(),
   soundAssetId: z.string().min(1).nullable().optional(),
   animationSettings: z.record(z.string(), z.unknown()).optional(),
+  editorLayout: z.record(z.string(), z.unknown()).optional(),
   defaultDurationMs: z.number().int().min(500).max(60000).optional(),
   defaultVolume: z.number().int().min(0).max(100).optional(),
 });
@@ -79,6 +80,7 @@ export async function PATCH(
   const data: Prisma.WorkspaceAlertLayoutUncheckedUpdateInput = {
     ...parsed.data,
     animationSettings: parsed.data.animationSettings as Prisma.InputJsonValue | undefined,
+    editorLayout: parsed.data.editorLayout as Prisma.InputJsonValue | undefined,
     visualAssetUrl: parsed.data.visualAssetId ? null : parsed.data.visualAssetUrl,
     soundAssetUrl: parsed.data.soundAssetId ? null : parsed.data.soundAssetUrl,
   };
