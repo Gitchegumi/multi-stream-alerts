@@ -154,6 +154,7 @@ export function OverlayLayoutEditor({
               editorLayout: draft,
             },
           }),
+        },
       );
       setResult(response.ok ? 'Saved.' : 'Could not save layout.');
     });
