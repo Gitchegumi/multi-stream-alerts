@@ -535,6 +535,8 @@ function ElementPreview({
     );
   }
   if (element.type === 'goal-bar') {
+    return (
+      <div>
         <strong>{text}</strong>
       </div>
     );
