@@ -210,6 +210,48 @@ export function OverlayLayoutEditor({
     setSelectedId(elementId);
   }
 
+  function updateTransformValue(
+    element: OverlayElement,
+    key: 'x' | 'y' | 'width' | 'height' | 'zIndex',
+    value: number,
+  ) {
+    if (!Number.isFinite(value)) return;
+
+    if (key === 'width') {
+      const width = clamp(Math.round(value), 1, draft.resolution.width);
+      patchElement(element.id, {
+        width,
+        x: clamp(element.x, 0, draft.resolution.width - width),
+      });
+      return;
+    }
+
+    if (key === 'height') {
+      const height = clamp(Math.round(value), 1, draft.resolution.height);
+      patchElement(element.id, {
+        height,
+        y: clamp(element.y, 0, draft.resolution.height - height),
+      });
+      return;
+    }
+
+    if (key === 'x') {
+      patchElement(element.id, {
+        x: clamp(Math.round(value), 0, draft.resolution.width - element.width),
+      });
+      return;
+    }
+
+    if (key === 'y') {
+      patchElement(element.id, {
+        y: clamp(Math.round(value), 0, draft.resolution.height - element.height),
+      });
+      return;
+    }
+
+    patchElement(element.id, { zIndex: Math.max(0, Math.round(value)) });
+  }
+
   return (
     <div className="overlay-editor-shell">
       <header className="overlay-editor-nav">
@@ -350,9 +392,6 @@ export function OverlayLayoutEditor({
                   }}
                 >
                   <ElementPreview element={element} assetById={assetById} />
-                  {element.id === selectedId && !previewing ? (
-                    <span className="resize-corner" />
-                  ) : null}
                 </div>
               ))}
           </div>
@@ -378,10 +417,11 @@ export function OverlayLayoutEditor({
                     <input
                       className="input"
                       type="number"
+                      min={key === 'width' || key === 'height' ? 1 : 0}
                       value={selected[key]}
                       disabled={!canManage}
                       onChange={(event) =>
-                        patchElement(selected.id, { [key]: Number(event.target.value) })
+                        updateTransformValue(selected, key, event.target.valueAsNumber)
                       }
                     />
                   </label>

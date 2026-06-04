@@ -546,15 +546,6 @@ audio.asset-preview {
   object-fit: contain;
 }
 
-.resize-corner {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 10px;
-  height: 10px;
-  background: var(--accent);
-}
-
 .goal-preview {
   position: relative;
   display: grid;
