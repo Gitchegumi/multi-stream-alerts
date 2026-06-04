@@ -34,8 +34,9 @@ export function AssetLibrary({
   const [filter, setFilter] = useState<AssetFilter>('all');
   const [externalUrl, setExternalUrl] = useState('');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [result, setResult] = useState<string | null>(null);
+  const [result, setResult] = useState<{ text: string; isError: boolean } | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [fileInputKey, setFileInputKey] = useState(0);
 
   const filteredAssets = useMemo(() => {
     if (filter === 'all') return assets;
@@ -46,7 +47,7 @@ export function AssetLibrary({
     startTransition(async () => {
       const response = await fetch(`/api/channels/${encodeURIComponent(channelSlug)}/assets`);
       if (!response.ok) {
-        setResult('Could not refresh asset library.');
+        setResult({ text: 'Could not refresh asset library.', isError: true });
         return;
       }
       const body = (await response.json()) as {
@@ -70,9 +71,16 @@ export function AssetLibrary({
         method: 'POST',
         body: formData,
       });
-      setResult(response.ok ? 'Asset uploaded.' : await errorMessage(response, 'Upload failed.'));
-      setUploadFile(null);
-      if (response.ok) refreshAssets();
+      if (response.ok) {
+        setResult({ text: 'Asset uploaded.', isError: false });
+        setUploadFile(null);
+        setFileInputKey((k) => k + 1);
+        refreshAssets();
+      } else {
+        setResult({ text: await errorMessage(response, 'Upload failed.'), isError: true });
+        setUploadFile(null);
+        setFileInputKey((k) => k + 1);
+      }
     });
   }
 
@@ -86,14 +94,12 @@ export function AssetLibrary({
         method: 'POST',
         body: formData,
       });
-      setResult(
-        response.ok
-          ? 'External asset added.'
-          : await errorMessage(response, 'Could not add asset.'),
-      );
       if (response.ok) {
+        setResult({ text: 'External asset added.', isError: false });
         setExternalUrl('');
         refreshAssets();
+      } else {
+        setResult({ text: await errorMessage(response, 'Could not add asset.'), isError: true });
       }
     });
   }
@@ -108,19 +114,28 @@ export function AssetLibrary({
         { method: 'DELETE' },
       );
       if (response.status === 409 && !force) {
-        setResult('Asset is assigned to a layout. Remove it first or force delete.');
+        setResult({
+          text: 'Asset is assigned to a layout. Remove it first or force delete.',
+          isError: true,
+        });
         return;
       }
-      setResult(
-        response.ok ? 'Asset deleted.' : await errorMessage(response, 'Could not delete asset.'),
-      );
-      if (response.ok) refreshAssets();
+      if (response.ok) {
+        setResult({ text: 'Asset deleted.', isError: false });
+        refreshAssets();
+      } else {
+        setResult({ text: await errorMessage(response, 'Could not delete asset.'), isError: true });
+      }
     });
   }
 
   return (
     <div className="asset-library">
-      {result ? <p className="muted">{result}</p> : null}
+      {result ? (
+        <p className={result.isError ? 'error' : 'pill-ok'} role="alert">
+          {result.text}
+        </p>
+      ) : null}
 
       <p className="muted small">
         {formatBytes(storageUsage.usedBytes)} of {formatBytes(storageUsage.quotaBytes)} used. Max
@@ -131,6 +146,7 @@ export function AssetLibrary({
         <label className="field">
           <span>Upload asset</span>
           <input
+            key={fileInputKey}
             className="input"
             type="file"
             accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,video/mp4,video/webm,audio/mpeg,audio/wav,audio/ogg"
