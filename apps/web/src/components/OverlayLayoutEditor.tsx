@@ -524,8 +524,11 @@ function ElementPreview({
   if (element.type === 'video') {
     const asset = element.assets?.video ? assetById.get(element.assets.video) : null;
     return asset ? (
-      <video src={asset.previewUrl} muted loop playsInline />
+      <video src={asset.previewUrl} muted loop playsInline autoPlay />
     ) : (
+      <span>Missing Asset</span>
+    );
+  }
       <span>Missing Asset</span>
     );
   }
