@@ -52,7 +52,7 @@ export function InviteManager({
 }) {
   const router = useRouter();
   const [codes, setCodes] = useState(initialCodes);
-  const [redemptions] = useState(initialRedemptions);
+  const [redemptions, setRedemptions] = useState(initialRedemptions);
   const [role, setRole] = useState<CodeSummary['role']>('owner');
   const [maxUses, setMaxUses] = useState(1);
   const [expiresAt, setExpiresAt] = useState('');
@@ -63,6 +63,7 @@ export function InviteManager({
   const [externalExpiresAt, setExternalExpiresAt] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const revokedCount = codes.filter((code) => code.isRevoked).length;
 
   function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -142,6 +143,53 @@ export function InviteManager({
       const data = (await response.json()) as { code: CodeSummary };
       setCodes((current) =>
         current.map((c) => (c.id === id ? { ...c, isRevoked: data.code.isRevoked } : c)),
+      );
+      router.refresh();
+    });
+  }
+
+  function handlePurgeRevoked(id: string) {
+    setError(null);
+    startTransition(async () => {
+      const response = await fetch('/api/admin/invites', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'purge_revoked', id }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        deletedCount?: number;
+        error?: string;
+      };
+      if (!response.ok || !data.deletedCount) {
+        setError(data.error ?? 'Failed to purge revoked invite code.');
+        return;
+      }
+      setCodes((current) => current.filter((code) => code.id !== id));
+      setRedemptions((current) => current.filter((redemption) => redemption.inviteCodeId !== id));
+      router.refresh();
+    });
+  }
+
+  function handlePurgeAllRevoked() {
+    setError(null);
+    startTransition(async () => {
+      const revokedIds = new Set(codes.filter((code) => code.isRevoked).map((code) => code.id));
+      const response = await fetch('/api/admin/invites', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'purge_all_revoked' }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        deletedCount?: number;
+        error?: string;
+      };
+      if (!response.ok) {
+        setError(data.error ?? 'Failed to purge revoked invite codes.');
+        return;
+      }
+      setCodes((current) => current.filter((code) => !code.isRevoked));
+      setRedemptions((current) =>
+        current.filter((redemption) => !revokedIds.has(redemption.inviteCodeId)),
       );
       router.refresh();
     });
@@ -252,7 +300,26 @@ export function InviteManager({
       </div>
 
       <div className="panel">
-        <h2>Active and historical codes</h2>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: 12,
+            alignItems: 'center',
+          }}
+        >
+          <h2>Active and historical codes</h2>
+          {revokedCount > 0 && (
+            <button
+              type="button"
+              className="button secondary"
+              onClick={handlePurgeAllRevoked}
+              disabled={pending}
+            >
+              Purge revoked ({revokedCount})
+            </button>
+          )}
+        </div>
         {codes.length === 0 ? (
           <p className="muted">No invite codes yet.</p>
         ) : (
@@ -307,6 +374,16 @@ export function InviteManager({
                         disabled={pending}
                       >
                         Revoke
+                      </button>
+                    )}
+                    {code.isRevoked && (
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() => handlePurgeRevoked(code.id)}
+                        disabled={pending}
+                      >
+                        Purge
                       </button>
                     )}
                   </div>

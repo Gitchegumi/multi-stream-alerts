@@ -4,12 +4,26 @@ import {
   prisma,
   createInviteCode,
   listInviteCodes,
+  purgeRevokedInviteCode,
+  purgeRevokedInviteCodes,
   revokeInviteCode,
 } from '@multi-stream-alerts/database';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
+
+export type HandlerDeps = {
+  revokeInviteCode: typeof revokeInviteCode;
+  purgeRevokedInviteCode: typeof purgeRevokedInviteCode;
+  purgeRevokedInviteCodes: typeof purgeRevokedInviteCodes;
+};
+
+const defaultDeps: HandlerDeps = {
+  revokeInviteCode,
+  purgeRevokedInviteCode,
+  purgeRevokedInviteCodes,
+};
 
 const createSchema = z.object({
   role: z.enum(['admin', 'owner', 'editor', 'viewer']).optional(),
@@ -26,9 +40,19 @@ const createSchema = z.object({
     .optional(),
 });
 
-const revokeSchema = z.object({
-  id: z.string().min(1),
-});
+const deleteSchema = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('revoke'),
+    id: z.string().min(1),
+  }),
+  z.object({
+    action: z.literal('purge_revoked'),
+    id: z.string().min(1),
+  }),
+  z.object({
+    action: z.literal('purge_all_revoked'),
+  }),
+]);
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions);
@@ -106,14 +130,41 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const parsed = revokeSchema.safeParse(body);
+  const result = await handleDelete({ rawBody: body });
+  return NextResponse.json(result.body, { status: result.status });
+}
+
+export async function handleDelete({
+  rawBody,
+  deps = defaultDeps,
+}: {
+  rawBody: unknown;
+  deps?: HandlerDeps;
+}): Promise<{ status: number; body: unknown }> {
+  const parsed = deleteSchema.safeParse({
+    action: 'revoke',
+    ...(rawBody as Record<string, unknown>),
+  });
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid revoke payload' }, { status: 400 });
+    return { status: 400, body: { error: 'Invalid invite delete payload' } };
   }
 
-  const updated = await revokeInviteCode(parsed.data.id);
-  if (!updated) {
-    return NextResponse.json({ error: 'Invite code not found' }, { status: 404 });
+  if (parsed.data.action === 'purge_all_revoked') {
+    const deletedCount = await deps.purgeRevokedInviteCodes();
+    return { status: 200, body: { deletedCount } };
   }
-  return NextResponse.json({ code: updated });
+
+  if (parsed.data.action === 'purge_revoked') {
+    const deletedCount = await deps.purgeRevokedInviteCode(parsed.data.id);
+    if (deletedCount === 0) {
+      return { status: 404, body: { error: 'Revoked invite code not found' } };
+    }
+    return { status: 200, body: { deletedCount } };
+  }
+
+  const updated = await deps.revokeInviteCode(parsed.data.id);
+  if (!updated) {
+    return { status: 404, body: { error: 'Invite code not found' } };
+  }
+  return { status: 200, body: { code: updated } };
 }
