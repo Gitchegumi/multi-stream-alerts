@@ -154,14 +154,13 @@ export function OverlayLayoutEditor({
               editorLayout: draft,
             },
           }),
-        },
       );
       setResult(response.ok ? 'Saved.' : 'Could not save layout.');
     });
   }
 
   function startDrag(event: React.PointerEvent, element: OverlayElement) {
-    if (!canManage || previewing || element.locked) return;
+  function startDrag(event: import('react').PointerEvent<HTMLDivElement>, element: OverlayElement) {
     event.preventDefault();
     setSelectedId(element.id);
     const canvas = canvasRef.current;
@@ -535,9 +534,6 @@ function ElementPreview({
     );
   }
   if (element.type === 'goal-bar') {
-    return (
-      <div className="goal-preview">
-        <span style={{ width: '64%' }} />
         <strong>{text}</strong>
       </div>
     );

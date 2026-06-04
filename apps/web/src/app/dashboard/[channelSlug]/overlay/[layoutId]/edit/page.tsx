@@ -41,6 +41,7 @@ export default async function OverlayEditorPage({
     canManageChannel(session.user.id, session.user.role, channel.id),
   ]);
 
+  if (!canManage) redirect('/dashboard?error=forbidden');
   if (!layout) notFound();
 
   return (

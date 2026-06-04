@@ -239,17 +239,13 @@ audio.asset-preview {
   cursor: pointer;
   font-weight: 600;
   padding: 10px 14px;
+  text-align: center;
+  text-decoration: none;
 }
 
 .button-secondary:hover {
   background: var(--line);
 }
-
-.button-secondary {
-  text-align: center;
-  text-decoration: none;
-}
-
 .button-secondary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
