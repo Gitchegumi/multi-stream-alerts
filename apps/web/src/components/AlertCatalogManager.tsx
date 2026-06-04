@@ -575,6 +575,14 @@ export function AlertCatalogManager({
                     >
                       Preview
                     </button>
+                    <a
+                      className="button-secondary"
+                      href={`/dashboard/${encodeURIComponent(channelSlug)}/overlay/${encodeURIComponent(
+                        layout.id,
+                      )}/edit`}
+                    >
+                      Edit canvas
+                    </a>
                     <button
                       className="button-secondary"
                       type="button"

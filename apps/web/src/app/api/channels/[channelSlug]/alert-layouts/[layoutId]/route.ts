@@ -7,6 +7,7 @@ import {
   ensureDefaultChannel,
   getDefaultWorkspaceAlertLayout,
   prisma,
+  type Prisma,
 } from '@multi-stream-alerts/database';
 import { safeAssetUrlSchema } from '@multi-stream-alerts/shared';
 import { authOptions } from '@/lib/auth';
@@ -25,6 +26,7 @@ const layoutSchema = z.object({
   soundAssetUrl: nullableAssetUrlSchema,
   visualAssetId: z.string().min(1).nullable().optional(),
   soundAssetId: z.string().min(1).nullable().optional(),
+  animationSettings: z.record(z.string(), z.unknown()).optional(),
   defaultDurationMs: z.number().int().min(500).max(60000).optional(),
   defaultVolume: z.number().int().min(0).max(100).optional(),
 });
@@ -74,13 +76,16 @@ export async function PATCH(
     return NextResponse.json({ error: assetError }, { status: 400 });
   }
 
+  const data: Prisma.WorkspaceAlertLayoutUncheckedUpdateInput = {
+    ...parsed.data,
+    animationSettings: parsed.data.animationSettings as Prisma.InputJsonValue | undefined,
+    visualAssetUrl: parsed.data.visualAssetId ? null : parsed.data.visualAssetUrl,
+    soundAssetUrl: parsed.data.soundAssetId ? null : parsed.data.soundAssetUrl,
+  };
+
   const layout = await prisma.workspaceAlertLayout.update({
     where: { id: layoutId },
-    data: {
-      ...parsed.data,
-      visualAssetUrl: parsed.data.visualAssetId ? null : parsed.data.visualAssetUrl,
-      soundAssetUrl: parsed.data.soundAssetId ? null : parsed.data.soundAssetUrl,
-    },
+    data,
   });
 
   return NextResponse.json({ ok: true, layout });
