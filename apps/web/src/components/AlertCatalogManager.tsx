@@ -426,7 +426,12 @@ export function AlertCatalogManager({
                             className="button-secondary"
                             type="button"
                             disabled={isPending || !config.enabled}
-                            onClick={() => testAlert(config.alertEventType.eventKey)}
+                            onClick={() =>
+                              testAlert(
+                                config.alertEventType.eventKey,
+                                config.layoutId ?? undefined,
+                              )
+                            }
                           >
                             Test
                           </button>

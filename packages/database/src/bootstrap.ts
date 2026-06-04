@@ -1,15 +1,29 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { prisma, toAlertEvent } from './client';
+import { prisma as realPrisma, toAlertEvent } from './client';
 import { publishAlertEvent } from './redis';
-import { ensureWorkspaceAlertDefaults, resolveAlertConfig } from './alert-catalog';
+import {
+  ensureWorkspaceAlertDefaults,
+  resolveAlertConfig as realResolveAlertConfig,
+} from './alert-catalog';
 import type { AlertEvent, AlertPlatform, AlertType } from '@multi-stream-alerts/shared';
+
+// Test injection hooks — only used in __tests__
+let _resolveAlertConfig = realResolveAlertConfig;
+let _prisma = realPrisma;
+export function __setResolveAlertConfig(fn: typeof realResolveAlertConfig | undefined) {
+  _resolveAlertConfig = fn ?? realResolveAlertConfig;
+}
+export function __setPrisma(mockPrisma: Partial<typeof realPrisma> | undefined) {
+  _prisma = (mockPrisma ?? realPrisma) as typeof realPrisma;
+}
+export { realResolveAlertConfig as resolveAlertConfig };
 
 export async function ensureDefaultChannel() {
   const slug = requiredEnv('DEFAULT_CHANNEL_SLUG');
   const name = requiredEnv('DEFAULT_CHANNEL_NAME');
   const displayKey = requiredEnv('INITIAL_DISPLAY_KEY');
 
-  const channel = await prisma.channel.upsert({
+  const channel = await _prisma.channel.upsert({
     where: { slug },
     update: { name },
     create: { slug, name },
@@ -20,7 +34,7 @@ export async function ensureDefaultChannel() {
     { slug: 'vertical', name: 'Vertical' },
     { slug: 'test', name: 'Test' },
   ]) {
-    await prisma.overlayProfile.upsert({
+    await _prisma.overlayProfile.upsert({
       where: { channelId_slug: { channelId: channel.id, slug: profile.slug } },
       update: {},
       create: {
@@ -54,7 +68,7 @@ export async function createStoredAlertEvent(input: {
   rawPayload?: unknown;
   layoutIdOverride?: string;
 }): Promise<AlertEvent | null> {
-  const config = await resolveAlertConfig({
+  const config = await _resolveAlertConfig({
     channelId: input.channelId,
     platform: input.platform,
     type: input.type,
@@ -73,12 +87,12 @@ export async function createStoredAlertEvent(input: {
 
   const layout =
     input.layoutIdOverride !== undefined
-      ? await prisma.workspaceAlertLayout.findFirst({
+      ? await _prisma.workspaceAlertLayout.findFirst({
           where: { id: input.layoutIdOverride, channelId: input.channelId },
         })
       : config.layout;
   const eventType = config.alertEventType;
-  const row = await prisma.alertEvent.create({
+  const row = await _prisma.alertEvent.create({
     data: {
       id: randomUUID(),
       channelId: input.channelId,
@@ -88,9 +102,15 @@ export async function createStoredAlertEvent(input: {
       layoutId: layout?.id,
       layoutName: layout?.name,
       layoutStyle: layout?.style,
-      durationMs: config.durationMs ?? layout?.defaultDurationMs,
-      volume: config.volume ?? layout?.defaultVolume,
-      templateText: config.templateText,
+      durationMs:
+        input.layoutIdOverride !== undefined
+          ? layout?.defaultDurationMs
+          : (config.durationMs ?? layout?.defaultDurationMs),
+      volume:
+        input.layoutIdOverride !== undefined
+          ? layout?.defaultVolume
+          : (config.volume ?? layout?.defaultVolume),
+      templateText: input.layoutIdOverride !== undefined ? undefined : config.templateText,
       visualAssetUrl: layout?.visualAssetId
         ? `/api/assets/${layout.visualAssetId}/content`
         : layout?.visualAssetUrl,
@@ -139,7 +159,7 @@ export async function claimDeduplicationKey(input: {
   channelId: string;
 }) {
   try {
-    await prisma.deduplicationKey.create({ data: input });
+    await _prisma.deduplicationKey.create({ data: input });
     return true;
   } catch (error) {
     if (isUniqueConstraintError(error)) {
