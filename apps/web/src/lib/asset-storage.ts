@@ -27,9 +27,10 @@ class LocalAssetStorage implements StorageProvider {
   private uploadDir = process.env.UPLOAD_DIR ?? process.env.ASSETS_PATH ?? '/app/uploads';
 
   async put(input: { channelId: string; body: Buffer; mimeType: string }): Promise<StoredAsset> {
+    const channelSegment = safeStorageSegment(input.channelId);
     const storedFilename = `${randomUUID()}.${extensionForMime(input.mimeType)}`;
-    const key = `${input.channelId}/${storedFilename}`;
-    const targetDir = path.resolve(this.uploadDir, input.channelId);
+    const key = `${channelSegment}/${storedFilename}`;
+    const targetDir = path.resolve(this.uploadDir, channelSegment);
     const targetPath = path.resolve(targetDir, storedFilename);
 
     if (!targetPath.startsWith(targetDir + path.sep)) {
@@ -63,6 +64,13 @@ class LocalAssetStorage implements StorageProvider {
     }
     return target;
   }
+}
+
+export function safeStorageSegment(value: string) {
+  if (!/^[A-Za-z0-9_-]+$/.test(value)) {
+    throw new Error('Invalid storage path segment.');
+  }
+  return value;
 }
 
 class S3AssetStorage implements StorageProvider {

@@ -57,7 +57,18 @@ INGRESS_PORT=8080
 
 `NEXTAUTH_URL` must match the browser-facing origin used to open the dashboard. For reverse proxy deployments, use `https://<your-alerts-domain>`. For local-only testing without a proxy, use the local origin you are opening in the browser.
 
-Set `INITIAL_DISPLAY_KEY` to a long random value before first startup. The default `main` overlay profile uses that key. Additional default profile keys are generated at runtime in the database.
+Set `INITIAL_DISPLAY_KEY` to a long random value before first startup. The default `main` overlay profile uses that key. Additional default profile keys are generated at runtime in the database. After startup, rotate display keys from the dashboard instead of editing environment variables.
+
+### Instance-level environment variables
+
+The `.env` file is for instance plumbing and bootstrap values only:
+
+- Public origins and ports (`PUBLIC_BASE_URL`, `INGRESS_PUBLIC_BASE_URL`, `NEXTAUTH_URL`, `WEB_PORT`, `INGRESS_PORT`).
+- Database, Redis, upload, and optional S3 storage settings.
+- Auth/session/OIDC settings (`AUTH_SECRET`, `AUTH_OIDC_*`, onboarding flags, and `INITIAL_ADMIN_EMAIL`).
+- Bootstrap defaults (`DEFAULT_CHANNEL_*`, `INITIAL_DISPLAY_KEY`) and the encryption-at-rest key (`INSTANCE_ENCRYPTION_KEY`).
+
+Ko-fi, Twitch, and YouTube platform credentials are configured per workspace in the dashboard at **Settings -> Integrations**. They are encrypted at rest and are not sent to browser clients after save.
 
 ## Authentication Model
 
@@ -218,6 +229,8 @@ https://<your-alerts-domain>/api/webhooks/youtube/<your-channel-slug>
 
 Webhook routes do not use OIDC. They must verify provider secrets/signatures and only ingest events. Ko-fi and YouTube webhooks include the channel slug in the path; Twitch uses a single global callback URL and identifies the channel by matching the inbound HMAC against stored per-channel `eventsubSecret` values.
 
+All webhook validation uses per-workspace integration settings from the database. Platform tokens, OAuth client secrets, and EventSub secrets are never read from request-visible browser payloads and are not logged. Dashboard test alerts call the same `storeAndPublishAlertEvent` path used by real webhook alerts, so disabled or unmapped alert types are suppressed consistently.
+
 ## Alert Event Catalog and Layouts
 
 Alert types and alert layouts are separate concepts. An alert type is the event that happened, such as `twitch.followed` or `youtube.superchat`. A layout is the reusable visual/audio presentation used when the event fires. One layout can be assigned to many alert types, and different alert types can use different layouts in the same workspace.
@@ -278,7 +291,7 @@ Supported MVP sources:
 - S3-compatible storage such as MinIO or AIStor.
 - User-managed external `http`/`https` asset URLs.
 
-Supported uploaded types are PNG, JPEG, WebP, GIF, safely checked SVG, MP4, WebM, MP3, WAV, and OGG. Upload validation checks file extension and detected file signature where practical, enforces per-workspace quota and max file size, sanitizes original filenames, and generates server-side storage names. Local and S3 assets are served through `/api/assets/:assetId/content`; dashboard sessions can preview them, and overlay browser sources must include a valid display key for the asset's workspace.
+Supported uploaded types are PNG, JPEG, WebP, GIF, safely checked SVG, MP4, WebM, MP3, WAV, and OGG. Upload validation checks file extension and detected file signature where practical, enforces per-workspace quota and max file size, sanitizes original filenames, rejects path-like storage segments, and generates server-side storage names. Local, S3, and external URL assets are mediated through `/api/assets/:assetId/content`; dashboard sessions can preview them, and overlay browser sources must include a valid display key for the asset's workspace before bytes are served or external URLs are redirected.
 
 Local storage example:
 
@@ -343,6 +356,8 @@ ${APP_DATA_PATH}/postgres:/var/lib/postgresql/data
 ${APP_DATA_PATH}/redis:/data
 ${UPLOADS_PATH}:/app/uploads
 ```
+
+For TrueNAS, create a dataset such as `/mnt/<pool>/apps/gitchalerts`, then set `APP_DATA_PATH` to that dataset and `UPLOADS_PATH` to a child directory such as `/mnt/<pool>/apps/gitchalerts/uploads`. Do not point `UPLOADS_PATH` at a temporary directory or a path inside an image/container layer; local uploaded alert media lives there and must survive container rebuilds, app upgrades, and reboots. Keep `UPLOAD_DIR=/app/uploads` unless you also change the Compose mount target.
 
 ## Reverse Proxy
 
@@ -418,7 +433,7 @@ Overlay URLs are managed from the dashboard at **Dashboard → Overlay Profiles*
 ### Display keys
 
 - A `displayKey` is a long random string scoped to one overlay profile and its channel.
-- It grants **overlay-only access**: the browser source can connect to the SSE event stream and load assets, but it cannot open dashboard pages or act as a session.
+- It grants **overlay-only access**: the browser source can connect to the SSE event stream and load assets for that same workspace, but it cannot open dashboard pages or act as a session.
 - Display keys are **not** user passwords or OIDC tokens. They are separate credentials meant for OBS / Meld browser sources.
 
 ### Getting the overlay URL
@@ -441,7 +456,7 @@ There is no grace period or dual-key window. Plan rotations around stream downti
 ### Security model
 
 - `displayKey` ≠ dashboard session auth. Knowing a display key does not grant dashboard access, and a dashboard session cookie is never accepted by overlay or SSE routes.
-- Overlay routes validate the `displayKey` query parameter. SSE routes validate it and then filter events to the matching channel.
+- Overlay routes validate the `displayKey` query parameter. SSE routes validate it and then filter events to the matching channel. Asset content routes also require either a dashboard session with channel access or a display key for the asset's channel.
 - If a display key leaks, rotate it. The leaked key cannot be used to modify channel settings, view other channels, or access the dashboard.
 
 ## Testing
@@ -478,7 +493,6 @@ The form field `data` should contain a JSON payload with a matching `verificatio
 - Twitch EventSub is stubbed with challenge/signature structure but does not yet normalize notifications.
 - YouTube ingestion is stubbed and returns a future-implementation response.
 - Template editing is a dashboard stub in v1.
-- Overlay display key rotation is represented in the schema but does not yet have dashboard controls.
 - The worker currently subscribes to Redis and logs normalized events for future queue processing.
 
 ## Roadmap
@@ -486,5 +500,13 @@ The form field `data` should contain a JSON payload with a matching `verificatio
 - Twitch EventSub subscription management and normalized alerts.
 - YouTube Super Chat, membership, and live chat support.
 - TikTok adapter research.
-- Dashboard controls for templates, overlay settings, and display key rotation.
+- Dashboard controls for templates and richer overlay settings.
 - Richer admin UI for per-workspace quotas, asset allowlists, and signed URL policies.
+
+## Hardening Changelog
+
+- Asset content now authorizes dashboard sessions or workspace-scoped display keys before redirecting external asset URLs.
+- Local upload storage rejects path-like workspace segments and continues to use generated server-side filenames.
+- Overlay stream logs identify the channel/profile without logging any display-key material.
+- The web test script is shell-neutral on Windows and POSIX shells.
+- Deployment docs now clarify instance-level env vars, UI-managed platform credentials, display-key rotation, and persistent Docker/TrueNAS upload storage.
