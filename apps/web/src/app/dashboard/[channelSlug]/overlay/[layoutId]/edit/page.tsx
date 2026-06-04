@@ -1,5 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
-import { canManageChannel, canViewChannel, prisma } from '@multi-stream-alerts/database';
+import { canManageChannel, prisma } from '@multi-stream-alerts/database';
 import { OverlayLayoutEditor } from '@/components/OverlayLayoutEditor';
 import { requireDashboardSession } from '@/lib/session';
 
@@ -16,10 +16,10 @@ export default async function OverlayEditorPage({
   const channel = await prisma.channel.findUnique({ where: { slug: channelSlug } });
   if (!channel) notFound();
 
-  const canView = await canViewChannel(session.user.id, session.user.role, channel.id);
-  if (!canView) redirect('/dashboard?error=forbidden');
+  const canManage = await canManageChannel(session.user.id, session.user.role, channel.id);
+  if (!canManage) redirect('/dashboard?error=forbidden');
 
-  const [layout, assets, canManage] = await Promise.all([
+  const [layout, assets] = await Promise.all([
     prisma.workspaceAlertLayout.findFirst({
       where: { id: layoutId, channelId: channel.id },
       select: {
@@ -38,10 +38,8 @@ export default async function OverlayEditorPage({
         externalUrl: true,
       },
     }),
-    canManageChannel(session.user.id, session.user.role, channel.id),
   ]);
 
-  if (!canManage) redirect('/dashboard?error=forbidden');
   if (!layout) notFound();
 
   return (

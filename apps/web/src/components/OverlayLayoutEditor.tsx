@@ -142,22 +142,26 @@ export function OverlayLayoutEditor({
   function save() {
     setResult(null);
     startTransition(async () => {
-      const response = await fetch(
-        `/api/channels/${encodeURIComponent(channelSlug)}/alert-layouts/${encodeURIComponent(
-          layout.id,
-        )}`,
-        {
-          method: 'PATCH',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            animationSettings: {
-              ...layout.animationSettings,
-              editorLayout: draft,
-            },
-          }),
-        },
-      );
-      setResult(response.ok ? 'Saved.' : 'Could not save layout.');
+      try {
+        const response = await fetch(
+          `/api/channels/${encodeURIComponent(channelSlug)}/alert-layouts/${encodeURIComponent(
+            layout.id,
+          )}`,
+          {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              animationSettings: {
+                ...layout.animationSettings,
+                editorLayout: draft,
+              },
+            }),
+          },
+        );
+        setResult(response.ok ? 'Saved.' : 'Could not save layout.');
+      } catch {
+        setResult('Could not save layout.');
+      }
     });
   }
 
@@ -600,11 +604,15 @@ function normalizeEditorLayout(settings: Record<string, unknown>): EditorLayout 
       elements: candidate.elements.flatMap((element, index) => {
         if (!element || typeof element !== 'object') return [];
         const parsed = element as Partial<OverlayElement>;
+        const type = isElementType(parsed.type) ? parsed.type : 'alert-box';
+        const base = createElement(type, index + 1, index + 1);
         return [
           {
-            ...createElement('alert-box', index + 1, index + 1),
+            ...base,
             ...parsed,
-            properties: { ...(parsed.properties ?? {}) },
+            type,
+            properties: { ...base.properties, ...(parsed.properties ?? {}) },
+            assets: { ...base.assets, ...(parsed.assets ?? {}) },
           },
         ];
       }),
@@ -685,6 +693,16 @@ function labelForType(type: ElementType) {
     .split('-')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
+}
+
+function isElementType(value: unknown): value is ElementType {
+  return (
+    value === 'text' ||
+    value === 'image' ||
+    value === 'video' ||
+    value === 'alert-box' ||
+    value === 'goal-bar'
+  );
 }
 
 function clamp(value: number, min: number, max: number) {
