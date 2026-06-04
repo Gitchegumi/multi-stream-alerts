@@ -108,7 +108,7 @@ export async function POST(
       },
     });
 
-    return NextResponse.json({ ok: true, asset });
+    return NextResponse.json({ ok: true, asset: serializeAsset(asset) });
   }
 
   if (!settings.serverUploadsEnabled) {
@@ -170,7 +170,7 @@ export async function POST(
     },
   });
 
-  return NextResponse.json({ ok: true, asset });
+  return NextResponse.json({ ok: true, asset: serializeAsset(asset) });
 }
 
 async function authorize(params: { channelSlug: string }, access: 'view' | 'manage') {
@@ -190,6 +190,38 @@ async function authorize(params: { channelSlug: string }, access: 'view' | 'mana
   if (!allowed) return { status: 403 as const, error: 'Channel access denied' };
 
   return { channel, userId: session.user.id, userRole: session.user.role };
+}
+
+export function serializeAsset(asset: {
+  id: string;
+  sourceType: string;
+  assetType: string;
+  originalFilename: string | null;
+  externalUrl: string | null;
+  mimeType: string;
+  fileSizeBytes: bigint | null;
+  storageProvider: string;
+  createdAt: Date;
+  updatedAt: Date;
+  storedFilename?: string | null;
+  storageKey?: string | null;
+  durationSeconds?: number | null;
+}) {
+  return {
+    id: asset.id,
+    sourceType: asset.sourceType,
+    assetType: asset.assetType,
+    originalFilename: asset.originalFilename,
+    externalUrl: asset.externalUrl,
+    mimeType: asset.mimeType,
+    fileSizeBytes: asset.fileSizeBytes?.toString() ?? null,
+    storageProvider: asset.storageProvider,
+    createdAt: asset.createdAt.toISOString(),
+    updatedAt: asset.updatedAt.toISOString(),
+    storedFilename: asset.storedFilename ?? null,
+    storageKey: asset.storageKey ?? null,
+    durationSeconds: asset.durationSeconds ?? null,
+  };
 }
 
 function sanitizeOriginalFilename(filename: string) {
