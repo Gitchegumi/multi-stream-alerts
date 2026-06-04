@@ -327,6 +327,12 @@ export function OverlayLayoutEditor({
                   tabIndex={0}
                   onPointerDown={(event) => startDrag(event, element)}
                   onClick={() => setSelectedId(element.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setSelectedId(element.id);
+                    }
+                  }}
                   style={{
                     left: element.x * zoom,
                     top: element.y * zoom,
