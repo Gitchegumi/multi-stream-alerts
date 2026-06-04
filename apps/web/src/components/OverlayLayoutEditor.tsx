@@ -149,11 +149,11 @@ export function OverlayLayoutEditor({
           method: 'PATCH',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
-            style: 'custom',
             animationSettings: {
               ...layout.animationSettings,
               editorLayout: draft,
             },
+          }),
           }),
         },
       );
