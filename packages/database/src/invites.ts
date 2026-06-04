@@ -129,6 +129,20 @@ export async function revokeInviteCode(id: string): Promise<InviteCodeSummary | 
   return toSummary(updated);
 }
 
+export async function purgeRevokedInviteCode(id: string): Promise<number> {
+  const result = await prisma.inviteCode.deleteMany({
+    where: { id, isRevoked: true },
+  });
+  return result.count;
+}
+
+export async function purgeRevokedInviteCodes(): Promise<number> {
+  const result = await prisma.inviteCode.deleteMany({
+    where: { isRevoked: true },
+  });
+  return result.count;
+}
+
 export async function findInviteByCode(rawCode: string) {
   if (!rawCode) return null;
   const normalized = rawCode

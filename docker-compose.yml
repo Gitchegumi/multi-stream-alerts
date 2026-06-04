@@ -13,6 +13,8 @@ services:
     ports:
       - '${WEB_PORT:-3000}:3000'
     volumes:
+      # Persist uploaded local assets outside the container. On TrueNAS,
+      # point UPLOADS_PATH at a dataset path that survives app upgrades.
       - '${UPLOADS_PATH}:/app/uploads'
     depends_on:
       alerts-postgres:
@@ -64,6 +66,7 @@ services:
       POSTGRES_USER: '${POSTGRES_USER}'
       POSTGRES_PASSWORD: '${POSTGRES_PASSWORD}'
     volumes:
+      # Keep database files on persistent host storage, not container layers.
       - '${APP_DATA_PATH}/postgres:/var/lib/postgresql/data'
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
@@ -77,6 +80,7 @@ services:
     container_name: alerts-redis
     command: ['redis-server', '--appendonly', 'yes']
     volumes:
+      # Redis appendonly persistence also lives under APP_DATA_PATH.
       - '${APP_DATA_PATH}/redis:/data'
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']

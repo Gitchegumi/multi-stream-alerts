@@ -37,7 +37,7 @@ export async function GET(request: Request) {
 
   console.info('overlay connected', {
     channelId: profile.channelId,
-    displayKeyPrefix: displayKey.slice(0, 8),
+    profileId: profile.id,
   });
 
   const encoder = new TextEncoder();
