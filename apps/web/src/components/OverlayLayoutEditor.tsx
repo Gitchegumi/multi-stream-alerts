@@ -548,11 +548,17 @@ function normalizeEditorLayout(settings: Record<string, unknown>): EditorLayout 
         width: Number(candidate.resolution.width) || 1920,
         height: Number(candidate.resolution.height) || 1080,
       },
-      elements: candidate.elements.map((element, index) => ({
-        ...createElement('alert-box', index + 1, index + 1),
-        ...element,
-        properties: { ...element.properties },
-      })),
+      elements: candidate.elements.flatMap((element, index) => {
+        if (!element || typeof element !== 'object') return [];
+        const parsed = element as Partial<OverlayElement>;
+        return [
+          {
+            ...createElement('alert-box', index + 1, index + 1),
+            ...parsed,
+            properties: { ...(parsed.properties ?? {}) },
+          },
+        ];
+      }),
     };
   }
   return {
