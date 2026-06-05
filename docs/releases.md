@@ -5,8 +5,8 @@ GitchAlerts uses one repo release version and separate container/service release
 - Repo release version: `version.json` at the repository root under `release`.
 - Service versions: each service `package.json` under `apps/web`, `apps/ingress`, and `apps/worker`.
 - Repo release tags: SemVer-style tags such as `v0.1.0`, `v0.1.1`, and `v0.2.0`.
-- Service release tags: component Git tags such as `alerts-web-v0.1.0`, `alerts-ingress-v0.1.0`, and `alerts-worker-v0.1.0`.
-- Production container tags: release-triggered plain version tags such as `v0.1.0`, plus `latest`.
+- Service release Git tags: component tags such as `alerts-web-v0.1.0`, `alerts-ingress-v0.1.0`, and `alerts-worker-v0.1.0`.
+- Production container image tags: plain version tags such as `v0.1.0`, plus `latest`.
 - Traceability tags: `sha-<shortsha>` for every published image.
 
 The repo release increments when the deployable container surface changes. That includes app code, shared package code used by containers, Docker/build files, dependency lockfiles, and deployment files that affect published images. Docs-only and other non-deployable changes should not force a repo release.
@@ -38,7 +38,7 @@ Use conventional commit prefixes so Release Please can calculate the next SemVer
 - `feat:` creates a minor release.
 - `feat!:`, `fix!:`, or a commit with `BREAKING CHANGE:` creates a major release.
 
-When a service release PR is merged, Release Please creates that service tag. The `Publish containers` workflow detects the service tag and publishes only the matching image. For example, `alerts-web-v0.2.0` publishes `alerts-web` only.
+When a service release PR is merged, Release Please creates that service Git tag. The `Publish containers` workflow detects the service Git tag and publishes only the matching image. For example, `alerts-web-v0.2.0` publishes `alerts-web:v0.2.0` and `alerts-web:latest` only.
 
 When a repo release PR is merged, Release Please creates the repo tag. The `Publish containers` workflow detects the repo tag and publishes the full deployable image set with the repo release tag.
 
@@ -50,7 +50,7 @@ This matters because workflow actions performed with the default `GITHUB_TOKEN` 
 
 ## Published Images
 
-Service release images are published to GHCR with service-specific tags:
+Service release images are published to GHCR with plain version tags scoped by image name:
 
 ```text
 ghcr.io/gitchegumi/multi-stream-alerts/alerts-web:v0.1.0

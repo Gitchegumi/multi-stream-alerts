@@ -33,13 +33,13 @@ jobs:
         service:
           - name: alerts-web
             build_arg: web
-            tag_prefix: alerts-web-v
+            git_tag_prefix: alerts-web-v
           - name: alerts-ingress
             build_arg: ingress
-            tag_prefix: alerts-ingress-v
+            git_tag_prefix: alerts-ingress-v
           - name: alerts-worker
             build_arg: worker
-            tag_prefix: alerts-worker-v
+            git_tag_prefix: alerts-worker-v
 
     steps:
       - name: Checkout
@@ -52,7 +52,7 @@ jobs:
         run: |
           ref_name="${GITHUB_REF_NAME}"
           service_dir="${{ matrix.service.build_arg }}"
-          tag_prefix="${{ matrix.service.tag_prefix }}"
+          git_tag_prefix="${{ matrix.service.git_tag_prefix }}"
 
           if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
             if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
@@ -109,7 +109,7 @@ jobs:
 
             echo "enabled=false" >> "$GITHUB_OUTPUT"
             echo "reason=no $service_dir container changes" >> "$GITHUB_OUTPUT"
-          elif [[ "$ref_name" == "$tag_prefix"* ]]; then
+          elif [[ "$ref_name" == "$git_tag_prefix"* ]]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
             echo "reason=service release tag" >> "$GITHUB_OUTPUT"
           elif [[ "$ref_name" == v* ]]; then
@@ -140,8 +140,8 @@ jobs:
           release="$(jq -r .release version.json)"
           service="$(jq -r .version "apps/${{ matrix.service.build_arg }}/package.json")"
 
-          if [[ "${GITHUB_REF_TYPE}" == "tag" && "$ref_name" == "${{ matrix.service.tag_prefix }}"* ]]; then
-            service="${ref_name#${{ matrix.service.tag_prefix }}}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "$ref_name" == "${{ matrix.service.git_tag_prefix }}"* ]]; then
+            service="${ref_name#${{ matrix.service.git_tag_prefix }}}"
           fi
 
           if [[ "${GITHUB_REF_TYPE}" == "tag" && "$ref_name" == v* ]]; then
@@ -151,7 +151,7 @@ jobs:
           echo "release=$release" >> "$GITHUB_OUTPUT"
           echo "release_tag=v$release" >> "$GITHUB_OUTPUT"
           echo "service=$service" >> "$GITHUB_OUTPUT"
-          echo "service_tag=v$service" >> "$GITHUB_OUTPUT"
+          echo "service_image_tag=v$service" >> "$GITHUB_OUTPUT"
 
       - name: Generate image metadata
         if: steps.publish.outputs.enabled == 'true'
@@ -160,7 +160,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.name }}
           tags: |
-            type=raw,value=${{ steps.versions.outputs.service_tag }},enable=${{ github.ref_type == 'tag' && !startsWith(github.ref_name, 'v') }}
+            type=raw,value=${{ steps.versions.outputs.service_image_tag }},enable=${{ github.ref_type == 'tag' && !startsWith(github.ref_name, 'v') }}
             type=raw,value=${{ steps.versions.outputs.release_tag }},enable=${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') }}
             type=raw,value=latest
             type=sha,prefix=sha-
@@ -168,7 +168,7 @@ jobs:
             org.opencontainers.image.title=${{ matrix.service.name }}
             org.opencontainers.image.description=GitcheGumi Alerts ${{ matrix.service.name }} container
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.version=${{ steps.versions.outputs.service_tag }}
+            org.opencontainers.image.version=${{ steps.versions.outputs.service_image_tag }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.base.name=${{ steps.versions.outputs.release_tag }}
 
@@ -182,7 +182,7 @@ jobs:
           build-args: |
             SERVICE=${{ matrix.service.build_arg }}
             RELEASE_VERSION=${{ steps.versions.outputs.release_tag }}
-            SERVICE_VERSION=${{ steps.versions.outputs.service_tag }}
+            SERVICE_VERSION=${{ steps.versions.outputs.service_image_tag }}
             GIT_SHA=${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
