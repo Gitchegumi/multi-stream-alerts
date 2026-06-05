@@ -4,21 +4,20 @@ import { OverlayClient } from '@/components/OverlayClient';
 import {
   getClientIp,
   isOverlayRouteRateLimited,
-  resolveLegacyOverlayProfile,
+  resolveScopedOverlayProfile,
 } from '@/lib/overlay-access';
 
 export const dynamic = 'force-dynamic';
 
-export default async function OverlayPage({
+export default async function ScopedOverlayPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ profile: string }>;
+  params: Promise<{ channelSlug: string; profile: string }>;
   searchParams: Promise<{ displayKey?: string }>;
 }) {
-  const { profile } = await params;
-  const query = await searchParams;
-  const displayKey = query.displayKey;
+  const { channelSlug, profile } = await params;
+  const { displayKey } = await searchParams;
 
   if (!displayKey) {
     notFound();
@@ -34,7 +33,8 @@ export default async function OverlayPage({
     );
   }
 
-  const overlayProfile = await resolveLegacyOverlayProfile({
+  const overlayProfile = await resolveScopedOverlayProfile({
+    channelSlug,
     profileSlug: profile,
     displayKey,
   });

@@ -6,7 +6,7 @@ import {
   toAlertEvent,
 } from '@multi-stream-alerts/database';
 import { requireDashboardSession } from '@/lib/session';
-import { AlertCatalogManager } from '@/components/AlertCatalogManager';
+import { CanvasWorkspace } from '@/components/CanvasWorkspace';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +14,10 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
   const session = await requireDashboardSession();
   const { channelSlug } = await params;
 
-  const channel = await prisma.channel.findUnique({ where: { slug: channelSlug } });
+  const channel = await prisma.channel.findUnique({
+    where: { slug: channelSlug },
+    include: { overlayProfiles: { orderBy: { createdAt: 'asc' } } },
+  });
   if (!channel) notFound();
 
   const canView = await canViewChannel(session.user.id, session.user.role, channel.id);
@@ -54,25 +57,34 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
     take: 5,
   });
 
-  const assets = await prisma.workspaceAsset.findMany({
-    where: { channelId: channel.id },
-    orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      assetType: true,
-      originalFilename: true,
-      externalUrl: true,
-    },
+  const publicBaseUrl = process.env.PUBLIC_BASE_URL ?? 'https://<your-alerts-domain>';
+  const enabledEventKeys = alertConfigs
+    .filter((config) => config.enabled)
+    .map((config) => config.alertEventType.eventKey);
+  const canvases = channel.overlayProfiles.map((profile) => {
+    const settings = readCanvasSettings(profile.settingsJson, enabledEventKeys);
+    return {
+      id: profile.id,
+      name: profile.name,
+      slug: profile.slug,
+      displayKey: profile.displayKey,
+      isActive: profile.isActive,
+      updatedAt: profile.updatedAt.toISOString(),
+      url: `${publicBaseUrl}/overlay/${channel.slug}/${profile.slug}?displayKey=${encodeURIComponent(
+        profile.displayKey,
+      )}`,
+      settings,
+    };
   });
 
   return (
     <main className="dashboard-shell">
-      <AlertCatalogManager
+      <CanvasWorkspace
         channelId={channel.id}
         channelSlug={channel.slug}
-        initialConfigs={alertConfigs}
-        initialLayouts={alertLayouts}
-        initialAssets={assets}
+        initialCanvases={canvases}
+        alertConfigs={alertConfigs}
+        layouts={alertLayouts}
       />
 
       <section className="panel" style={{ marginTop: 16 }}>
@@ -95,4 +107,24 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
       </section>
     </main>
   );
+}
+
+function readCanvasSettings(value: unknown, fallbackEventKeys: string[]) {
+  const settings = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const raw = settings as {
+    width?: unknown;
+    height?: unknown;
+    background?: unknown;
+    alertEventKeys?: unknown;
+  };
+  const alertEventKeys = Array.isArray(raw.alertEventKeys)
+    ? raw.alertEventKeys.filter((key): key is string => typeof key === 'string')
+    : fallbackEventKeys;
+
+  return {
+    width: typeof raw.width === 'number' ? raw.width : 1920,
+    height: typeof raw.height === 'number' ? raw.height : 1080,
+    background: raw.background === 'dark' ? ('dark' as const) : ('transparent' as const),
+    alertEventKeys,
+  };
 }
