@@ -95,6 +95,14 @@ function buildOidcProvider() {
     'https://<your-alerts-domain>'
   ).replace(/\/$/, '');
 
+  if (!process.env.NEXTAUTH_URL && !process.env.PUBLIC_BASE_URL) {
+    console.warn(
+      '[auth] Neither NEXTAUTH_URL nor PUBLIC_BASE_URL is set. ' +
+        'OIDC callback URIs will use the hard-coded placeholder. ' +
+        'Set one of these env vars so the reverse proxy routes correctly.',
+    );
+  }
+
   return {
     id: 'oidc' as const,
     name: process.env.AUTH_OIDC_PROVIDER_NAME ?? 'OIDC',
