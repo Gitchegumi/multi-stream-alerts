@@ -33,28 +33,83 @@ jobs:
         service:
           - name: alerts-web
             build_arg: web
-            version_key: web
-            tag_prefix: alerts-web-v
+            git_tag_prefix: alerts-web-v
           - name: alerts-ingress
             build_arg: ingress
-            version_key: ingress
-            tag_prefix: alerts-ingress-v
+            git_tag_prefix: alerts-ingress-v
           - name: alerts-worker
             build_arg: worker
-            version_key: worker
-            tag_prefix: alerts-worker-v
+            git_tag_prefix: alerts-worker-v
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
       - name: Decide whether to publish this service
         id: publish
         run: |
           ref_name="${GITHUB_REF_NAME}"
-          tag_prefix="${{ matrix.service.tag_prefix }}"
+          service_dir="${{ matrix.service.build_arg }}"
+          git_tag_prefix="${{ matrix.service.git_tag_prefix }}"
 
           if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-            echo "reason=branch build" >> "$GITHUB_OUTPUT"
-          elif [[ "$ref_name" == "$tag_prefix"* ]]; then
+            if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+              echo "enabled=true" >> "$GITHUB_OUTPUT"
+              echo "reason=manual build" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            before="${{ github.event.before }}"
+
+            if [[ -z "$before" || "$before" =~ ^0+$ ]]; then
+              echo "enabled=true" >> "$GITHUB_OUTPUT"
+              echo "reason=no comparison base" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            if ! git cat-file -e "$before^{commit}" 2>/dev/null; then
+              git fetch --no-tags --depth=1 origin "$before" || true
+            fi
+
+            if ! git cat-file -e "$before^{commit}" 2>/dev/null; then
+              echo "enabled=true" >> "$GITHUB_OUTPUT"
+              echo "reason=comparison base unavailable" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            while IFS= read -r file; do
+              if [[ "$file" == "apps/$service_dir" || "$file" == "apps/$service_dir/"* ]]; then
+                echo "enabled=true" >> "$GITHUB_OUTPUT"
+                echo "reason=$file changed" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+
+              if [[ "$file" == packages/shared/* || "$file" == packages/database/* ]]; then
+                echo "enabled=true" >> "$GITHUB_OUTPUT"
+                echo "reason=$file changed" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+
+              if [[ "$service_dir" == "web" && "$file" == packages/ui/* ]]; then
+                echo "enabled=true" >> "$GITHUB_OUTPUT"
+                echo "reason=$file changed" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+
+              case "$file" in
+                Dockerfile | docker-compose.yml | package.json | pnpm-lock.yaml | pnpm-workspace.yaml | version.json | .github/workflows/publish-containers.yml)
+                  echo "enabled=true" >> "$GITHUB_OUTPUT"
+                  echo "reason=$file changed" >> "$GITHUB_OUTPUT"
+                  exit 0
+                  ;;
+              esac
+            done < <(git diff --name-only "$before" "$GITHUB_SHA")
+
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "reason=no $service_dir container changes" >> "$GITHUB_OUTPUT"
+          elif [[ "$ref_name" == "$git_tag_prefix"* ]]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
             echo "reason=service release tag" >> "$GITHUB_OUTPUT"
           elif [[ "$ref_name" == v* ]]; then
@@ -64,10 +119,6 @@ jobs:
             echo "enabled=false" >> "$GITHUB_OUTPUT"
             echo "reason=not this service tag" >> "$GITHUB_OUTPUT"
           fi
-
-      - name: Checkout
-        if: steps.publish.outputs.enabled == 'true'
-        uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
         if: steps.publish.outputs.enabled == 'true'
@@ -87,10 +138,10 @@ jobs:
         run: |
           ref_name="${GITHUB_REF_NAME}"
           release="$(jq -r .release version.json)"
-          service="$(jq -r '.services["${{ matrix.service.version_key }}"]' version.json)"
+          service="$(jq -r .version "apps/${{ matrix.service.build_arg }}/package.json")"
 
-          if [[ "${GITHUB_REF_TYPE}" == "tag" && "$ref_name" == "${{ matrix.service.tag_prefix }}"* ]]; then
-            service="${ref_name#${{ matrix.service.tag_prefix }}}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "$ref_name" == "${{ matrix.service.git_tag_prefix }}"* ]]; then
+            service="${ref_name#${{ matrix.service.git_tag_prefix }}}"
           fi
 
           if [[ "${GITHUB_REF_TYPE}" == "tag" && "$ref_name" == v* ]]; then
@@ -100,7 +151,7 @@ jobs:
           echo "release=$release" >> "$GITHUB_OUTPUT"
           echo "release_tag=v$release" >> "$GITHUB_OUTPUT"
           echo "service=$service" >> "$GITHUB_OUTPUT"
-          echo "service_tag=${{ matrix.service.tag_prefix }}$service" >> "$GITHUB_OUTPUT"
+          echo "service_image_tag=v$service" >> "$GITHUB_OUTPUT"
 
       - name: Generate image metadata
         if: steps.publish.outputs.enabled == 'true'
@@ -109,15 +160,15 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.name }}
           tags: |
-            type=raw,value=${{ steps.versions.outputs.service_tag }}
-            type=raw,value=${{ steps.versions.outputs.release_tag }},enable=${{ startsWith(github.ref_name, 'v') }}
-            type=raw,value=latest,enable=${{ startsWith(github.ref_name, 'v') }}
+            type=raw,value=${{ steps.versions.outputs.service_image_tag }},enable=${{ github.ref_type == 'tag' && !startsWith(github.ref_name, 'v') }}
+            type=raw,value=${{ steps.versions.outputs.release_tag }},enable=${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') }}
+            type=raw,value=latest,enable=${{ github.ref_name == 'main' || github.ref_type == 'tag' }}
             type=sha,prefix=sha-
           labels: |
             org.opencontainers.image.title=${{ matrix.service.name }}
             org.opencontainers.image.description=GitcheGumi Alerts ${{ matrix.service.name }} container
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.version=${{ steps.versions.outputs.service_tag }}
+            org.opencontainers.image.version=${{ steps.versions.outputs.service_image_tag }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.base.name=${{ steps.versions.outputs.release_tag }}
 
@@ -131,7 +182,7 @@ jobs:
           build-args: |
             SERVICE=${{ matrix.service.build_arg }}
             RELEASE_VERSION=${{ steps.versions.outputs.release_tag }}
-            SERVICE_VERSION=${{ steps.versions.outputs.service_tag }}
+            SERVICE_VERSION=${{ steps.versions.outputs.service_image_tag }}
             GIT_SHA=${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

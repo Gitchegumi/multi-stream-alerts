@@ -3,10 +3,10 @@
 GitchAlerts uses one repo release version and separate container/service release versions.
 
 - Repo release version: `version.json` at the repository root under `release`.
-- Service versions: `version.json` under `services`.
+- Service versions: each service `package.json` under `apps/web`, `apps/ingress`, and `apps/worker`.
 - Repo release tags: SemVer-style tags such as `v0.1.0`, `v0.1.1`, and `v0.2.0`.
-- Service release tags: component tags such as `alerts-web-v0.1.0`, `alerts-ingress-v0.1.0`, and `alerts-worker-v0.1.0`.
-- Production container tags: service release tags and, when a repo release is cut, the repo release tag.
+- Service release Git tags: component tags such as `alerts-web-v0.1.0`, `alerts-ingress-v0.1.0`, and `alerts-worker-v0.1.0`.
+- Production container image tags: plain version tags such as `v0.1.0`, plus `latest`.
 - Traceability tags: `sha-<shortsha>` for every published image.
 
 The repo release increments when the deployable container surface changes. That includes app code, shared package code used by containers, Docker/build files, dependency lockfiles, and deployment files that affect published images. Docs-only and other non-deployable changes should not force a repo release.
@@ -29,7 +29,7 @@ Release PRs update the relevant version metadata:
 - `CHANGELOG.md` for the repo release.
 - service changelogs under each app directory for service releases.
 - `package.json` files for the affected release component.
-- `version.json` for the repo release and affected service versions.
+- `version.json` for the repo release and affected service `package.json` files for service versions.
 - `.release-please-manifest.json` for Release Please state.
 
 Use conventional commit prefixes so Release Please can calculate the next SemVer version:
@@ -38,7 +38,7 @@ Use conventional commit prefixes so Release Please can calculate the next SemVer
 - `feat:` creates a minor release.
 - `feat!:`, `fix!:`, or a commit with `BREAKING CHANGE:` creates a major release.
 
-When a service release PR is merged, Release Please creates that service tag. The `Publish containers` workflow detects the service tag and publishes only the matching image. For example, `alerts-web-v0.2.0` publishes `alerts-web` only.
+When a service release PR is merged, Release Please creates that service Git tag. The `Publish containers` workflow detects the service Git tag and publishes only the matching image. For example, `alerts-web-v0.2.0` publishes `alerts-web:v0.2.0` and `alerts-web:latest` only.
 
 When a repo release PR is merged, Release Please creates the repo tag. The `Publish containers` workflow detects the repo tag and publishes the full deployable image set with the repo release tag.
 
@@ -50,12 +50,12 @@ This matters because workflow actions performed with the default `GITHUB_TOKEN` 
 
 ## Published Images
 
-Service release images are published to GHCR with service-specific tags:
+Service release images are published to GHCR with plain version tags scoped by image name:
 
 ```text
-ghcr.io/gitchegumi/multi-stream-alerts/alerts-web:alerts-web-v0.1.0
-ghcr.io/gitchegumi/multi-stream-alerts/alerts-ingress:alerts-ingress-v0.1.0
-ghcr.io/gitchegumi/multi-stream-alerts/alerts-worker:alerts-worker-v0.1.0
+ghcr.io/gitchegumi/multi-stream-alerts/alerts-web:v0.1.0
+ghcr.io/gitchegumi/multi-stream-alerts/alerts-ingress:v0.1.0
+ghcr.io/gitchegumi/multi-stream-alerts/alerts-worker:v0.1.0
 ```
 
 Repo releases publish the full deployable set with the repo release tag:
@@ -72,9 +72,11 @@ Each published image also gets:
 sha-<shortsha>
 ```
 
-Repo release builds also update `latest`. Service-only release builds do not update `latest` unless a repo release tag is also created.
+Every published image also updates `latest` for that service. Release-triggered publishes also write a plain `vX.Y.Z` image tag. A service-only release updates `latest` only for the matching service image. A repo release updates `latest` for the full deployable image set.
 
-Use the repo `vX.Y.Z` tag for self-hosted production deployments when you want the full deployable set pinned together. Use service tags when debugging or testing a specific image.
+Branch publishes only build service images whose runtime inputs changed. A change under `apps/web` builds `alerts-web`, a change under `apps/ingress` builds `alerts-ingress`, and a change under `apps/worker` builds `alerts-worker`. Shared runtime dependencies such as `packages/shared`, `packages/database`, the root package files, lockfile, Dockerfile, compose file, repo version metadata, or the publish workflow build every service. `packages/ui` builds `alerts-web` only.
+
+Use the repo `vX.Y.Z` tag for self-hosted production deployments when you want the full deployable set pinned together. Use service image version tags when debugging or testing a specific image.
 
 Images include OCI labels for `org.opencontainers.image.version`, `org.opencontainers.image.revision`, `org.opencontainers.image.source`, `org.opencontainers.image.title`, `org.opencontainers.image.description`, and `org.opencontainers.image.base.name`.
 
@@ -90,7 +92,7 @@ Images include OCI labels for `org.opencontainers.image.version`, `org.openconta
    - ingress release: `alerts-ingress-vX.Y.Z`
    - worker release: `alerts-worker-vX.Y.Z`
 6. Confirm the `Publish containers` workflow built the expected image or image set.
-7. Update self-hosted deployments by setting `GITCHALERTS_VERSION=vX.Y.Z` for repo releases, or by explicitly pinning a service image tag for targeted testing.
+7. Update self-hosted deployments by setting `GITCHALERTS_VERSION=vX.Y.Z` for repo releases, using `latest` for the newest published image, or by explicitly pinning a service image tag for targeted testing.
 
 ## Manual Escape Hatch
 

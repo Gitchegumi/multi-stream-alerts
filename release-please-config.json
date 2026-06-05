@@ -23,38 +23,17 @@
     "apps/web": {
       "package-name": "alerts-web",
       "include-component-in-tag": true,
-      "changelog-path": "CHANGELOG.md",
-      "extra-files": [
-        {
-          "type": "json",
-          "path": "../../version.json",
-          "jsonpath": "$.services.web"
-        }
-      ]
+      "changelog-path": "CHANGELOG.md"
     },
     "apps/ingress": {
       "package-name": "alerts-ingress",
       "include-component-in-tag": true,
-      "changelog-path": "CHANGELOG.md",
-      "extra-files": [
-        {
-          "type": "json",
-          "path": "../../version.json",
-          "jsonpath": "$.services.ingress"
-        }
-      ]
+      "changelog-path": "CHANGELOG.md"
     },
     "apps/worker": {
       "package-name": "alerts-worker",
       "include-component-in-tag": true,
-      "changelog-path": "CHANGELOG.md",
-      "extra-files": [
-        {
-          "type": "json",
-          "path": "../../version.json",
-          "jsonpath": "$.services.worker"
-        }
-      ]
+      "changelog-path": "CHANGELOG.md"
     }
   }
 }
