@@ -44,12 +44,14 @@ export default async function ChannelDashboardPage({
     ]);
 
   const activeAlertsCount = alertSetup.configs.filter((c) => c.enabled).length;
+  const guideUrl =
+    process.env.NEXT_PUBLIC_DOCS_URL ?? 'https://gitchegumi.github.io/multi-stream-alerts/';
 
   const navCards = [
     {
       label: 'Alerts',
       href: `/dashboard/${encodeURIComponent(channel.slug)}/alerts`,
-      description: 'Configure alert types and layouts',
+      description: 'Manage canvases, browser-source URLs, and alert assignments',
     },
     {
       label: 'Assets',
@@ -57,19 +59,14 @@ export default async function ChannelDashboardPage({
       description: 'Manage images, videos, and audio files',
     },
     {
-      label: 'Integrations',
-      href: `/dashboard/${encodeURIComponent(channel.slug)}/integrations`,
-      description: 'Connect Twitch, YouTube, Ko-fi',
-    },
-    {
-      label: 'Overlay',
-      href: `/dashboard/${encodeURIComponent(channel.slug)}/overlay`,
-      description: 'Copy overlay URLs for OBS',
-    },
-    {
       label: 'Settings',
       href: `/dashboard/${encodeURIComponent(channel.slug)}/settings`,
-      description: 'Workspace name and danger zone',
+      description: 'Workspace settings and integrations',
+    },
+    {
+      label: 'Guide',
+      href: guideUrl,
+      description: 'User and developer documentation',
     },
   ];
 

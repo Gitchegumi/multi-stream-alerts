@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handleGet, type HandlerDeps, type HandlerSession } from '../route.ts';
+import { handleGet, handlePost, type HandlerDeps, type HandlerSession } from '../route.ts';
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -55,9 +55,24 @@ type MockDeps = {
         where: { channelId: string };
         orderBy: { createdAt: 'asc' };
       }) => Promise<ReturnType<typeof makeProfileRow>[]>;
+      findFirst: (args: {
+        where: { channelId: string; slug: string };
+        select?: { id: true };
+      }) => Promise<ReturnType<typeof makeProfileRow> | { id: string } | null>;
+      create: (args: {
+        data: {
+          channelId: string;
+          name: string;
+          slug: string;
+          displayKey: string;
+          isActive: boolean;
+          settingsJson: object;
+        };
+      }) => Promise<ReturnType<typeof makeProfileRow>>;
     };
   };
   canManageChannel: (userId: string, role: string, channelId: string) => Promise<boolean>;
+  generateKey: () => string;
 };
 
 function makeDeps(overrides: Partial<MockDeps> = {}): HandlerDeps {
@@ -68,9 +83,18 @@ function makeDeps(overrides: Partial<MockDeps> = {}): HandlerDeps {
       },
       overlayProfile: {
         findMany: async () => [makeProfileRow()],
+        findFirst: async () => null,
+        create: async (args) =>
+          makeProfileRow({
+            name: args.data.name,
+            slug: args.data.slug,
+            displayKey: args.data.displayKey,
+            isActive: args.data.isActive,
+          }),
       },
     },
     canManageChannel: async () => true,
+    generateKey: () => 'generated-display-key',
     ...overrides,
   };
   return deps as unknown as HandlerDeps;
@@ -131,7 +155,7 @@ test('handleGet returns 200 with the profile list shape', async () => {
     slug: 'main',
     displayKey: 'key-a',
     isActive: true,
-    url: '/overlay/main?displayKey=key-a',
+    url: '/overlay/main/main?displayKey=key-a',
   });
   assert.deepEqual(body.profiles[1], {
     id: 'p2',
@@ -139,9 +163,102 @@ test('handleGet returns 200 with the profile list shape', async () => {
     slug: 'vertical',
     displayKey: 'key-b',
     isActive: false,
-    url: '/overlay/vertical?displayKey=key-b',
+    url: '/overlay/main/vertical?displayKey=key-b',
   });
   assert.equal(result.headers?.['Cache-Control'], 'no-store');
+});
+
+test('handlePost creates a canvas with a unique slug and generated display key', async () => {
+  const result = await handlePost({
+    session: makeSession(),
+    channelSlug: 'main',
+    body: { name: 'Main Overlay' },
+    deps: makeDeps(),
+  });
+
+  assert.equal(result.status, 201);
+  const body = result.body as { profile: ReturnType<typeof makeProfileRow> };
+  assert.equal(body.profile.name, 'Main Overlay');
+  assert.equal(body.profile.slug, 'main-overlay');
+  assert.equal(body.profile.displayKey, 'generated-display-key');
+  assert.equal(result.headers?.['Cache-Control'], 'no-store');
+});
+
+test('handlePost suffixes canvas slugs when the base slug is already used', async () => {
+  const seenSlugs: string[] = [];
+  const deps = makeDeps({
+    prisma: {
+      channel: { findUnique: async () => makeChannelRow() },
+      overlayProfile: {
+        findMany: async () => [],
+        findFirst: async (args) => {
+          seenSlugs.push(args.where.slug);
+          return args.where.slug === 'main-overlay' ? { id: 'existing' } : null;
+        },
+        create: async (args) => makeProfileRow({ name: args.data.name, slug: args.data.slug }),
+      },
+    },
+  });
+
+  const result = await handlePost({
+    session: makeSession(),
+    channelSlug: 'main',
+    body: { name: 'Main Overlay' },
+    deps,
+  });
+
+  assert.equal(result.status, 201);
+  const body = result.body as { profile: ReturnType<typeof makeProfileRow> };
+  assert.equal(body.profile.slug, 'main-overlay-2');
+  assert.deepEqual(seenSlugs, ['main-overlay', 'main-overlay-2']);
+});
+
+test('handlePost duplicates source canvas settings when requested', async () => {
+  const copiedSettings = {
+    width: 1280,
+    height: 720,
+    background: 'dark',
+    alertEventKeys: ['kofi.tipped'],
+  };
+  let createdSettings: object | null = null;
+  const deps = makeDeps({
+    prisma: {
+      channel: { findUnique: async () => makeChannelRow() },
+      overlayProfile: {
+        findMany: async () => [],
+        findFirst: async (args) =>
+          args.where.slug === 'source'
+            ? { ...makeProfileRow({ slug: 'source' }), settingsJson: copiedSettings }
+            : null,
+        create: async (args) => {
+          createdSettings = args.data.settingsJson;
+          return makeProfileRow({ name: args.data.name, slug: args.data.slug });
+        },
+      },
+    },
+  });
+
+  const result = await handlePost({
+    session: makeSession(),
+    channelSlug: 'main',
+    body: { name: 'Source copy', duplicateFromSlug: 'source' },
+    deps,
+  });
+
+  assert.equal(result.status, 201);
+  assert.deepEqual(createdSettings, copiedSettings);
+});
+
+test('handlePost returns 404 when duplicate source is missing', async () => {
+  const result = await handlePost({
+    session: makeSession(),
+    channelSlug: 'main',
+    body: { name: 'Missing copy', duplicateFromSlug: 'missing' },
+    deps: makeDeps(),
+  });
+
+  assert.equal(result.status, 404);
+  assert.deepEqual(result.body, { error: 'Source canvas not found' });
 });
 
 // ---------------------------------------------------------------------------

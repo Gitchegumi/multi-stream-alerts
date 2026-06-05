@@ -3,11 +3,28 @@
 import { overlayMessage, type AlertEvent } from '@multi-stream-alerts/shared';
 import { useEffect, useRef, useState } from 'react';
 
-export function OverlayClient({ displayKey, profile }: { displayKey: string; profile: string }) {
+type CanvasSettings = {
+  alertEventKeys: string[];
+};
+
+export function OverlayClient({
+  displayKey,
+  profile,
+  settings,
+}: {
+  displayKey: string;
+  profile: string;
+  settings: CanvasSettings;
+}) {
   const [activeAlert, setActiveAlert] = useState<AlertEvent | null>(null);
   const queueRef = useRef<AlertEvent[]>([]);
   const activeRef = useRef(false);
   const timeoutRef = useRef<number | null>(null);
+  const assignedKeysRef = useRef(new Set(settings.alertEventKeys));
+
+  useEffect(() => {
+    assignedKeysRef.current = new Set(settings.alertEventKeys);
+  }, [settings.alertEventKeys]);
 
   useEffect(() => {
     const source = new EventSource(
@@ -15,7 +32,13 @@ export function OverlayClient({ displayKey, profile }: { displayKey: string; pro
     );
 
     source.addEventListener('alert', (event) => {
-      queueRef.current.push(JSON.parse((event as MessageEvent).data) as AlertEvent);
+      const alert = JSON.parse((event as MessageEvent).data) as AlertEvent;
+      const assignedKeys = assignedKeysRef.current;
+      if (assignedKeys.size > 0 && (!alert.eventKey || !assignedKeys.has(alert.eventKey))) {
+        return;
+      }
+
+      queueRef.current.push(alert);
       drainQueue();
     });
 

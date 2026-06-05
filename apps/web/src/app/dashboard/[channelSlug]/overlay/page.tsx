@@ -29,7 +29,9 @@ export default async function OverlayPage({
     slug: p.slug,
     displayKey: p.displayKey,
     isActive: p.isActive,
-    url: `${publicBaseUrl}/overlay/${p.slug}?displayKey=${encodeURIComponent(p.displayKey)}`,
+    url: `${publicBaseUrl}/overlay/${channel.slug}/${p.slug}?displayKey=${encodeURIComponent(
+      p.displayKey,
+    )}`,
   }));
 
   return (
