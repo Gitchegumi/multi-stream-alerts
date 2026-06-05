@@ -1,6 +1,5 @@
 import { prisma } from '@multi-stream-alerts/database';
 
-const legacyOverlayProfiles = new Set(['main', 'vertical', 'test']);
 const rateLimitWindowMs = 60_000;
 const maxAttemptsPerWindow = 60;
 const overlayRouteRateLimits = new Map<string, { count: number; resetAt: number }>();
@@ -51,23 +50,6 @@ export async function resolveScopedOverlayProfile(input: {
   });
 
   return profile?.isActive ? profile : null;
-}
-
-export async function resolveLegacyOverlayProfile(input: {
-  profileSlug: string;
-  displayKey: string;
-  deps?: OverlayAccessDeps;
-}) {
-  if (!legacyOverlayProfiles.has(input.profileSlug)) {
-    return null;
-  }
-
-  const deps = input.deps ?? defaultDeps;
-  const profile = await deps.prisma.overlayProfile.findUnique({
-    where: { displayKey: input.displayKey },
-  });
-
-  return profile?.isActive && profile.slug === input.profileSlug ? profile : null;
 }
 
 export function isOverlayRouteRateLimited(clientIp: string) {

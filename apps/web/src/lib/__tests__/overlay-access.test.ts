@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   getClientIp,
-  resolveLegacyOverlayProfile,
   resolveScopedOverlayProfile,
   type OverlayAccessDeps,
   type OverlayProfileForAccess,
@@ -88,24 +87,6 @@ test('resolveScopedOverlayProfile rejects inactive canvases', async () => {
   });
 
   assert.equal(result, null);
-});
-
-test('resolveLegacyOverlayProfile only permits bootstrap overlay slugs', async () => {
-  assert.equal(
-    await resolveLegacyOverlayProfile({
-      profileSlug: 'custom-canvas',
-      displayKey: 'key-a',
-      deps: makeDeps(makeProfile({ slug: 'custom-canvas', displayKey: 'key-a' })),
-    }),
-    null,
-  );
-
-  const legacy = await resolveLegacyOverlayProfile({
-    profileSlug: 'main',
-    displayKey: 'key-a',
-    deps: makeDeps(makeProfile({ slug: 'main', displayKey: 'key-a' })),
-  });
-  assert.equal(legacy?.slug, 'main');
 });
 
 test('getClientIp prefers x-forwarded-for then x-real-ip', () => {
