@@ -1,8 +1,20 @@
 FROM node:24-alpine AS base
 
 ARG SERVICE
+ARG RELEASE_VERSION=0.1.0
+ARG SERVICE_VERSION=0.1.0
+ARG GIT_SHA=unknown
 ENV SERVICE=${SERVICE}
+ENV GITCHALERTS_RELEASE_VERSION=${RELEASE_VERSION}
+ENV GITCHALERTS_SERVICE_VERSION=${SERVICE_VERSION}
+ENV GITCHALERTS_COMMIT_SHA=${GIT_SHA}
 WORKDIR /app
+
+LABEL org.opencontainers.image.version="${RELEASE_VERSION}"
+LABEL org.opencontainers.image.revision="${GIT_SHA}"
+LABEL org.opencontainers.image.source="https://github.com/Gitchegumi/multi-stream-alerts"
+LABEL org.opencontainers.image.title="gitchalerts-${SERVICE}"
+LABEL org.opencontainers.image.description="GitcheGumi Alerts ${SERVICE} container"
 
 RUN npm install -g pnpm@9.15.4
 

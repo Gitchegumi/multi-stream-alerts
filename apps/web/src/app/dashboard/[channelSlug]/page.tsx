@@ -8,6 +8,7 @@ import {
   toAlertEvent,
 } from '@multi-stream-alerts/database';
 import { requireDashboardSession } from '@/lib/session';
+import { getVersionStatus } from '@/lib/update-check';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -29,16 +30,18 @@ export default async function ChannelDashboardPage({
   const canView = await canViewChannel(session.user.id, session.user.role, channel.id);
   if (!canView) redirect('/dashboard?error=forbidden');
 
-  const [alertSetup, recentEvents, storageUsage, storageSettings] = await Promise.all([
-    getWorkspaceAlertSetup(channel.id),
-    prisma.alertEvent.findMany({
-      where: { channelId: channel.id },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    }),
-    getWorkspaceStorageUsage(channel.id),
-    getWorkspaceStorageSettings(channel.id),
-  ]);
+  const [alertSetup, recentEvents, storageUsage, storageSettings, versionStatus] =
+    await Promise.all([
+      getWorkspaceAlertSetup(channel.id),
+      prisma.alertEvent.findMany({
+        where: { channelId: channel.id },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      }),
+      getWorkspaceStorageUsage(channel.id),
+      getWorkspaceStorageSettings(channel.id),
+      getVersionStatus(),
+    ]);
 
   const activeAlertsCount = alertSetup.configs.filter((c) => c.enabled).length;
 
@@ -113,6 +116,53 @@ export default async function ChannelDashboardPage({
             );
           })
         )}
+      </section>
+
+      <section className="panel version-panel" style={{ marginTop: 16 }}>
+        <div className="version-panel-header">
+          <div>
+            <h2>Deployment</h2>
+            <p className="muted small">Current release and container build metadata.</p>
+          </div>
+          {versionStatus.update.status === 'update-available' ? (
+            <span className="pill pill-warn">Update available</span>
+          ) : versionStatus.update.status === 'up-to-date' ? (
+            <span className="pill pill-ok">Up to date</span>
+          ) : versionStatus.update.status === 'disabled' ? (
+            <span className="pill pill-muted">Update checks off</span>
+          ) : (
+            <span className="pill pill-muted">Update unknown</span>
+          )}
+        </div>
+
+        <dl className="version-grid">
+          <div>
+            <dt>Project release</dt>
+            <dd>{versionStatus.build.releaseTag}</dd>
+          </div>
+          <div>
+            <dt>Commit</dt>
+            <dd>{versionStatus.build.shortCommitSha ?? 'unknown'}</dd>
+          </div>
+          {Object.entries(versionStatus.build.serviceVersions).map(([service, version]) => (
+            <div key={service}>
+              <dt>{service} service</dt>
+              <dd>{version}</dd>
+            </div>
+          ))}
+        </dl>
+
+        {versionStatus.update.latest ? (
+          <p className="muted small">
+            Latest release:{' '}
+            <a href={versionStatus.update.latest.htmlUrl}>{versionStatus.update.latest.tagName}</a>
+            {versionStatus.update.checkedAt
+              ? ` checked ${new Date(versionStatus.update.checkedAt).toLocaleString()}`
+              : ''}
+          </p>
+        ) : versionStatus.update.error ? (
+          <p className="muted small">Latest release could not be checked.</p>
+        ) : null}
       </section>
     </main>
   );

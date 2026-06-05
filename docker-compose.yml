@@ -1,9 +1,13 @@
 services:
   alerts-web:
+    image: ghcr.io/gitchegumi/multi-stream-alerts/alerts-web:${GITCHALERTS_VERSION:-v0.1.0}
     build:
       context: .
       args:
         SERVICE: web
+        RELEASE_VERSION: ${GITCHALERTS_VERSION:-v0.1.0}
+        SERVICE_VERSION: ${GITCHALERTS_WEB_VERSION:-0.1.0}
+        GIT_SHA: ${GITCHALERTS_COMMIT_SHA:-local}
     container_name: alerts-web
     env_file:
       - .env
@@ -25,10 +29,14 @@ services:
     restart: unless-stopped
 
   alerts-ingress:
+    image: ghcr.io/gitchegumi/multi-stream-alerts/alerts-ingress:${GITCHALERTS_VERSION:-v0.1.0}
     build:
       context: .
       args:
         SERVICE: ingress
+        RELEASE_VERSION: ${GITCHALERTS_VERSION:-v0.1.0}
+        SERVICE_VERSION: ${GITCHALERTS_INGRESS_VERSION:-0.1.0}
+        GIT_SHA: ${GITCHALERTS_COMMIT_SHA:-local}
     container_name: alerts-ingress
     env_file:
       - .env
@@ -43,10 +51,14 @@ services:
     restart: unless-stopped
 
   alerts-worker:
+    image: ghcr.io/gitchegumi/multi-stream-alerts/alerts-worker:${GITCHALERTS_VERSION:-v0.1.0}
     build:
       context: .
       args:
         SERVICE: worker
+        RELEASE_VERSION: ${GITCHALERTS_VERSION:-v0.1.0}
+        SERVICE_VERSION: ${GITCHALERTS_WORKER_VERSION:-0.1.0}
+        GIT_SHA: ${GITCHALERTS_COMMIT_SHA:-local}
     container_name: alerts-worker
     env_file:
       - .env

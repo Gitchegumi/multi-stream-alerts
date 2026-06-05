@@ -53,6 +53,9 @@ UPLOAD_DIR=/app/uploads
 STORAGE_PROVIDER=local
 WEB_PORT=3000
 INGRESS_PORT=8080
+GITCHALERTS_VERSION=v0.1.0
+UPDATE_CHECK_ENABLED=true
+UPDATE_CHECK_REPO=Gitchegumi/multi-stream-alerts
 ```
 
 `NEXTAUTH_URL` must match the browser-facing origin used to open the dashboard. For reverse proxy deployments, use `https://<your-alerts-domain>`. For local-only testing without a proxy, use the local origin you are opening in the browser.
@@ -338,6 +341,19 @@ Start the stack after configuring `.env`:
 ```bash
 docker compose up --build
 ```
+
+For self-hosted production deployments, pin a readable release tag instead of
+using `latest`:
+
+```env
+GITCHALERTS_VERSION=v0.1.0
+```
+
+Compose references the release-tagged GHCR images and still keeps local `build`
+settings for development. Published images also include `sha-<shortsha>` tags
+and OCI labels for release version, Git revision, source, title, and
+description. See [Release and Container Versioning](docs/releases.md) for the
+maintainer release process.
 
 Services:
 
