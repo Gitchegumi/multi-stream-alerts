@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.1.1...v0.1.2) (2026-06-05)
+
+
+### Bug Fixes
+
+* permission issue in Dockerfile ([a8bb2e4](https://github.com/Gitchegumi/multi-stream-alerts/commit/a8bb2e4a24806d48c6d26f64bd37822835f4cd73))
+
 ## [0.1.1](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.1.0...v0.1.1) (2026-06-05)
 
 
