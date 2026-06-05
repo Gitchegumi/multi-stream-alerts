@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.1.3...v0.1.4) (2026-06-05)
+
+
+### Bug Fixes
+
+* **overlay:** remove conflicting legacy route ([0ede83e](https://github.com/Gitchegumi/multi-stream-alerts/commit/0ede83e8fd35f0b2d8941c7568b17d71a58e1593))
+
 ## [0.1.3](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.1.2...v0.1.3) (2026-06-05)
 
 
