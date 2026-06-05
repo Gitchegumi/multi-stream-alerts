@@ -42,15 +42,73 @@ jobs:
             tag_prefix: alerts-worker-v
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
       - name: Decide whether to publish this service
         id: publish
         run: |
           ref_name="${GITHUB_REF_NAME}"
+          service_dir="${{ matrix.service.build_arg }}"
           tag_prefix="${{ matrix.service.tag_prefix }}"
 
           if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-            echo "reason=branch build" >> "$GITHUB_OUTPUT"
+            if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+              echo "enabled=true" >> "$GITHUB_OUTPUT"
+              echo "reason=manual build" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            before="${{ github.event.before }}"
+
+            if [[ -z "$before" || "$before" =~ ^0+$ ]]; then
+              echo "enabled=true" >> "$GITHUB_OUTPUT"
+              echo "reason=no comparison base" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            if ! git cat-file -e "$before^{commit}" 2>/dev/null; then
+              git fetch --no-tags --depth=1 origin "$before" || true
+            fi
+
+            if ! git cat-file -e "$before^{commit}" 2>/dev/null; then
+              echo "enabled=true" >> "$GITHUB_OUTPUT"
+              echo "reason=comparison base unavailable" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            while IFS= read -r file; do
+              if [[ "$file" == "apps/$service_dir" || "$file" == "apps/$service_dir/"* ]]; then
+                echo "enabled=true" >> "$GITHUB_OUTPUT"
+                echo "reason=$file changed" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+
+              if [[ "$file" == packages/shared/* || "$file" == packages/database/* ]]; then
+                echo "enabled=true" >> "$GITHUB_OUTPUT"
+                echo "reason=$file changed" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+
+              if [[ "$service_dir" == "web" && "$file" == packages/ui/* ]]; then
+                echo "enabled=true" >> "$GITHUB_OUTPUT"
+                echo "reason=$file changed" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+
+              case "$file" in
+                Dockerfile | docker-compose.yml | package.json | pnpm-lock.yaml | pnpm-workspace.yaml | version.json | .github/workflows/publish-containers.yml)
+                  echo "enabled=true" >> "$GITHUB_OUTPUT"
+                  echo "reason=$file changed" >> "$GITHUB_OUTPUT"
+                  exit 0
+                  ;;
+              esac
+            done < <(git diff --name-only "$before" "$GITHUB_SHA")
+
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "reason=no $service_dir container changes" >> "$GITHUB_OUTPUT"
           elif [[ "$ref_name" == "$tag_prefix"* ]]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
             echo "reason=service release tag" >> "$GITHUB_OUTPUT"
@@ -61,10 +119,6 @@ jobs:
             echo "enabled=false" >> "$GITHUB_OUTPUT"
             echo "reason=not this service tag" >> "$GITHUB_OUTPUT"
           fi
-
-      - name: Checkout
-        if: steps.publish.outputs.enabled == 'true'
-        uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
         if: steps.publish.outputs.enabled == 'true'

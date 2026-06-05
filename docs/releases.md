@@ -74,6 +74,8 @@ sha-<shortsha>
 
 Every published image also updates `latest` for that service. Release-triggered publishes also write a plain `vX.Y.Z` image tag. A service-only release updates `latest` only for the matching service image. A repo release updates `latest` for the full deployable image set.
 
+Branch publishes only build service images whose runtime inputs changed. A change under `apps/web` builds `alerts-web`, a change under `apps/ingress` builds `alerts-ingress`, and a change under `apps/worker` builds `alerts-worker`. Shared runtime dependencies such as `packages/shared`, `packages/database`, the root package files, lockfile, Dockerfile, compose file, repo version metadata, or the publish workflow build every service. `packages/ui` builds `alerts-web` only.
+
 Use the repo `vX.Y.Z` tag for self-hosted production deployments when you want the full deployable set pinned together. Use service image version tags when debugging or testing a specific image.
 
 Images include OCI labels for `org.opencontainers.image.version`, `org.opencontainers.image.revision`, `org.opencontainers.image.source`, `org.opencontainers.image.title`, `org.opencontainers.image.description`, and `org.opencontainers.image.base.name`.
