@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.1.2...v0.1.3) (2026-06-05)
+
+
+### Features
+
+* **alerts:** add canvas workspace and docs site ([431c479](https://github.com/Gitchegumi/multi-stream-alerts/commit/431c479cba765ad03ef425ec85868371581e3b96))
+
 ## [0.1.2](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.1.1...v0.1.2) (2026-06-05)
 
 
