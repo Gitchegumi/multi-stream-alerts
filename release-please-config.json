@@ -1,0 +1,60 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "node",
+  "include-v-in-tag": true,
+  "include-v-in-release-name": true,
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
+  "group-pull-request-title-pattern": "chore(release): release ${branch}",
+  "packages": {
+    ".": {
+      "package-name": "gitchalerts",
+      "include-component-in-tag": false,
+      "pull-request-title-pattern": "chore(release): release ${version}",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "version.json",
+          "jsonpath": "$.release"
+        }
+      ]
+    },
+    "apps/web": {
+      "package-name": "alerts-web",
+      "include-component-in-tag": true,
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "../../version.json",
+          "jsonpath": "$.services.web"
+        }
+      ]
+    },
+    "apps/ingress": {
+      "package-name": "alerts-ingress",
+      "include-component-in-tag": true,
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "../../version.json",
+          "jsonpath": "$.services.ingress"
+        }
+      ]
+    },
+    "apps/worker": {
+      "package-name": "alerts-worker",
+      "include-component-in-tag": true,
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "../../version.json",
+          "jsonpath": "$.services.worker"
+        }
+      ]
+    }
+  }
+}
