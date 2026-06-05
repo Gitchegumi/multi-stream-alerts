@@ -4,23 +4,33 @@ import { useState } from 'react';
 import { usePathname, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import type { getVersionStatus } from '@/lib/update-check';
 
 type NavUser = {
   email: string;
   role: string;
 };
 
+type NavVersionStatus = Awaited<ReturnType<typeof getVersionStatus>>;
+
 type NavBarProps = {
   user: NavUser;
   defaultChannelSlug: string | null;
+  versionStatus: NavVersionStatus;
 };
 
-export function NavBar({ user, defaultChannelSlug }: NavBarProps) {
+export function NavBar({ user, defaultChannelSlug, versionStatus }: NavBarProps) {
   const pathname = usePathname();
   const params = useParams();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const channelSlug = (params?.channelSlug as string | undefined) ?? defaultChannelSlug;
+  const updateLabel = getUpdateLabel(versionStatus.update.status);
+  const updateClass = getUpdateClass(versionStatus.update.status);
+  const latestLabel = versionStatus.update.latest?.tagName ?? null;
+  const statusTitle = latestLabel
+    ? `${versionStatus.build.releaseTag} deployed. Latest release: ${latestLabel}.`
+    : `${versionStatus.build.releaseTag} deployed. Update status: ${updateLabel}.`;
 
   const links = [
     {
@@ -104,6 +114,10 @@ export function NavBar({ user, defaultChannelSlug }: NavBarProps) {
       </div>
 
       <div className="nav-user">
+        <div className="nav-release" title={statusTitle} aria-label={statusTitle}>
+          <span className="nav-release-version">{versionStatus.build.releaseTag}</span>
+          <span className={`pill ${updateClass}`}>{updateLabel}</span>
+        </div>
         <span className="nav-user-email" title={user.email}>
           {user.email}
         </span>
@@ -113,4 +127,28 @@ export function NavBar({ user, defaultChannelSlug }: NavBarProps) {
       </div>
     </nav>
   );
+}
+
+function getUpdateLabel(status: NavVersionStatus['update']['status']) {
+  switch (status) {
+    case 'update-available':
+      return 'Update available';
+    case 'up-to-date':
+      return 'Up to date';
+    case 'disabled':
+      return 'Updates off';
+    default:
+      return 'Update unknown';
+  }
+}
+
+function getUpdateClass(status: NavVersionStatus['update']['status']) {
+  switch (status) {
+    case 'update-available':
+      return 'pill-warn';
+    case 'up-to-date':
+      return 'pill-ok';
+    default:
+      return 'pill-muted';
+  }
 }
