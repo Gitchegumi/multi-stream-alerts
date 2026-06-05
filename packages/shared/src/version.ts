@@ -1,6 +1,9 @@
+import ingressPackage from '../../../apps/ingress/package.json' with { type: 'json' };
+import webPackage from '../../../apps/web/package.json' with { type: 'json' };
+import workerPackage from '../../../apps/worker/package.json' with { type: 'json' };
 import versionMetadata from '../../../version.json' with { type: 'json' };
 
-export type ServiceName = keyof typeof versionMetadata.services;
+export type ServiceName = 'web' | 'ingress' | 'worker';
 
 export type BuildMetadata = {
   releaseVersion: string;
@@ -37,7 +40,11 @@ export type UpdateStatus =
 
 export const PROJECT_RELEASE_VERSION = versionMetadata.release;
 export const PROJECT_RELEASE_TAG = formatReleaseTag(PROJECT_RELEASE_VERSION);
-export const SERVICE_VERSIONS: Record<ServiceName, string> = versionMetadata.services;
+export const SERVICE_VERSIONS: Record<ServiceName, string> = {
+  web: webPackage.version,
+  ingress: ingressPackage.version,
+  worker: workerPackage.version,
+};
 
 export function getBuildMetadata(env: NodeJS.ProcessEnv = process.env): BuildMetadata {
   const commitSha =

@@ -33,15 +33,12 @@ jobs:
         service:
           - name: alerts-web
             build_arg: web
-            version_key: web
             tag_prefix: alerts-web-v
           - name: alerts-ingress
             build_arg: ingress
-            version_key: ingress
             tag_prefix: alerts-ingress-v
           - name: alerts-worker
             build_arg: worker
-            version_key: worker
             tag_prefix: alerts-worker-v
 
     steps:
@@ -87,7 +84,7 @@ jobs:
         run: |
           ref_name="${GITHUB_REF_NAME}"
           release="$(jq -r .release version.json)"
-          service="$(jq -r '.services["${{ matrix.service.version_key }}"]' version.json)"
+          service="$(jq -r .version "apps/${{ matrix.service.build_arg }}/package.json")"
 
           if [[ "${GITHUB_REF_TYPE}" == "tag" && "$ref_name" == "${{ matrix.service.tag_prefix }}"* ]]; then
             service="${ref_name#${{ matrix.service.tag_prefix }}}"
@@ -100,7 +97,7 @@ jobs:
           echo "release=$release" >> "$GITHUB_OUTPUT"
           echo "release_tag=v$release" >> "$GITHUB_OUTPUT"
           echo "service=$service" >> "$GITHUB_OUTPUT"
-          echo "service_tag=${{ matrix.service.tag_prefix }}$service" >> "$GITHUB_OUTPUT"
+          echo "service_tag=v$service" >> "$GITHUB_OUTPUT"
 
       - name: Generate image metadata
         if: steps.publish.outputs.enabled == 'true'
@@ -109,9 +106,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.name }}
           tags: |
-            type=raw,value=${{ steps.versions.outputs.service_tag }}
-            type=raw,value=${{ steps.versions.outputs.release_tag }},enable=${{ startsWith(github.ref_name, 'v') }}
-            type=raw,value=latest,enable=${{ startsWith(github.ref_name, 'v') }}
+            type=raw,value=${{ steps.versions.outputs.service_tag }},enable=${{ github.ref_type == 'tag' && !startsWith(github.ref_name, 'v') }}
+            type=raw,value=${{ steps.versions.outputs.release_tag }},enable=${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') }}
+            type=raw,value=latest
             type=sha,prefix=sha-
           labels: |
             org.opencontainers.image.title=${{ matrix.service.name }}
