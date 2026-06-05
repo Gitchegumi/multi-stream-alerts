@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-web-v0.1.2...alerts-web-v0.1.3) (2026-06-05)
+
+
+### Bug Fixes
+
+* **overlay:** remove conflicting legacy route ([0ede83e](https://github.com/Gitchegumi/multi-stream-alerts/commit/0ede83e8fd35f0b2d8941c7568b17d71a58e1593))
+
 ## [0.1.2](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-web-v0.1.1...alerts-web-v0.1.2) (2026-06-05)
 
 
