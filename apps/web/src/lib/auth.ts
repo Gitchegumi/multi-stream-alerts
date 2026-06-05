@@ -89,6 +89,20 @@ const oidcSignInDeps: OidcSignInDeps = {
 };
 
 function buildOidcProvider() {
+  const baseUrl = (
+    process.env.NEXTAUTH_URL ??
+    process.env.PUBLIC_BASE_URL ??
+    'https://<your-alerts-domain>'
+  ).replace(/\/$/, '');
+
+  if (!process.env.NEXTAUTH_URL && !process.env.PUBLIC_BASE_URL) {
+    console.warn(
+      '[auth] Neither NEXTAUTH_URL nor PUBLIC_BASE_URL is set. ' +
+        'OIDC callback URIs will use the hard-coded placeholder. ' +
+        'Set one of these env vars so the reverse proxy routes correctly.',
+    );
+  }
+
   return {
     id: 'oidc' as const,
     name: process.env.AUTH_OIDC_PROVIDER_NAME ?? 'OIDC',
@@ -98,6 +112,12 @@ function buildOidcProvider() {
     clientId: process.env.AUTH_OIDC_CLIENT_ID ?? '<your-oidc-client-id>',
     clientSecret: process.env.AUTH_OIDC_CLIENT_SECRET ?? '<your-oidc-client-secret>',
     authorization: { params: { scope: 'openid email profile' } },
+    // NextAuth v4 uses a relative callback redirect by default, but behind
+    // reverse proxies it can resolve to the internal hostname. Explicitly
+    // set the callback URL so Authentik receives the public canonical URL.
+    client: {
+      redirect_uris: [`${baseUrl}/api/auth/callback/oidc`],
+    },
     checks: ['pkce', 'state', 'nonce'] as ('pkce' | 'state' | 'nonce')[],
     profile(profile: Record<string, unknown>) {
       return {
