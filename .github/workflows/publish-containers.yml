@@ -162,7 +162,7 @@ jobs:
           tags: |
             type=raw,value=${{ steps.versions.outputs.service_image_tag }},enable=${{ github.ref_type == 'tag' && !startsWith(github.ref_name, 'v') }}
             type=raw,value=${{ steps.versions.outputs.release_tag }},enable=${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') }}
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ github.ref_name == 'main' || github.ref_type == 'tag' }}
             type=sha,prefix=sha-
           labels: |
             org.opencontainers.image.title=${{ matrix.service.name }}
