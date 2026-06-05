@@ -25,6 +25,9 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm prisma:generate
 RUN pnpm --filter @multi-stream-alerts/${SERVICE} build
 
+RUN if [ "$SERVICE" = "web" ]; then mkdir -p /app/apps/web/.next/cache; fi \
+  && chown -R 1000:1000 /app
+
 USER 1000
 
 EXPOSE 3000
