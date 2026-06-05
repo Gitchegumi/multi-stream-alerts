@@ -73,7 +73,7 @@ export function NavBar({ user, defaultChannelSlug, versionStatus }: NavBarProps)
     <nav className="nav-bar" aria-label="Main">
       <div className="nav-brand">
         <Link href="/" aria-label="GitcheGumi Alerts – Home">
-          <Image src="/logo.svg" alt="GitcheGumi Alerts logo" width={160} height={40} priority />
+          <Image src="/logo.svg" alt="GitcheGumi Alerts logo" width={320} height={80} priority />
         </Link>
       </div>
 
