@@ -68,10 +68,7 @@ export function WorkspaceSettingsForm({
         Save name
       </button>
 
-      <div
-        className="danger-zone"
-        style={{ marginTop: 24, borderTop: '1px solid var(--border)', paddingTop: 16 }}
-      >
+      <div className="danger-zone" style={{ marginTop: 24 }}>
         <h3>Danger zone</h3>
         {!confirmDelete ? (
           <button

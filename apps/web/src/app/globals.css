@@ -379,6 +379,34 @@ audio.asset-preview {
   font-size: 18px;
 }
 
+.stat-card {
+  gap: 6px;
+  border-color: rgba(65, 102, 245, 0.4);
+  background: linear-gradient(135deg, rgba(65, 102, 245, 0.16), transparent 68%), var(--panel);
+}
+
+.stat-value {
+  color: var(--attention);
+  font-size: 32px;
+  line-height: 1;
+}
+
+.nav-card {
+  display: grid;
+  gap: 8px;
+  text-decoration: none;
+  transition:
+    border-color 120ms ease,
+    transform 120ms ease,
+    background 120ms ease;
+}
+
+.nav-card:hover {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, rgba(175, 224, 206, 0.1), transparent 60%), var(--panel);
+  transform: translateY(-1px);
+}
+
 .stack {
   display: grid;
   gap: 12px;
@@ -991,6 +1019,17 @@ textarea.input {
   border: 1px solid var(--line);
 }
 
+.badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-soft);
+  font-size: 12px;
+}
+
 .pill-ok {
   background: rgba(175, 224, 206, 0.16);
   color: var(--accent);
@@ -1102,6 +1141,48 @@ textarea.input {
   color: var(--text);
   border-color: var(--attention);
   background: var(--attention-soft);
+}
+
+.overlay-profile-list {
+  display: grid;
+  gap: 12px;
+}
+
+.overlay-profile-row {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.overlay-profile-info,
+.overlay-profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-form {
+  display: grid;
+  gap: 12px;
+}
+
+.danger-zone {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+.danger-zone .button {
+  background: var(--attention);
+  color: #17120a;
+  box-shadow: 0 8px 24px rgba(252, 163, 17, 0.2);
+}
+
+.danger-zone .button:hover {
+  background: #ffbb47;
 }
 
 /* Hamburger */
