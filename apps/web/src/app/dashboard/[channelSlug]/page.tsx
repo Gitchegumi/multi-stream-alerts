@@ -10,6 +10,7 @@ import {
 import { requireDashboardSession } from '@/lib/session';
 import { getVersionStatus } from '@/lib/update-check';
 import { RecentAlertFeed } from '@/components/RecentAlertFeed';
+import { UserLocalTime } from '@/components/UserLocalTime';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -137,9 +138,12 @@ export default async function ChannelDashboardPage({
           <p className="muted small">
             Latest release:{' '}
             <a href={versionStatus.update.latest.htmlUrl}>{versionStatus.update.latest.tagName}</a>
-            {versionStatus.update.checkedAt
-              ? ` checked ${new Date(versionStatus.update.checkedAt).toLocaleString()}`
-              : ''}
+            {versionStatus.update.checkedAt ? (
+              <>
+                {' checked '}
+                <UserLocalTime value={versionStatus.update.checkedAt} />
+              </>
+            ) : null}
           </p>
         ) : versionStatus.update.error ? (
           <p className="muted small">Latest release could not be checked.</p>
