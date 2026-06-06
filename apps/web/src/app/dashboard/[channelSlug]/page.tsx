@@ -45,9 +45,6 @@ export default async function ChannelDashboardPage({
     ]);
 
   const activeAlertsCount = alertSetup.configs.filter((c) => c.enabled).length;
-  const guideUrl =
-    process.env.NEXT_PUBLIC_DOCS_URL ?? 'https://gitchegumi.github.io/multi-stream-alerts/';
-
   const navCards = [
     {
       label: 'Alerts',
@@ -66,7 +63,7 @@ export default async function ChannelDashboardPage({
     },
     {
       label: 'Guide',
-      href: guideUrl,
+      href: `/dashboard/${encodeURIComponent(channel.slug)}/guide`,
       description: 'User and developer documentation',
     },
   ];

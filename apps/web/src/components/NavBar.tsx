@@ -28,8 +28,6 @@ export function NavBar({ user, defaultChannelSlug, versionStatus }: NavBarProps)
   const updateLabel = getUpdateLabel(versionStatus.update.status);
   const updateClass = getUpdateClass(versionStatus.update.status);
   const latestLabel = versionStatus.update.latest?.tagName ?? null;
-  const guideUrl =
-    process.env.NEXT_PUBLIC_DOCS_URL ?? 'https://gitchegumi.github.io/multi-stream-alerts/';
   const statusTitle = latestLabel
     ? `${versionStatus.build.releaseTag} deployed. Latest release: ${latestLabel}.`
     : `${versionStatus.build.releaseTag} deployed. Update status: ${updateLabel}.`;
@@ -54,7 +52,7 @@ export function NavBar({ user, defaultChannelSlug, versionStatus }: NavBarProps)
     },
     {
       label: 'Guide',
-      href: guideUrl,
+      href: channelSlug ? `/dashboard/${encodeURIComponent(channelSlug)}/guide` : '/dashboard',
     },
   ];
 
