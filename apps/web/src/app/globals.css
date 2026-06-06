@@ -116,7 +116,7 @@ textarea {
 
 .canvas-workspace {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(260px, 300px);
   gap: 16px;
   align-items: start;
 }
@@ -124,6 +124,8 @@ textarea {
 .canvas-panel,
 .canvas-main {
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -142,12 +144,17 @@ textarea {
 .canvas-layout-links {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
 .canvas-panel-header,
 .canvas-url-bar {
   justify-content: space-between;
+}
+
+.canvas-url-bar > div {
+  min-width: 0;
 }
 
 .canvas-panel h2,
@@ -205,7 +212,7 @@ textarea {
 
 .canvas-preview {
   width: min(100%, 960px);
-  min-width: 360px;
+  min-width: 0;
   margin: 0 auto;
   overflow: hidden;
   border: 1px solid var(--line-strong);
@@ -226,7 +233,7 @@ textarea {
 
 .canvas-settings-grid {
   display: grid;
-  grid-template-columns: minmax(180px, 1.4fr) repeat(3, minmax(110px, 0.7fr)) auto;
+  grid-template-columns: minmax(160px, 1.4fr) repeat(3, minmax(92px, 0.7fr)) auto;
   gap: 10px;
   align-items: end;
 }
@@ -560,6 +567,7 @@ audio.asset-preview {
 }
 
 .url-item {
+  max-width: 100%;
   overflow-wrap: anywhere;
   color: var(--accent);
   font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
@@ -850,6 +858,16 @@ textarea.input {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 1120px) {
+  .canvas-workspace {
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  }
+
+  .canvas-workspace > .canvas-panel:last-child {
+    grid-column: 1 / -1;
   }
 }
 
