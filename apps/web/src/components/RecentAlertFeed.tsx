@@ -1,4 +1,5 @@
 import type { AlertEvent, AlertPlatform, AlertType } from '@multi-stream-alerts/shared';
+import { UserLocalTime } from './UserLocalTime';
 
 export function RecentAlertFeed({ events }: { events: AlertEvent[] }) {
   if (events.length === 0) {
@@ -16,7 +17,9 @@ export function RecentAlertFeed({ events }: { events: AlertEvent[] }) {
         </span>
         <strong className="recent-alert-name">from {event.displayName}</strong>
       </div>
-      <span className="muted">{new Date(event.createdAt).toLocaleString()}</span>
+      <span className="muted">
+        <UserLocalTime value={event.createdAt} />
+      </span>
     </div>
   ));
 }
