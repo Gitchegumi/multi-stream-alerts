@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.1.4](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-web-v0.1.3...alerts-web-v0.1.4) (2026-06-06)
+
+
+### Features
+
+* **web:** add recent alert feed pills ([eee76ea](https://github.com/Gitchegumi/multi-stream-alerts/commit/eee76ea5f5a124829c9ec10e267b5f6ab27da288))
+* **web:** align UI with brand palette ([7790aab](https://github.com/Gitchegumi/multi-stream-alerts/commit/7790aabd05a2fdd0f73f3b70188a8dd29d830e78))
+* **web:** align UI with brand palette ([1e65c59](https://github.com/Gitchegumi/multi-stream-alerts/commit/1e65c5956de67ecce737dbb3dcd360798fcef57f))
+* **web:** embed guide in dashboard ([8f54619](https://github.com/Gitchegumi/multi-stream-alerts/commit/8f54619b91d11b29f171589e85aaff4d1a605c5d))
+* **web:** polish branded dashboard surfaces ([fbb4645](https://github.com/Gitchegumi/multi-stream-alerts/commit/fbb464592dfcdb71586c7eb2972da3a212ea9387))
+
+
+### Bug Fixes
+
+* **web:** keep dashboard nav exact ([131a51f](https://github.com/Gitchegumi/multi-stream-alerts/commit/131a51fd91b81d595c1d4cec0deca30c3f806b70))
+* **web:** localize recent alert times ([8c233a7](https://github.com/Gitchegumi/multi-stream-alerts/commit/8c233a740e3ddb39349a7d6b7dc083e22aa074d9))
+* **web:** localize update check time ([1e268eb](https://github.com/Gitchegumi/multi-stream-alerts/commit/1e268ebf3cd5372ea93ca7984dc2eb0eeeb53e52))
+* **web:** prevent alerts workspace overlap ([262fc93](https://github.com/Gitchegumi/multi-stream-alerts/commit/262fc93b615866edff65a8227ca93a7617f47561))
+* **web:** use valid local time options ([1cc92d3](https://github.com/Gitchegumi/multi-stream-alerts/commit/1cc92d3a78b09ba72378080fb76c8d5231b8a469))
+* **web:** widen alerts dashboard workspace ([376cfaa](https://github.com/Gitchegumi/multi-stream-alerts/commit/376cfaab605d908f99458ecba74a276a17f13459))
+
 ## [0.1.3](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-web-v0.1.2...alerts-web-v0.1.3) (2026-06-05)
 
 
