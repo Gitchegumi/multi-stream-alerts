@@ -38,6 +38,7 @@ export function NavBar({ user, defaultChannelSlug, versionStatus }: NavBarProps)
     {
       label: 'Dashboard',
       href: channelSlug ? `/dashboard/${encodeURIComponent(channelSlug)}` : '/dashboard',
+      exact: true,
     },
     {
       label: 'Alerts',
@@ -57,9 +58,10 @@ export function NavBar({ user, defaultChannelSlug, versionStatus }: NavBarProps)
     },
   ];
 
-  const isActive = (href: string): boolean => {
+  const isActive = (href: string, exact = false): boolean => {
     if (!pathname) return false;
     if (href === pathname) return true;
+    if (exact) return false;
     if (href !== '/dashboard' && pathname.startsWith(href)) return true;
     if (href === '/dashboard' && pathname === '/dashboard') return true;
     return false;
@@ -90,8 +92,8 @@ export function NavBar({ user, defaultChannelSlug, versionStatus }: NavBarProps)
           <Link
             key={link.label}
             href={link.href}
-            className={`nav-link${isActive(link.href) ? ' nav-link-active' : ''}`}
-            aria-current={isActive(link.href) ? 'page' : undefined}
+            className={`nav-link${isActive(link.href, link.exact) ? ' nav-link-active' : ''}`}
+            aria-current={isActive(link.href, link.exact) ? 'page' : undefined}
             onClick={() => setMobileOpen(false)}
           >
             {link.label}
