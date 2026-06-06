@@ -514,6 +514,112 @@ audio.asset-preview {
   border-bottom: 0;
 }
 
+.recent-alert-row {
+  gap: 8px;
+}
+
+.recent-alert-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.recent-alert-name {
+  overflow-wrap: anywhere;
+}
+
+.event-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 24px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.platform-pill-twitch {
+  background: rgba(145, 70, 255, 0.2);
+  border-color: rgba(145, 70, 255, 0.46);
+  color: #d9c4ff;
+}
+
+.platform-pill-youtube {
+  background: rgba(255, 0, 0, 0.18);
+  border-color: rgba(255, 0, 0, 0.42);
+  color: #ffb4b4;
+}
+
+.platform-pill-kofi {
+  background: rgba(255, 91, 121, 0.18);
+  border-color: rgba(255, 91, 121, 0.44);
+  color: #ffc0cc;
+}
+
+.platform-pill-tiktok {
+  background: rgba(0, 242, 234, 0.14);
+  border-color: rgba(0, 242, 234, 0.38);
+  color: #a8fffb;
+}
+
+.platform-pill-manual,
+.platform-pill-generic {
+  background: rgba(204, 219, 220, 0.12);
+  border-color: rgba(204, 219, 220, 0.34);
+  color: var(--brand-platinum);
+}
+
+.action-pill {
+  color: var(--brand-soft-white);
+}
+
+.action-pill-follow,
+.action-pill-membership,
+.action-pill-redemption,
+.action-pill-channel_point {
+  background: rgba(175, 224, 206, 0.16);
+  border-color: rgba(175, 224, 206, 0.44);
+}
+
+.action-pill-subscription,
+.action-pill-resubscription,
+.action-pill-gift,
+.action-pill-raid {
+  background: rgba(65, 102, 245, 0.2);
+  border-color: rgba(65, 102, 245, 0.52);
+}
+
+.action-pill-tip,
+.action-pill-superchat,
+.action-pill-supersticker,
+.action-pill-cheer,
+.action-pill-hypechat,
+.action-pill-charity_donation {
+  background: rgba(252, 163, 17, 0.18);
+  border-color: rgba(252, 163, 17, 0.48);
+}
+
+.action-pill-shop_order,
+.action-pill-commission,
+.action-pill-external_purchase {
+  background: rgba(175, 224, 206, 0.1);
+  border-color: rgba(175, 224, 206, 0.36);
+  color: var(--accent);
+}
+
+.action-pill-test,
+.action-pill-widget_event,
+.action-pill-stream_online,
+.action-pill-stream_offline {
+  background: rgba(204, 219, 220, 0.12);
+  border-color: rgba(204, 219, 220, 0.34);
+  color: var(--brand-platinum);
+}
+
 .version-panel {
   display: grid;
   gap: 14px;
