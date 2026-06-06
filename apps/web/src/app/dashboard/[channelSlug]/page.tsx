@@ -9,6 +9,8 @@ import {
 } from '@multi-stream-alerts/database';
 import { requireDashboardSession } from '@/lib/session';
 import { getVersionStatus } from '@/lib/update-check';
+import { RecentAlertFeed } from '@/components/RecentAlertFeed';
+import { UserLocalTime } from '@/components/UserLocalTime';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -44,9 +46,6 @@ export default async function ChannelDashboardPage({
     ]);
 
   const activeAlertsCount = alertSetup.configs.filter((c) => c.enabled).length;
-  const guideUrl =
-    process.env.NEXT_PUBLIC_DOCS_URL ?? 'https://gitchegumi.github.io/multi-stream-alerts/';
-
   const navCards = [
     {
       label: 'Alerts',
@@ -65,7 +64,7 @@ export default async function ChannelDashboardPage({
     },
     {
       label: 'Guide',
-      href: guideUrl,
+      href: `/dashboard/${encodeURIComponent(channel.slug)}/guide`,
       description: 'User and developer documentation',
     },
   ];
@@ -98,21 +97,7 @@ export default async function ChannelDashboardPage({
 
       <section className="panel" style={{ marginTop: 16 }}>
         <h2>Recent alerts</h2>
-        {recentEvents.length === 0 ? (
-          <p className="muted">No alerts have been received yet.</p>
-        ) : (
-          recentEvents.map((row) => {
-            const event = toAlertEvent(row);
-            return (
-              <div className="event-row" key={event.id}>
-                <strong>
-                  {event.platform} / {event.type} from {event.displayName}
-                </strong>
-                <span className="muted">{new Date(event.createdAt).toLocaleString()}</span>
-              </div>
-            );
-          })
-        )}
+        <RecentAlertFeed events={recentEvents.map(toAlertEvent)} />
       </section>
 
       <section className="panel version-panel" style={{ marginTop: 16 }}>
@@ -153,9 +138,12 @@ export default async function ChannelDashboardPage({
           <p className="muted small">
             Latest release:{' '}
             <a href={versionStatus.update.latest.htmlUrl}>{versionStatus.update.latest.tagName}</a>
-            {versionStatus.update.checkedAt
-              ? ` checked ${new Date(versionStatus.update.checkedAt).toLocaleString()}`
-              : ''}
+            {versionStatus.update.checkedAt ? (
+              <>
+                {' checked '}
+                <UserLocalTime value={versionStatus.update.checkedAt} />
+              </>
+            ) : null}
           </p>
         ) : versionStatus.update.error ? (
           <p className="muted small">Latest release could not be checked.</p>

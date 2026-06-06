@@ -7,6 +7,7 @@ import {
 } from '@multi-stream-alerts/database';
 import { requireDashboardSession } from '@/lib/session';
 import { CanvasWorkspace } from '@/components/CanvasWorkspace';
+import { RecentAlertFeed } from '@/components/RecentAlertFeed';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,21 +90,7 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
 
       <section className="panel" style={{ marginTop: 16 }}>
         <h2>Recent alerts</h2>
-        {recentEvents.length === 0 ? (
-          <p className="muted">No alerts have been received yet.</p>
-        ) : (
-          recentEvents.map((row) => {
-            const event = toAlertEvent(row);
-            return (
-              <div className="event-row" key={event.id}>
-                <strong>
-                  {event.platform} / {event.type} from {event.displayName}
-                </strong>
-                <span className="muted">{new Date(event.createdAt).toLocaleString()}</span>
-              </div>
-            );
-          })
-        )}
+        <RecentAlertFeed events={recentEvents.map(toAlertEvent)} />
       </section>
     </main>
   );

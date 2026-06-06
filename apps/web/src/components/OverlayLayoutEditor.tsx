@@ -68,6 +68,9 @@ const palette: Array<{ type: ElementType; label: string }> = [
   { type: 'goal-bar', label: 'Goal Bar' },
 ];
 const EDITOR_LAYOUT_VERSION = 1;
+const BRAND_SOFT_WHITE = '#f0f0f0';
+const BRAND_CHARCOAL = '#2c2c2c';
+const BRAND_ULTRAMARINE = '#4166f5';
 
 export function OverlayLayoutEditor({
   channelSlug,
@@ -512,7 +515,7 @@ export function OverlayLayoutEditor({
                   <input
                     className="input"
                     type="color"
-                    value={selected.properties.color ?? '#ffffff'}
+                    value={selected.properties.color ?? BRAND_SOFT_WHITE}
                     disabled={!canManage}
                     onChange={(event) =>
                       patchProperties(selected.id, { color: event.target.value })
@@ -524,7 +527,7 @@ export function OverlayLayoutEditor({
                   <input
                     className="input"
                     type="color"
-                    value={selected.properties.backgroundColor ?? '#1b1f27'}
+                    value={selected.properties.backgroundColor ?? BRAND_CHARCOAL}
                     disabled={!canManage}
                     onChange={(event) =>
                       patchProperties(selected.id, { backgroundColor: event.target.value })
@@ -734,17 +737,22 @@ function createElement(type: ElementType, count: number, zIndex: number): Overla
     text: {
       width: 520,
       height: 110,
-      properties: { textTemplate: 'Stream text', fontSize: 42, color: '#ffffff', opacity: 1 },
+      properties: {
+        textTemplate: 'Stream text',
+        fontSize: 42,
+        color: BRAND_SOFT_WHITE,
+        opacity: 1,
+      },
     },
     image: {
       width: 360,
       height: 240,
-      properties: { backgroundColor: '#242a35', opacity: 1 },
+      properties: { backgroundColor: BRAND_CHARCOAL, opacity: 1 },
     },
     video: {
       width: 420,
       height: 260,
-      properties: { backgroundColor: '#242a35', opacity: 1 },
+      properties: { backgroundColor: BRAND_CHARCOAL, opacity: 1 },
     },
     'alert-box': {
       width: 560,
@@ -753,8 +761,8 @@ function createElement(type: ElementType, count: number, zIndex: number): Overla
         textTemplate: '{user} just subscribed!',
         fontFamily: 'Inter',
         fontSize: 36,
-        color: '#ffffff',
-        backgroundColor: '#1b1f27',
+        color: BRAND_SOFT_WHITE,
+        backgroundColor: BRAND_ULTRAMARINE,
         opacity: 0.92,
         animationIn: 'fade-in',
         animationOut: 'fade-out',
@@ -767,8 +775,8 @@ function createElement(type: ElementType, count: number, zIndex: number): Overla
       properties: {
         textTemplate: 'Goal progress',
         fontSize: 24,
-        color: '#ffffff',
-        backgroundColor: '#242a35',
+        color: BRAND_SOFT_WHITE,
+        backgroundColor: BRAND_CHARCOAL,
         opacity: 1,
       },
     },
