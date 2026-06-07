@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.7](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.1.6...v0.1.7) (2026-06-07)
+
+
+### Features
+
+* **overlays:** add canvas runtime schema editor ([c35abb5](https://github.com/Gitchegumi/multi-stream-alerts/commit/c35abb54eee8b559fcef05375c17b345e67cb9dc)), closes [#60](https://github.com/Gitchegumi/multi-stream-alerts/issues/60)
+* **overlays:** make canvas editor interactive ([848e0fc](https://github.com/Gitchegumi/multi-stream-alerts/commit/848e0fc6acf37bbfe4d8317dc8fd43546f654737))
+
+
+### Bug Fixes
+
+* adjusted height restriction for .component-alert-bindings ([2511c2e](https://github.com/Gitchegumi/multi-stream-alerts/commit/2511c2e92f4a0da108a6490b93ee8ab9447c5a40))
+* **overlays:** refresh canvas urls and docs ([6fb1384](https://github.com/Gitchegumi/multi-stream-alerts/commit/6fb1384a4d2a33c535089ba3a45e181b0f8aa262))
+* **overlays:** repair canvas editor media controls ([4ff39c3](https://github.com/Gitchegumi/multi-stream-alerts/commit/4ff39c30c19c4057cd43c2f52fea05bc8a05607b))
+* **overlays:** stabilize canvas editor controls ([2bee415](https://github.com/Gitchegumi/multi-stream-alerts/commit/2bee4153bf2cea5be1b31f1285494f0e8124e719))
+* **overlays:** wire canvas assets and test preview ([e5949fe](https://github.com/Gitchegumi/multi-stream-alerts/commit/e5949fe6f64b960e77c4aacbdefcf3fac7bb7b61))
+
 ## [0.1.6](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.1.5...v0.1.6) (2026-06-07)
 
 
