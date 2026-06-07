@@ -2,16 +2,22 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { prisma as realPrisma, toAlertEvent } from './client';
 import { publishAlertEvent } from './redis';
 import {
-  ensureWorkspaceAlertDefaults,
+  ensureWorkspaceAlertDefaults as realEnsureWorkspaceAlertDefaults,
   resolveAlertConfig as realResolveAlertConfig,
 } from './alert-catalog';
 import type { AlertEvent, AlertPlatform, AlertType } from '@multi-stream-alerts/shared';
 
 // Test injection hooks — only used in __tests__
 let _resolveAlertConfig = realResolveAlertConfig;
+let _ensureWorkspaceAlertDefaults = realEnsureWorkspaceAlertDefaults;
 let _prisma = realPrisma;
 export function __setResolveAlertConfig(fn: typeof realResolveAlertConfig | undefined) {
   _resolveAlertConfig = fn ?? realResolveAlertConfig;
+}
+export function __setEnsureWorkspaceAlertDefaults(
+  fn: typeof realEnsureWorkspaceAlertDefaults | undefined,
+) {
+  _ensureWorkspaceAlertDefaults = fn ?? realEnsureWorkspaceAlertDefaults;
 }
 export function __setPrisma(mockPrisma: Partial<typeof realPrisma> | undefined) {
   _prisma = (mockPrisma ?? realPrisma) as typeof realPrisma;
@@ -34,22 +40,90 @@ export async function ensureDefaultChannel() {
     { slug: 'vertical', name: 'Vertical' },
     { slug: 'test', name: 'Test' },
   ]) {
-    await _prisma.overlayProfile.upsert({
+    const existingProfile = await _prisma.overlayProfile.findUnique({
       where: { channelId_slug: { channelId: channel.id, slug: profile.slug } },
-      update: {},
-      create: {
-        channelId: channel.id,
-        slug: profile.slug,
-        name: profile.name,
-        displayKey: profile.slug === 'main' ? displayKey : randomBytes(32).toString('hex'),
-        settingsJson: {},
-      },
+    });
+
+    if (existingProfile) {
+      continue;
+    }
+
+    await createOverlayProfileWithUniqueKey({
+      channelId: channel.id,
+      slug: profile.slug,
+      name: profile.name,
+      preferredDisplayKey: profile.slug === 'main' ? displayKey : undefined,
     });
   }
 
-  await ensureWorkspaceAlertDefaults(channel.id);
+  await _ensureWorkspaceAlertDefaults(channel.id);
 
   return channel;
+}
+
+async function createOverlayProfileWithUniqueKey(input: {
+  channelId: string;
+  slug: string;
+  name: string;
+  preferredDisplayKey?: string;
+}) {
+  let preferredDisplayKey = input.preferredDisplayKey;
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const displayKey = await resolveUniqueOverlayDisplayKey(preferredDisplayKey);
+
+    try {
+      return await _prisma.overlayProfile.create({
+        data: {
+          channelId: input.channelId,
+          slug: input.slug,
+          name: input.name,
+          displayKey,
+          settingsJson: {},
+        },
+      });
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) {
+        throw error;
+      }
+
+      const existingProfile = await _prisma.overlayProfile.findUnique({
+        where: { channelId_slug: { channelId: input.channelId, slug: input.slug } },
+      });
+      if (existingProfile) {
+        return existingProfile;
+      }
+
+      preferredDisplayKey = undefined;
+    }
+  }
+
+  throw new Error(`Could not create overlay profile "${input.slug}" with a unique display key`);
+}
+
+async function resolveUniqueOverlayDisplayKey(preferredDisplayKey?: string) {
+  if (preferredDisplayKey) {
+    const existing = await _prisma.overlayProfile.findUnique({
+      where: { displayKey: preferredDisplayKey },
+      select: { id: true },
+    });
+    if (!existing) {
+      return preferredDisplayKey;
+    }
+  }
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const candidate = randomBytes(32).toString('hex');
+    const existing = await _prisma.overlayProfile.findUnique({
+      where: { displayKey: candidate },
+      select: { id: true },
+    });
+    if (!existing) {
+      return candidate;
+    }
+  }
+
+  throw new Error('Could not generate a unique overlay display key');
 }
 
 export async function createStoredAlertEvent(input: {
