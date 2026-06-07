@@ -82,19 +82,6 @@ textarea {
   padding: 32px 20px 48px;
 }
 
-.guide-page {
-  height: calc(100vh - 57px);
-  background: var(--bg);
-}
-
-.guide-frame {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border: 0;
-  background: var(--brand-soft-white);
-}
-
 .dashboard-header {
   display: flex;
   align-items: flex-start;
