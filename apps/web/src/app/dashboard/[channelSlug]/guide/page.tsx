@@ -128,12 +128,9 @@ function resolveDocsDir() {
 }
 
 function readMarkdownFiles(docsDir: string): GuideDoc[] {
-  return fs
-    .readdirSync(docsDir, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
-    .map((entry) => {
-      const relativePath = path.join(entry.parentPath, entry.name);
-      const filePath = path.join(docsDir, relativePath);
+  return collectMarkdownFiles(docsDir)
+    .map((filePath) => {
+      const relativePath = path.relative(docsDir, filePath);
       const slug = relativePath.replace(/\\/g, '/').replace(/\.md$/, '');
       const source = fs.readFileSync(filePath, 'utf8');
       const blocks = parseMarkdown(source);
@@ -143,7 +140,16 @@ function readMarkdownFiles(docsDir: string): GuideDoc[] {
             block.type === 'heading' && block.level === 1,
         )?.text ?? titleFromSlug(slug);
       return { slug, title, blocks };
-    });
+    })
+    .sort((a, b) => a.slug.localeCompare(b.slug));
+}
+
+function collectMarkdownFiles(dir: string): string[] {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) return collectMarkdownFiles(entryPath);
+    return entry.isFile() && entry.name.endsWith('.md') ? [entryPath] : [];
+  });
 }
 
 function parseMarkdown(source: string): MarkdownBlock[] {

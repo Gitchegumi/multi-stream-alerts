@@ -601,7 +601,8 @@ export function CanvasWorkspace({
               onChange={(event) => setDraftName(event.currentTarget.value)}
               onBlur={(event) => {
                 const name = event.currentTarget.value.trim();
-                if (name && name !== selected.name) patchCanvas(selected.slug, { name });
+                if (name && name !== selected.name)
+                  patchCanvas(selected.slug, { name, slug: name });
               }}
             />
           </label>
