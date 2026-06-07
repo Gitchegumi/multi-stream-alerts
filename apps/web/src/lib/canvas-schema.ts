@@ -28,6 +28,8 @@ export type CanvasElement = {
   bindings: {
     textTemplate?: string;
     assetRole?: 'eventVisual';
+    assetId?: string;
+    assetUrl?: string;
   };
   animation: {
     in?: 'fade' | 'pop' | 'slide-up';
@@ -44,6 +46,9 @@ export type CanvasSettings = {
   alertEventKeys: string[];
   elements: CanvasElement[];
   defaultDurationMs: number;
+  audioAssetId: string | null;
+  audioAssetUrl: string | null;
+  volume: number;
 };
 
 export type CanvasSchemaResult = {
@@ -97,6 +102,9 @@ export function normalizeCanvasSettings(
       alertEventKeys,
       elements: elements.length ? elements : createDefaultCanvasElements(width, height),
       defaultDurationMs: coerceNumber(raw.defaultDurationMs, DEFAULT_DURATION_MS, 500, 60000),
+      audioAssetId: isNonEmptyString(raw.audioAssetId) ? raw.audioAssetId : null,
+      audioAssetUrl: isNonEmptyString(raw.audioAssetUrl) ? raw.audioAssetUrl : null,
+      volume: coerceNumber(raw.volume, 80, 0, 100),
     },
     warnings,
   };
@@ -119,6 +127,9 @@ export function serializeCanvasSettings(settings: CanvasSettings): CanvasSetting
       opacity: clamp(Number(element.opacity), 0, 1),
     })),
     defaultDurationMs: clamp(Math.round(settings.defaultDurationMs), 500, 60000),
+    audioAssetId: settings.audioAssetId,
+    audioAssetUrl: settings.audioAssetUrl,
+    volume: clamp(Math.round(settings.volume), 0, 100),
   };
 }
 
@@ -175,7 +186,7 @@ export function createCanvasElement(
       width: 280,
       height: 280,
       styles: {},
-      bindings: { assetRole: 'eventVisual' },
+      bindings: { assetRole: 'eventVisual', assetId: undefined, assetUrl: undefined },
       animation: { in: 'pop', out: 'fade', durationMs: DEFAULT_DURATION_MS },
     },
     shape: {

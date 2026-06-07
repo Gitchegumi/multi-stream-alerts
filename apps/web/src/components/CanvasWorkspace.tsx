@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
+import type { AlertEvent } from '@multi-stream-alerts/shared';
 import {
   createCanvasElement,
   EVENT_VARIABLES,
@@ -40,18 +41,28 @@ type AlertLayout = {
   style: string;
 };
 
+type WorkspaceAsset = {
+  id: string;
+  assetType: 'image' | 'video' | 'audio';
+  originalFilename: string | null;
+  externalUrl: string | null;
+  previewUrl: string;
+};
+
 export function CanvasWorkspace({
   channelId,
   channelSlug,
   initialCanvases,
   alertConfigs,
   layouts,
+  assets,
 }: {
   channelId: string;
   channelSlug: string;
   initialCanvases: CanvasProfile[];
   alertConfigs: AlertConfig[];
   layouts: AlertLayout[];
+  assets: WorkspaceAsset[];
 }) {
   const [canvases, setCanvases] = useState(initialCanvases);
   const [configs, setConfigs] = useState(alertConfigs);
@@ -61,6 +72,7 @@ export function CanvasWorkspace({
     initialCanvases[0]?.settings.elements[0]?.id ?? '',
   );
   const [result, setResult] = useState<string | null>(null);
+  const [previewAlert, setPreviewAlert] = useState<AlertEvent | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const selected = canvases.find((canvas) => canvas.slug === selectedSlug) ?? canvases[0];
@@ -69,6 +81,10 @@ export function CanvasWorkspace({
     selected?.settings.elements[0] ??
     null;
   const assignedKeys = new Set(selected?.settings.alertEventKeys ?? []);
+  const imageAssets = assets.filter(
+    (asset) => asset.assetType === 'image' || asset.assetType === 'video',
+  );
+  const audioAssets = assets.filter((asset) => asset.assetType === 'audio');
   const groupedConfigs = useMemo(() => {
     return configs.reduce<Record<string, AlertConfig[]>>((groups, config) => {
       const platform = config.alertEventType.platform;
@@ -260,6 +276,22 @@ export function CanvasWorkspace({
 
   function testAlert(eventKey = 'manual.test') {
     if (!selected) return;
+    const preview: AlertEvent = {
+      id: `preview-${Date.now()}`,
+      channelId,
+      platform:
+        eventKey.split('.')[0] === eventKey
+          ? 'manual'
+          : (eventKey.split('.')[0] as AlertEvent['platform']),
+      type: 'test',
+      eventKey,
+      displayName: 'Preview viewer',
+      message: `Canvas preview for ${selected.name}.`,
+      rawEventId: `preview-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+    };
+    setPreviewAlert(preview);
+    window.setTimeout(() => setPreviewAlert(null), selected.settings.defaultDurationMs);
     startTransition(async () => {
       const response = await fetch('/api/test-alert', {
         method: 'POST',
@@ -271,7 +303,11 @@ export function CanvasWorkspace({
           isPublic: true,
         }),
       });
-      setResult(response.ok ? 'Test alert sent.' : 'Test alert was not sent.');
+      setResult(
+        response.ok
+          ? 'Test alert sent and previewed.'
+          : 'Local preview shown, but the alert was not sent.',
+      );
     });
   }
 
@@ -430,9 +466,12 @@ export function CanvasWorkspace({
                     }}
                   >
                     {element.type === 'alert-image' ? (
-                      <span className="canvas-image-placeholder">Event image</span>
+                      <PreviewAsset
+                        asset={assetForElement(element, assets)}
+                        fallback={previewAlert ? 'Event image' : 'Event image'}
+                      />
                     ) : element.type === 'shape' ? null : (
-                      renderCanvasText(element.bindings.textTemplate ?? element.name, null)
+                      renderCanvasText(element.bindings.textTemplate ?? element.name, previewAlert)
                     )}
                   </button>
                 ))}
@@ -509,6 +548,45 @@ export function CanvasWorkspace({
               <option value="dark">Dark preview</option>
             </select>
           </label>
+          <label className="field">
+            <span>Audio</span>
+            <select
+              className="select"
+              value={selected.settings.audioAssetId ?? ''}
+              onChange={(event) =>
+                patchCanvas(selected.slug, {
+                  settings: {
+                    audioAssetId: event.currentTarget.value || null,
+                    audioAssetUrl:
+                      audioAssets.find((asset) => asset.id === event.currentTarget.value)
+                        ?.externalUrl ?? null,
+                  },
+                })
+              }
+            >
+              <option value="">Use event/default audio</option>
+              {audioAssets.map((asset) => (
+                <option key={asset.id} value={asset.id}>
+                  {assetLabel(asset)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Volume</span>
+            <input
+              className="input"
+              type="number"
+              min={0}
+              max={100}
+              value={selected.settings.volume}
+              onChange={(event) =>
+                patchCanvas(selected.slug, {
+                  settings: { volume: Number(event.currentTarget.value) },
+                })
+              }
+            />
+          </label>
           <label className="toggle-line canvas-active-toggle">
             <input
               type="checkbox"
@@ -549,7 +627,11 @@ export function CanvasWorkspace({
         </div>
 
         <section className="panel">
-          <h2>Alert layouts</h2>
+          <h2>Legacy alert presets</h2>
+          <p className="muted small">
+            These presets still feed existing alert-type defaults. New overlay editing should happen
+            on the selected canvas above.
+          </p>
           <div className="canvas-layout-links">
             {layouts.map((layout) => (
               <a
@@ -576,6 +658,30 @@ export function CanvasWorkspace({
                 onChange={(event) => patchElement(selectedElement.id, { name: event.target.value })}
               />
             </label>
+            {selectedElement.type === 'alert-image' ? (
+              <label className="field">
+                <span>Stored asset</span>
+                <select
+                  className="select"
+                  value={selectedElement.bindings.assetId ?? ''}
+                  onChange={(event) => {
+                    const asset = assets.find((item) => item.id === event.currentTarget.value);
+                    patchElementBindings(selectedElement, {
+                      assetRole: event.currentTarget.value ? undefined : 'eventVisual',
+                      assetId: event.currentTarget.value || undefined,
+                      assetUrl: asset?.externalUrl ?? undefined,
+                    });
+                  }}
+                >
+                  <option value="">Use event image/video</option>
+                  {imageAssets.map((asset) => (
+                    <option key={asset.id} value={asset.id}>
+                      {assetLabel(asset)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             <div className="number-fields">
               {(['x', 'y', 'width', 'height'] as const).map((key) => (
                 <label className="field" key={key}>
@@ -792,4 +898,37 @@ function elementTypeLabel(type: CanvasElementType) {
 
 function solidColor(value: string | undefined) {
   return value?.startsWith('#') ? value : undefined;
+}
+
+function assetLabel(asset: WorkspaceAsset) {
+  return asset.originalFilename ?? asset.externalUrl ?? asset.id;
+}
+
+function assetForElement(element: CanvasElement, assets: WorkspaceAsset[]) {
+  return element.bindings.assetId
+    ? assets.find((asset) => asset.id === element.bindings.assetId)
+    : null;
+}
+
+function PreviewAsset({
+  asset,
+  fallback,
+}: {
+  asset: WorkspaceAsset | null | undefined;
+  fallback: string;
+}) {
+  if (!asset) return <span className="canvas-image-placeholder">{fallback}</span>;
+  if (asset.assetType === 'video') {
+    return (
+      <video
+        className="canvas-preview-asset"
+        src={asset.previewUrl}
+        muted
+        loop
+        playsInline
+        autoPlay
+      />
+    );
+  }
+  return <img className="canvas-preview-asset" alt="" src={asset.previewUrl} />;
 }

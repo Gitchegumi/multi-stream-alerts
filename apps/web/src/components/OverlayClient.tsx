@@ -67,10 +67,19 @@ export function OverlayClient({
 
     activeRef.current = true;
     setActiveAlert(nextAlert);
-    const soundAssetUrl = resolveOverlayAssetUrl(nextAlert.soundAssetUrl, displayKey);
-    if (soundAssetUrl && nextAlert.volume !== 0) {
+    const soundAssetUrl =
+      resolveCanvasAssetUrl(
+        settingsRef.current.audioAssetId,
+        settingsRef.current.audioAssetUrl,
+        displayKey,
+      ) ?? resolveOverlayAssetUrl(nextAlert.soundAssetUrl, displayKey);
+    const volume =
+      settingsRef.current.audioAssetId || settingsRef.current.audioAssetUrl
+        ? settingsRef.current.volume
+        : nextAlert.volume;
+    if (soundAssetUrl && volume !== 0) {
       const audio = new Audio(soundAssetUrl);
-      audio.volume = Math.max(0, Math.min(1, (nextAlert.volume ?? 80) / 100));
+      audio.volume = Math.max(0, Math.min(1, (volume ?? 80) / 100));
       void audio.play().catch((error) => {
         console.warn('alert sound playback failed', {
           eventId: nextAlert.id,
@@ -142,9 +151,12 @@ function CanvasRuntimeElement({
   };
 
   if (element.type === 'alert-image') {
+    const assetUrl =
+      resolveCanvasAssetUrl(element.bindings.assetId, element.bindings.assetUrl, displayKey) ??
+      resolveOverlayAssetUrl(alert.visualAssetUrl, displayKey);
     return (
       <div className="overlay-canvas-runtime-element" style={style}>
-        <VisualAsset url={resolveOverlayAssetUrl(alert.visualAssetUrl, displayKey)} />
+        <VisualAsset url={assetUrl} />
       </div>
     );
   }
@@ -177,6 +189,17 @@ function resolveOverlayAssetUrl(url: string | undefined, displayKey: string) {
 
   const separator = url.includes('?') ? '&' : '?';
   return `${url}${separator}displayKey=${encodeURIComponent(displayKey)}`;
+}
+
+function resolveCanvasAssetUrl(
+  assetId: string | undefined | null,
+  assetUrl: string | undefined | null,
+  displayKey: string,
+) {
+  if (assetId) {
+    return `/api/assets/${encodeURIComponent(assetId)}/content?displayKey=${encodeURIComponent(displayKey)}`;
+  }
+  return resolveOverlayAssetUrl(assetUrl ?? undefined, displayKey);
 }
 
 function animationName(value: CanvasElement['animation']['in']) {

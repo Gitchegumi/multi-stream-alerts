@@ -83,3 +83,28 @@ test('serializeCanvasSettings deduplicates assignments', () => {
 
   assert.deepEqual(serializeCanvasSettings(settings).alertEventKeys, ['kofi.tipped']);
 });
+
+test('normalizeCanvasSettings preserves canvas audio and fixed element assets', () => {
+  const result = normalizeCanvasSettings({
+    audioAssetId: 'asset-audio',
+    audioAssetUrl: 'https://cdn.example.com/alert.ogg',
+    volume: 45,
+    elements: [
+      {
+        id: 'media',
+        type: 'alert-image',
+        name: 'Media',
+        bindings: {
+          assetId: 'asset-image',
+          assetUrl: 'https://cdn.example.com/alert.png',
+        },
+      },
+    ],
+  });
+
+  assert.equal(result.settings.audioAssetId, 'asset-audio');
+  assert.equal(result.settings.audioAssetUrl, 'https://cdn.example.com/alert.ogg');
+  assert.equal(result.settings.volume, 45);
+  assert.equal(result.settings.elements[0]?.bindings.assetId, 'asset-image');
+  assert.equal(result.settings.elements[0]?.bindings.assetUrl, 'https://cdn.example.com/alert.png');
+});

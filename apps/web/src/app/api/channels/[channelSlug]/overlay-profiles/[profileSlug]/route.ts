@@ -19,6 +19,9 @@ const settingsSchema = z
     alertEventKeys: z.array(z.string().min(1).max(120)).optional(),
     elements: z.array(z.record(z.string(), z.unknown())).optional(),
     defaultDurationMs: z.number().int().min(500).max(60000).optional(),
+    audioAssetId: z.string().min(1).nullable().optional(),
+    audioAssetUrl: z.string().min(1).nullable().optional(),
+    volume: z.number().int().min(0).max(100).optional(),
   })
   .partial();
 

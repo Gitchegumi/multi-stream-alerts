@@ -58,6 +58,10 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
     orderBy: { createdAt: 'desc' },
     take: 5,
   });
+  const assets = await prisma.workspaceAsset.findMany({
+    where: { channelId: channel.id },
+    orderBy: { createdAt: 'desc' },
+  });
 
   const publicBaseUrl = process.env.PUBLIC_BASE_URL ?? 'https://<your-alerts-domain>';
   const enabledEventKeys = alertConfigs
@@ -87,6 +91,13 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
         initialCanvases={canvases}
         alertConfigs={alertConfigs}
         layouts={alertLayouts}
+        assets={assets.map((asset) => ({
+          id: asset.id,
+          assetType: asset.assetType,
+          originalFilename: asset.originalFilename,
+          externalUrl: asset.externalUrl,
+          previewUrl: asset.externalUrl ?? `/api/assets/${encodeURIComponent(asset.id)}/content`,
+        }))}
       />
 
       <section className="panel" style={{ marginTop: 16 }}>
