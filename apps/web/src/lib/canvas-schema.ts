@@ -28,6 +28,7 @@ export type CanvasElement = {
   bindings: {
     textTemplate?: string;
     assetRole?: 'eventVisual';
+    assetType?: 'image' | 'video';
     assetId?: string;
     assetUrl?: string;
   };

@@ -204,7 +204,7 @@ textarea {
 
 .canvas-workspace {
   display: grid;
-  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(260px, 300px);
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(340px, 420px);
   gap: 16px;
   align-items: start;
 }
@@ -510,7 +510,11 @@ textarea {
 
 .canvas-components-panel {
   display: flex;
+  flex-direction: column;
+  gap: 10px;
   min-height: 680px;
+  max-height: calc(100vh - 160px);
+  overflow: auto;
   padding: 16px;
   background: #111216;
 }
@@ -672,7 +676,7 @@ textarea {
 
 .component-alert-bindings {
   min-height: 0;
-  overflow: auto;
+  overflow: visible;
 }
 
 .component-preview-footer {

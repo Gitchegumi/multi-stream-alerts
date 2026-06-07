@@ -156,7 +156,7 @@ function CanvasRuntimeElement({
       resolveOverlayAssetUrl(alert.visualAssetUrl, displayKey);
     return (
       <div className="overlay-canvas-runtime-element" style={style}>
-        <VisualAsset url={assetUrl} />
+        <VisualAsset kind={element.bindings.assetType} url={assetUrl} />
       </div>
     );
   }
@@ -172,11 +172,17 @@ function CanvasRuntimeElement({
   );
 }
 
-function VisualAsset({ url }: { url?: string }) {
+function VisualAsset({
+  kind,
+  url,
+}: {
+  kind?: CanvasElement['bindings']['assetType'];
+  url?: string;
+}) {
   if (!url) return null;
 
-  if (/\.(mp4|webm)(\?|$)/i.test(url)) {
-    return <video className="overlay-runtime-asset" src={url} autoPlay muted loop playsInline />;
+  if (kind === 'video' || /\.(mp4|webm)(\?|$)/i.test(url)) {
+    return <video className="overlay-runtime-asset" src={url} autoPlay loop playsInline />;
   }
 
   // eslint-disable-next-line @next/next/no-img-element

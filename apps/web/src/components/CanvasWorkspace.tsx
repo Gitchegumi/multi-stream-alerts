@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -73,6 +74,10 @@ export function CanvasWorkspace({
   const [configs, setConfigs] = useState(alertConfigs);
   const [selectedSlug, setSelectedSlug] = useState(initialCanvases[0]?.slug ?? '');
   const [draftName, setDraftName] = useState(initialCanvases[0]?.name ?? '');
+  const [canvasSizeDraft, setCanvasSizeDraft] = useState({
+    width: String(initialCanvases[0]?.settings.width ?? 1920),
+    height: String(initialCanvases[0]?.settings.height ?? 1080),
+  });
   const [selectedElementId, setSelectedElementId] = useState(
     initialCanvases[0]?.settings.elements[0]?.id ?? '',
   );
@@ -101,12 +106,41 @@ export function CanvasWorkspace({
     }, {});
   }, [configs]);
 
+  useEffect(() => {
+    if (!selected) return;
+    setCanvasSizeDraft({
+      width: String(selected.settings.width),
+      height: String(selected.settings.height),
+    });
+  }, [selected?.id, selected?.settings.width, selected?.settings.height]);
+
   function selectCanvas(slug: string) {
     const next = canvases.find((canvas) => canvas.slug === slug);
     setSelectedSlug(slug);
     setDraftName(next?.name ?? '');
+    setCanvasSizeDraft({
+      width: String(next?.settings.width ?? 1920),
+      height: String(next?.settings.height ?? 1080),
+    });
     setSelectedElementId(next?.settings.elements[0]?.id ?? '');
     setResult(null);
+  }
+
+  function commitCanvasDimension(axis: 'width' | 'height') {
+    if (!selected) return;
+    const min = axis === 'width' ? 320 : 240;
+    const max = axis === 'width' ? 7680 : 4320;
+    const nextValue = Number(canvasSizeDraft[axis]);
+    if (!Number.isFinite(nextValue)) {
+      setCanvasSizeDraft((current) => ({ ...current, [axis]: String(selected.settings[axis]) }));
+      return;
+    }
+
+    const rounded = Math.max(min, Math.min(max, Math.round(nextValue)));
+    setCanvasSizeDraft((current) => ({ ...current, [axis]: String(rounded) }));
+    if (rounded !== selected.settings[axis]) {
+      patchCanvas(selected.slug, { settings: { [axis]: rounded } });
+    }
   }
 
   function createCanvas(duplicateFromSlug?: string) {
@@ -541,7 +575,11 @@ export function CanvasWorkspace({
               className={`canvas-preview canvas-preview-${selected.settings.background}`}
               style={{ aspectRatio: `${selected.settings.width} / ${selected.settings.height}` }}
             >
-              <iframe title={`${selected.name} runtime preview`} src={selected.url} />
+              <iframe
+                allow="autoplay"
+                title={`${selected.name} runtime preview`}
+                src={selected.url}
+              />
             </div>
           </details>
         </section>
@@ -566,12 +604,19 @@ export function CanvasWorkspace({
               type="number"
               min={320}
               max={7680}
-              value={selected.settings.width}
+              value={canvasSizeDraft.width}
+              onBlur={() => commitCanvasDimension('width')}
               onChange={(event) =>
-                patchCanvas(selected.slug, {
-                  settings: { width: Number(event.currentTarget.value) },
-                })
+                setCanvasSizeDraft((current) => ({
+                  ...current,
+                  width: event.currentTarget.value,
+                }))
               }
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.currentTarget.blur();
+                }
+              }}
             />
           </label>
           <label className="field">
@@ -581,12 +626,19 @@ export function CanvasWorkspace({
               type="number"
               min={240}
               max={4320}
-              value={selected.settings.height}
+              value={canvasSizeDraft.height}
+              onBlur={() => commitCanvasDimension('height')}
               onChange={(event) =>
-                patchCanvas(selected.slug, {
-                  settings: { height: Number(event.currentTarget.value) },
-                })
+                setCanvasSizeDraft((current) => ({
+                  ...current,
+                  height: event.currentTarget.value,
+                }))
               }
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.currentTarget.blur();
+                }
+              }}
             />
           </label>
           <label className="field">
@@ -700,6 +752,10 @@ export function CanvasWorkspace({
                                 );
                                 patchElementBindings(element, {
                                   assetRole: event.currentTarget.value ? undefined : 'eventVisual',
+                                  assetType:
+                                    asset?.assetType === 'image' || asset?.assetType === 'video'
+                                      ? asset.assetType
+                                      : undefined,
                                   assetId: event.currentTarget.value || undefined,
                                   assetUrl: asset?.externalUrl ?? undefined,
                                 });
@@ -1115,7 +1171,7 @@ function PreviewAsset({
         className="canvas-preview-asset"
         key={previewKey ?? url}
         src={url}
-        muted
+        muted={!previewKey}
         loop
         playsInline
         autoPlay

@@ -96,6 +96,7 @@ test('normalizeCanvasSettings preserves canvas audio and fixed element assets', 
         name: 'Media',
         bindings: {
           assetId: 'asset-image',
+          assetType: 'video',
           assetUrl: 'https://cdn.example.com/alert.png',
         },
       },
@@ -106,5 +107,6 @@ test('normalizeCanvasSettings preserves canvas audio and fixed element assets', 
   assert.equal(result.settings.audioAssetUrl, 'https://cdn.example.com/alert.ogg');
   assert.equal(result.settings.volume, 45);
   assert.equal(result.settings.elements[0]?.bindings.assetId, 'asset-image');
+  assert.equal(result.settings.elements[0]?.bindings.assetType, 'video');
   assert.equal(result.settings.elements[0]?.bindings.assetUrl, 'https://cdn.example.com/alert.png');
 });
