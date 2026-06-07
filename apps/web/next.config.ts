@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
     '@multi-stream-alerts/database',
     '@multi-stream-alerts/ui',
   ],
+  outputFileTracingIncludes: {
+    '/dashboard/[channelSlug]/guide': ['../../docs/**/*'],
+  },
 };
 
 export default nextConfig;

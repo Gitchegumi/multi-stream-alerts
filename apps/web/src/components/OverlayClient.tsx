@@ -1,11 +1,13 @@
 'use client';
 
-import { overlayMessage, type AlertEvent } from '@multi-stream-alerts/shared';
+import type { AlertEvent } from '@multi-stream-alerts/shared';
 import { useEffect, useRef, useState } from 'react';
-
-type CanvasSettings = {
-  alertEventKeys: string[];
-};
+import {
+  renderCanvasText,
+  shouldRenderAlertOnCanvas,
+  type CanvasElement,
+  type CanvasSettings,
+} from '@/lib/canvas-schema';
 
 export function OverlayClient({
   displayKey,
@@ -20,11 +22,11 @@ export function OverlayClient({
   const queueRef = useRef<AlertEvent[]>([]);
   const activeRef = useRef(false);
   const timeoutRef = useRef<number | null>(null);
-  const assignedKeysRef = useRef(new Set(settings.alertEventKeys));
+  const settingsRef = useRef(settings);
 
   useEffect(() => {
-    assignedKeysRef.current = new Set(settings.alertEventKeys);
-  }, [settings.alertEventKeys]);
+    settingsRef.current = settings;
+  }, [settings]);
 
   useEffect(() => {
     const source = new EventSource(
@@ -33,8 +35,7 @@ export function OverlayClient({
 
     source.addEventListener('alert', (event) => {
       const alert = JSON.parse((event as MessageEvent).data) as AlertEvent;
-      const assignedKeys = assignedKeysRef.current;
-      if (assignedKeys.size > 0 && (!alert.eventKey || !assignedKeys.has(alert.eventKey))) {
+      if (!shouldRenderAlertOnCanvas(settingsRef.current, alert)) {
         return;
       }
 
@@ -66,10 +67,19 @@ export function OverlayClient({
 
     activeRef.current = true;
     setActiveAlert(nextAlert);
-    const soundAssetUrl = resolveOverlayAssetUrl(nextAlert.soundAssetUrl, displayKey);
-    if (soundAssetUrl && nextAlert.volume !== 0) {
+    const soundAssetUrl =
+      resolveCanvasAssetUrl(
+        settingsRef.current.audioAssetId,
+        settingsRef.current.audioAssetUrl,
+        displayKey,
+      ) ?? resolveOverlayAssetUrl(nextAlert.soundAssetUrl, displayKey);
+    const volume =
+      settingsRef.current.audioAssetId || settingsRef.current.audioAssetUrl
+        ? settingsRef.current.volume
+        : nextAlert.volume;
+    if (soundAssetUrl && volume !== 0) {
       const audio = new Audio(soundAssetUrl);
-      audio.volume = Math.max(0, Math.min(1, (nextAlert.volume ?? 80) / 100));
+      audio.volume = Math.max(0, Math.min(1, (volume ?? 80) / 100));
       void audio.play().catch((error) => {
         console.warn('alert sound playback failed', {
           eventId: nextAlert.id,
@@ -85,32 +95,102 @@ export function OverlayClient({
         activeRef.current = false;
         drainQueue();
       },
-      nextAlert.durationMs ?? (profile === 'test' ? 3500 : 6500),
+      nextAlert.durationMs ?? (profile === 'test' ? 3500 : settingsRef.current.defaultDurationMs),
     );
   }
 
   return (
-    <main className="overlay-stage" aria-live="polite">
-      {activeAlert ? (
-        <section className={`alert-card alert-card-${activeAlert.layoutStyle ?? 'vertical'}`}>
-          <VisualAsset url={resolveOverlayAssetUrl(activeAlert.visualAssetUrl, displayKey)} />
-          <h1 className="alert-title">{activeAlert.displayName}</h1>
-          <p className="alert-message">{overlayMessage(activeAlert)}</p>
-        </section>
-      ) : null}
+    <main
+      className={`overlay-stage overlay-stage-${settings.background}`}
+      aria-live="polite"
+      style={{ width: settings.width, height: settings.height }}
+    >
+      {activeAlert
+        ? settings.elements
+            .filter((element) => !element.hidden)
+            .sort((a, b) => a.zIndex - b.zIndex)
+            .map((element) => (
+              <CanvasRuntimeElement
+                displayKey={displayKey}
+                element={element}
+                alert={activeAlert}
+                key={element.id}
+              />
+            ))
+        : null}
     </main>
   );
 }
 
-function VisualAsset({ url }: { url?: string }) {
+function CanvasRuntimeElement({
+  displayKey,
+  element,
+  alert,
+}: {
+  displayKey: string;
+  element: CanvasElement;
+  alert: AlertEvent;
+}) {
+  const style = {
+    left: element.x,
+    top: element.y,
+    width: element.width,
+    height: element.height,
+    zIndex: element.zIndex,
+    opacity: element.opacity,
+    transform: `rotate(${element.rotation}deg)`,
+    color: element.styles.color,
+    background: element.styles.backgroundColor,
+    borderRadius: element.styles.borderRadius,
+    fontFamily: element.styles.fontFamily,
+    fontSize: element.styles.fontSize,
+    fontWeight: element.styles.fontWeight,
+    textShadow: element.styles.textShadow,
+    WebkitTextStroke:
+      element.styles.textStrokeWidth && element.styles.textStrokeColor
+        ? `${element.styles.textStrokeWidth}px ${element.styles.textStrokeColor}`
+        : undefined,
+    animationName: animationName(element.animation.in),
+    animationDuration: '520ms',
+  };
+
+  if (element.type === 'alert-image') {
+    const assetUrl =
+      resolveCanvasAssetUrl(element.bindings.assetId, element.bindings.assetUrl, displayKey) ??
+      resolveOverlayAssetUrl(alert.visualAssetUrl, displayKey);
+    return (
+      <div className="overlay-canvas-runtime-element" style={style}>
+        <VisualAsset kind={element.bindings.assetType} url={assetUrl} />
+      </div>
+    );
+  }
+
+  if (element.type === 'shape') {
+    return <div className="overlay-canvas-runtime-element" style={style} />;
+  }
+
+  return (
+    <div className="overlay-canvas-runtime-element overlay-canvas-runtime-text" style={style}>
+      {renderCanvasText(element.bindings.textTemplate ?? element.name, alert)}
+    </div>
+  );
+}
+
+function VisualAsset({
+  kind,
+  url,
+}: {
+  kind?: CanvasElement['bindings']['assetType'];
+  url?: string;
+}) {
   if (!url) return null;
 
-  if (/\.(mp4|webm)(\?|$)/i.test(url)) {
-    return <video className="alert-asset" src={url} autoPlay muted loop playsInline />;
+  if (kind === 'video' || /\.(mp4|webm)(\?|$)/i.test(url)) {
+    return <video className="overlay-runtime-asset" src={url} autoPlay loop playsInline />;
   }
 
   // eslint-disable-next-line @next/next/no-img-element
-  return <img className="alert-asset" alt="" src={url} />;
+  return <img className="overlay-runtime-asset" alt="" src={url} />;
 }
 
 function resolveOverlayAssetUrl(url: string | undefined, displayKey: string) {
@@ -119,4 +199,21 @@ function resolveOverlayAssetUrl(url: string | undefined, displayKey: string) {
 
   const separator = url.includes('?') ? '&' : '?';
   return `${url}${separator}displayKey=${encodeURIComponent(displayKey)}`;
+}
+
+function resolveCanvasAssetUrl(
+  assetId: string | undefined | null,
+  assetUrl: string | undefined | null,
+  displayKey: string,
+) {
+  if (assetId) {
+    return `/api/assets/${encodeURIComponent(assetId)}/content?displayKey=${encodeURIComponent(displayKey)}`;
+  }
+  return resolveOverlayAssetUrl(assetUrl ?? undefined, displayKey);
+}
+
+function animationName(value: CanvasElement['animation']['in']) {
+  if (value === 'pop') return 'alert-pop';
+  if (value === 'slide-up') return 'alert-slide-up';
+  return 'alert-fade';
 }

@@ -42,7 +42,7 @@ export default async function ChannelDashboardPage({
       }),
       getWorkspaceStorageUsage(channel.id),
       getWorkspaceStorageSettings(channel.id),
-      getVersionStatus(),
+      getVersionStatus(process.env, { force: true }),
     ]);
 
   const activeAlertsCount = alertSetup.configs.filter((c) => c.enabled).length;

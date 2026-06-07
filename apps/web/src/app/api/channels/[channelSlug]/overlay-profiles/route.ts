@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { canManageChannel, ensureDefaultChannel, prisma } from '@multi-stream-alerts/database';
 import { requireDashboardSession } from '@/lib/session';
+import { normalizeCanvasSettings, serializeCanvasSettings } from '@/lib/canvas-schema';
 import { randomBytes } from 'crypto';
 import { z } from 'zod';
 
@@ -210,10 +211,5 @@ function slugify(value: string) {
 }
 
 function defaultCanvasSettings() {
-  return {
-    width: 1920,
-    height: 1080,
-    background: 'transparent',
-    alertEventKeys: [],
-  };
+  return serializeCanvasSettings(normalizeCanvasSettings({}).settings);
 }

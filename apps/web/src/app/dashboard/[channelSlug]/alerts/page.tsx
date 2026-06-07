@@ -8,6 +8,7 @@ import {
 import { requireDashboardSession } from '@/lib/session';
 import { CanvasWorkspace } from '@/components/CanvasWorkspace';
 import { RecentAlertFeed } from '@/components/RecentAlertFeed';
+import { normalizeCanvasSettings } from '@/lib/canvas-schema';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,23 +40,14 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
       displayName: config.alertEventType.displayName,
     },
   }));
-  const alertLayouts = alertSetup.layouts.map((layout) => ({
-    id: layout.id,
-    name: layout.name,
-    style: layout.style,
-    visualAssetUrl: layout.visualAssetUrl,
-    soundAssetUrl: layout.soundAssetUrl,
-    visualAssetId: layout.visualAssetId,
-    soundAssetId: layout.soundAssetId,
-    defaultDurationMs: layout.defaultDurationMs,
-    defaultVolume: layout.defaultVolume,
-    isSystemPreset: layout.isSystemPreset,
-  }));
-
   const recentEvents = await prisma.alertEvent.findMany({
     where: { channelId: channel.id },
     orderBy: { createdAt: 'desc' },
     take: 5,
+  });
+  const assets = await prisma.workspaceAsset.findMany({
+    where: { channelId: channel.id },
+    orderBy: { createdAt: 'desc' },
   });
 
   const publicBaseUrl = process.env.PUBLIC_BASE_URL ?? 'https://<your-alerts-domain>';
@@ -85,7 +77,13 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
         channelSlug={channel.slug}
         initialCanvases={canvases}
         alertConfigs={alertConfigs}
-        layouts={alertLayouts}
+        assets={assets.map((asset) => ({
+          id: asset.id,
+          assetType: asset.assetType,
+          originalFilename: asset.originalFilename,
+          externalUrl: asset.externalUrl,
+          previewUrl: asset.externalUrl ?? `/api/assets/${encodeURIComponent(asset.id)}/content`,
+        }))}
       />
 
       <section className="panel" style={{ marginTop: 16 }}>
@@ -97,21 +95,5 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
 }
 
 function readCanvasSettings(value: unknown, fallbackEventKeys: string[]) {
-  const settings = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  const raw = settings as {
-    width?: unknown;
-    height?: unknown;
-    background?: unknown;
-    alertEventKeys?: unknown;
-  };
-  const alertEventKeys = Array.isArray(raw.alertEventKeys)
-    ? raw.alertEventKeys.filter((key): key is string => typeof key === 'string')
-    : fallbackEventKeys;
-
-  return {
-    width: typeof raw.width === 'number' ? raw.width : 1920,
-    height: typeof raw.height === 'number' ? raw.height : 1080,
-    background: raw.background === 'dark' ? ('dark' as const) : ('transparent' as const),
-    alertEventKeys,
-  };
+  return normalizeCanvasSettings(value, fallbackEventKeys).settings;
 }

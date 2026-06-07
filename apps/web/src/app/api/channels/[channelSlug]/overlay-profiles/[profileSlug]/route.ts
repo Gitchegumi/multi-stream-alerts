@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { canManageChannel, ensureDefaultChannel, prisma } from '@multi-stream-alerts/database';
+import {
+  canManageChannel,
+  ensureDefaultChannel,
+  prisma,
+  type Prisma,
+} from '@multi-stream-alerts/database';
 import { requireDashboardSession } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
@@ -12,6 +17,11 @@ const settingsSchema = z
     height: z.number().int().min(240).max(4320).optional(),
     background: z.enum(['transparent', 'dark']).optional(),
     alertEventKeys: z.array(z.string().min(1).max(120)).optional(),
+    elements: z.array(z.record(z.string(), z.unknown())).optional(),
+    defaultDurationMs: z.number().int().min(500).max(60000).optional(),
+    audioAssetId: z.string().min(1).nullable().optional(),
+    audioAssetUrl: z.string().min(1).nullable().optional(),
+    volume: z.number().int().min(0).max(100).optional(),
   })
   .partial();
 
@@ -101,7 +111,7 @@ export async function handlePatch(args: HandlePatchArgs): Promise<HandlerResult>
   const settingsJson = {
     ...readSettings(auth.profile.settingsJson),
     ...(data.settings ?? {}),
-  };
+  } as Prisma.InputJsonValue;
 
   const profile = await deps.prisma.overlayProfile.update({
     where: { id: auth.profile.id },
