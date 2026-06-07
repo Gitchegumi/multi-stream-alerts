@@ -8,14 +8,27 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const guideOrder = [
-  'getting-started',
-  'dashboard',
-  'canvases',
-  'alerts',
-  'browser-sources',
-  'assets',
-  'account-settings',
-  'troubleshooting',
+  'index',
+  'user-guide/getting-started',
+  'user-guide/dashboard',
+  'user-guide/canvases',
+  'user-guide/alerts',
+  'user-guide/browser-sources',
+  'user-guide/assets',
+  'user-guide/account-settings',
+  'user-guide/troubleshooting',
+  'developer-guide/architecture',
+  'developer-guide/local-development',
+  'developer-guide/deployment',
+  'developer-guide/environment-variables',
+  'developer-guide/auth',
+  'developer-guide/database',
+  'developer-guide/overlays-and-canvases',
+  'developer-guide/webhooks',
+  'developer-guide/contributing',
+  'releases',
+  'security-scans',
+  'audit/per-workspace-credentials',
 ];
 
 type MarkdownBlock =
@@ -54,7 +67,7 @@ export default async function GuidePage({
       <main className="dashboard-shell">
         <section className="panel">
           <h1 className="dashboard-title">Guide</h1>
-          <p className="muted">No user guide documents are available in this build.</p>
+          <p className="muted">No documentation files are available in this build.</p>
         </section>
       </main>
     );
@@ -93,26 +106,44 @@ function readGuideDocs(): GuideDoc[] {
   const docsDir = resolveDocsDir();
   if (!docsDir) return [];
 
-  return guideOrder.flatMap((slug) => {
-    const filePath = path.join(docsDir, `${slug}.md`);
-    if (!fs.existsSync(filePath)) return [];
-    const source = fs.readFileSync(filePath, 'utf8');
-    const blocks = parseMarkdown(source);
-    const title =
-      blocks.find(
-        (block): block is Extract<MarkdownBlock, { type: 'heading' }> =>
-          block.type === 'heading' && block.level === 1,
-      )?.text ?? titleFromSlug(slug);
-    return [{ slug, title, blocks }];
-  });
+  const docs = readMarkdownFiles(docsDir);
+  const bySlug = new Map(docs.map((doc) => [doc.slug, doc]));
+  const orderedDocs = guideOrder.flatMap((slug) => bySlug.get(slug) ?? []);
+  const orderedSlugs = new Set(orderedDocs.map((doc) => doc.slug));
+  const remainingDocs = docs
+    .filter((doc) => !orderedSlugs.has(doc.slug))
+    .sort((a, b) => a.slug.localeCompare(b.slug));
+
+  return [...orderedDocs, ...remainingDocs];
 }
 
 function resolveDocsDir() {
   const candidates = [
-    path.resolve(process.cwd(), 'docs', 'user-guide'),
-    path.resolve(process.cwd(), '..', '..', 'docs', 'user-guide'),
+    path.resolve(process.cwd(), 'docs'),
+    path.resolve(process.cwd(), '..', 'docs'),
+    path.resolve(process.cwd(), '..', '..', 'docs'),
+    path.resolve(process.cwd(), '..', '..', '..', 'docs'),
   ];
   return candidates.find((candidate) => fs.existsSync(candidate));
+}
+
+function readMarkdownFiles(docsDir: string): GuideDoc[] {
+  return fs
+    .readdirSync(docsDir, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+    .map((entry) => {
+      const relativePath = path.join(entry.parentPath, entry.name);
+      const filePath = path.join(docsDir, relativePath);
+      const slug = relativePath.replace(/\\/g, '/').replace(/\.md$/, '');
+      const source = fs.readFileSync(filePath, 'utf8');
+      const blocks = parseMarkdown(source);
+      const title =
+        blocks.find(
+          (block): block is Extract<MarkdownBlock, { type: 'heading' }> =>
+            block.type === 'heading' && block.level === 1,
+        )?.text ?? titleFromSlug(slug);
+      return { slug, title, blocks };
+    });
 }
 
 function parseMarkdown(source: string): MarkdownBlock[] {
@@ -247,9 +278,16 @@ function renderInlineMarkdown(text: string, channelSlug: string, docs: GuideDoc[
 
 function guideHref(href: string, channelSlug: string, docs: GuideDoc[]) {
   if (/^https?:\/\//.test(href)) return href;
-  const slug = href.split('/').at(-1)?.replace(/\.md$/, '');
+  const slug = href.replace(/^\.\//, '').replace(/\.md$/, '').replace(/\\/g, '/');
   if (slug && docs.some((doc) => doc.slug === slug)) {
     return `/dashboard/${encodeURIComponent(channelSlug)}/guide?doc=${encodeURIComponent(slug)}`;
+  }
+  const basename = slug.split('/').at(-1);
+  const basenameMatch = docs.find((doc) => doc.slug.split('/').at(-1) === basename);
+  if (basenameMatch) {
+    return `/dashboard/${encodeURIComponent(channelSlug)}/guide?doc=${encodeURIComponent(
+      basenameMatch.slug,
+    )}`;
   }
   return href;
 }

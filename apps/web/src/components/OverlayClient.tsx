@@ -146,6 +146,10 @@ function CanvasRuntimeElement({
     fontSize: element.styles.fontSize,
     fontWeight: element.styles.fontWeight,
     textShadow: element.styles.textShadow,
+    WebkitTextStroke:
+      element.styles.textStrokeWidth && element.styles.textStrokeColor
+        ? `${element.styles.textStrokeWidth}px ${element.styles.textStrokeColor}`
+        : undefined,
     animationName: animationName(element.animation.in),
     animationDuration: '520ms',
   };

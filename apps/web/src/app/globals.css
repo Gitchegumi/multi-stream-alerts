@@ -625,6 +625,10 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.component-control-row-fill {
+  grid-template-columns: auto auto minmax(68px, auto) minmax(76px, 1fr);
+}
+
 .compact-field,
 .metric-field {
   display: grid;
@@ -655,6 +659,13 @@ textarea {
 .metric-field .input {
   min-width: 0;
   padding: 7px 8px;
+}
+
+.compact-action-button {
+  align-self: end;
+  min-height: 30px;
+  padding: 7px 8px;
+  white-space: nowrap;
 }
 
 .component-add-menu {

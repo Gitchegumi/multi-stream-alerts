@@ -89,9 +89,7 @@ export function CanvasWorkspace({
 
   const selected = canvases.find((canvas) => canvas.slug === selectedSlug) ?? canvases[0];
   const selectedElement =
-    selected?.settings.elements.find((element) => element.id === selectedElementId) ??
-    selected?.settings.elements[0] ??
-    null;
+    selected?.settings.elements.find((element) => element.id === selectedElementId) ?? null;
   const assignedKeys = new Set(selected?.settings.alertEventKeys ?? []);
   const imageAssets = assets.filter(
     (asset) => asset.assetType === 'image' || asset.assetType === 'video',
@@ -479,8 +477,7 @@ export function CanvasWorkspace({
                 {canvas.settings.width}x{canvas.settings.height}
               </span>
               <span>
-                {canvas.isActive ? 'Active' : 'Inactive'} /{' '}
-                {new Date(canvas.updatedAt).toLocaleDateString()}
+                {canvas.isActive ? 'Active' : 'Inactive'} / {formatCanvasDate(canvas.updatedAt)}
               </span>
             </button>
           ))}
@@ -504,6 +501,11 @@ export function CanvasWorkspace({
             <div
               className={`canvas-design-stage canvas-preview-${selected.settings.background}`}
               ref={canvasStageRef}
+              onPointerDown={(event) => {
+                if (event.target === event.currentTarget) {
+                  setSelectedElementId('');
+                }
+              }}
               style={{
                 aspectRatio: `${selected.settings.width} / ${selected.settings.height}`,
                 width: 'min(100%, 960px)',
@@ -542,6 +544,12 @@ export function CanvasWorkspace({
                       fontSize: Math.max(10, (element.styles.fontSize ?? 32) / 2.8),
                       fontWeight: element.styles.fontWeight,
                       textShadow: element.styles.textShadow,
+                      WebkitTextStroke:
+                        element.styles.textStrokeWidth && element.styles.textStrokeColor
+                          ? `${Math.max(0, element.styles.textStrokeWidth / 2.8)}px ${
+                              element.styles.textStrokeColor
+                            }`
+                          : undefined,
                     }}
                   >
                     {element.type === 'alert-image' ? (
@@ -606,12 +614,13 @@ export function CanvasWorkspace({
               max={7680}
               value={canvasSizeDraft.width}
               onBlur={() => commitCanvasDimension('width')}
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 setCanvasSizeDraft((current) => ({
                   ...current,
-                  width: event.currentTarget.value,
-                }))
-              }
+                  width: value,
+                }));
+              }}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   event.currentTarget.blur();
@@ -628,12 +637,13 @@ export function CanvasWorkspace({
               max={4320}
               value={canvasSizeDraft.height}
               onBlur={() => commitCanvasDimension('height')}
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 setCanvasSizeDraft((current) => ({
                   ...current,
-                  height: event.currentTarget.value,
-                }))
-              }
+                  height: value,
+                }));
+              }}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   event.currentTarget.blur();
@@ -801,7 +811,7 @@ export function CanvasWorkspace({
                           </div>
                         </>
                       )}
-                      <div className="component-control-row">
+                      <div className="component-control-row component-control-row-fill">
                         <label className="compact-field">
                           <span>A</span>
                           <input
@@ -824,6 +834,15 @@ export function CanvasWorkspace({
                             }
                           />
                         </label>
+                        <button
+                          className="button-secondary compact-action-button"
+                          type="button"
+                          onClick={() =>
+                            patchElementStyles(element, { backgroundColor: undefined })
+                          }
+                        >
+                          No fill
+                        </button>
                         <label className="compact-field compact-field-wide">
                           <span>Size</span>
                           <input
@@ -840,6 +859,51 @@ export function CanvasWorkspace({
                           />
                         </label>
                       </div>
+                      {element.type === 'text' || element.type === 'alert-message' ? (
+                        <div className="component-control-row">
+                          <label className="compact-field">
+                            <span>Stroke</span>
+                            <input
+                              type="color"
+                              value={element.styles.textStrokeColor ?? '#000000'}
+                              onChange={(event) =>
+                                patchElementStyles(element, {
+                                  textStrokeColor: event.target.value,
+                                  textStrokeWidth: element.styles.textStrokeWidth ?? 2,
+                                })
+                              }
+                            />
+                          </label>
+                          <label className="compact-field compact-field-wide">
+                            <span>Px</span>
+                            <input
+                              className="input"
+                              type="number"
+                              min={0}
+                              max={24}
+                              value={element.styles.textStrokeWidth ?? 0}
+                              onChange={(event) =>
+                                patchElementStyles(element, {
+                                  textStrokeWidth: Number(event.target.value),
+                                  textStrokeColor: element.styles.textStrokeColor ?? '#000000',
+                                })
+                              }
+                            />
+                          </label>
+                          <button
+                            className="button-secondary compact-action-button"
+                            type="button"
+                            onClick={() =>
+                              patchElementStyles(element, {
+                                textStrokeColor: undefined,
+                                textStrokeWidth: undefined,
+                              })
+                            }
+                          >
+                            No stroke
+                          </button>
+                        </div>
+                      ) : null}
                       <div className="component-control-row">
                         <span>Fade-In</span>
                         <span>Fade-Out</span>
@@ -1144,6 +1208,10 @@ function solidColor(value: string | undefined) {
 
 function assetLabel(asset: WorkspaceAsset) {
   return asset.originalFilename ?? asset.externalUrl ?? asset.id;
+}
+
+function formatCanvasDate(value: string) {
+  return value.slice(0, 10);
 }
 
 function assetForElement(element: CanvasElement, assets: WorkspaceAsset[]) {

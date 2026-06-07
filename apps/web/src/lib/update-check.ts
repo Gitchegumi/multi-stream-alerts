@@ -16,9 +16,12 @@ type CacheEntry = {
 
 let cachedStatus: CacheEntry | null = null;
 
-export async function getVersionStatus(env: NodeJS.ProcessEnv = process.env) {
+export async function getVersionStatus(
+  env: NodeJS.ProcessEnv = process.env,
+  options: { force?: boolean } = {},
+) {
   const build = getBuildMetadata(env);
-  const updateStatus = await getUpdateStatus(build.releaseVersion, env);
+  const updateStatus = await getUpdateStatus(build.releaseVersion, env, Date.now(), options);
 
   return {
     build,
@@ -30,6 +33,7 @@ export async function getUpdateStatus(
   currentVersion: string,
   env: NodeJS.ProcessEnv = process.env,
   now = Date.now(),
+  options: { force?: boolean } = {},
 ): Promise<UpdateStatus> {
   const enabled = env.UPDATE_CHECK_ENABLED !== 'false';
 
@@ -44,7 +48,7 @@ export async function getUpdateStatus(
     };
   }
 
-  if (cachedStatus && cachedStatus.expiresAt > now) {
+  if (!options.force && cachedStatus && cachedStatus.expiresAt > now) {
     return cachedStatus.status;
   }
 
@@ -57,7 +61,8 @@ export async function getUpdateStatus(
         Accept: 'application/vnd.github+json',
         'User-Agent': 'gitchalerts-update-check',
       },
-      next: { revalidate: UPDATE_CHECK_TTL_MS / 1000 },
+      cache: options.force ? 'no-store' : undefined,
+      next: options.force ? undefined : { revalidate: UPDATE_CHECK_TTL_MS / 1000 },
     });
 
     if (!response.ok) {

@@ -24,6 +24,8 @@ export type CanvasElement = {
     fontWeight?: string;
     borderRadius?: number;
     textShadow?: string;
+    textStrokeColor?: string;
+    textStrokeWidth?: number;
   };
   bindings: {
     textTemplate?: string;
