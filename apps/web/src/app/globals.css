@@ -513,7 +513,6 @@ textarea {
   flex-direction: column;
   gap: 10px;
   min-height: 680px;
-  max-height: calc(100vh - 160px);
   overflow: auto;
   padding: 16px;
   background: #111216;
