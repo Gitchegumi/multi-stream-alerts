@@ -6,9 +6,14 @@ From **Alerts**, you can:
 
 - Create a canvas.
 - Select a canvas from the left panel.
+- Add text, alert message, event image, and shape layers.
+- Select layers and adjust position, size, visibility, lock state, opacity, and text variables.
 - Rename a canvas.
 - Duplicate a canvas.
 - Delete a canvas when more than one exists.
 - Set width, height, background behavior, and active status.
+- Assign alert types to the selected canvas.
+- Copy the browser-source URL and use it in OBS or another browser-source-capable app.
+- Send a test alert from the editor and inspect the runtime browser-source preview.
 
 Transparent backgrounds are recommended for production browser sources. Dark background is useful for previewing transparent content in the dashboard.

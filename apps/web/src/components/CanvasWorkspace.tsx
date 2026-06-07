@@ -1,13 +1,16 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
-
-type CanvasSettings = {
-  width: number;
-  height: number;
-  background: 'transparent' | 'dark';
-  alertEventKeys: string[];
-};
+import {
+  createCanvasElement,
+  EVENT_VARIABLES,
+  normalizeCanvasSettings,
+  renderCanvasText,
+  serializeCanvasSettings,
+  type CanvasElement,
+  type CanvasElementType,
+  type CanvasSettings,
+} from '@/lib/canvas-schema';
 
 type CanvasProfile = {
   id: string;
@@ -54,10 +57,17 @@ export function CanvasWorkspace({
   const [configs, setConfigs] = useState(alertConfigs);
   const [selectedSlug, setSelectedSlug] = useState(initialCanvases[0]?.slug ?? '');
   const [draftName, setDraftName] = useState(initialCanvases[0]?.name ?? '');
+  const [selectedElementId, setSelectedElementId] = useState(
+    initialCanvases[0]?.settings.elements[0]?.id ?? '',
+  );
   const [result, setResult] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const selected = canvases.find((canvas) => canvas.slug === selectedSlug) ?? canvases[0];
+  const selectedElement =
+    selected?.settings.elements.find((element) => element.id === selectedElementId) ??
+    selected?.settings.elements[0] ??
+    null;
   const assignedKeys = new Set(selected?.settings.alertEventKeys ?? []);
   const groupedConfigs = useMemo(() => {
     return configs.reduce<Record<string, AlertConfig[]>>((groups, config) => {
@@ -72,6 +82,7 @@ export function CanvasWorkspace({
     const next = canvases.find((canvas) => canvas.slug === slug);
     setSelectedSlug(slug);
     setDraftName(next?.name ?? '');
+    setSelectedElementId(next?.settings.elements[0]?.id ?? '');
     setResult(null);
   }
 
@@ -99,6 +110,7 @@ export function CanvasWorkspace({
       setCanvases((current) => [...current, canvas]);
       setSelectedSlug(canvas.slug);
       setDraftName(canvas.name);
+      setSelectedElementId(canvas.settings.elements[0]?.id ?? '');
       setResult(source ? 'Canvas duplicated.' : 'Canvas created.');
     });
   }
@@ -107,6 +119,8 @@ export function CanvasWorkspace({
     slug: string,
     patch: Omit<Partial<CanvasProfile>, 'settings'> & { settings?: Partial<CanvasSettings> },
   ) {
+    const currentCanvas = canvases.find((canvas) => canvas.slug === slug);
+    if (patch.settings && !currentCanvas) return;
     setResult(null);
     startTransition(async () => {
       const response = await fetch(
@@ -118,7 +132,9 @@ export function CanvasWorkspace({
             name: patch.name,
             slug: patch.slug,
             isActive: patch.isActive,
-            settings: patch.settings,
+            settings: patch.settings
+              ? serializeCanvasSettings({ ...currentCanvas!.settings, ...patch.settings })
+              : undefined,
           }),
         },
       );
@@ -131,6 +147,11 @@ export function CanvasWorkspace({
       setCanvases((current) => current.map((item) => (item.id === canvas.id ? canvas : item)));
       setSelectedSlug(canvas.slug);
       setDraftName(canvas.name);
+      setSelectedElementId((current) =>
+        canvas.settings.elements.some((element) => element.id === current)
+          ? current
+          : (canvas.settings.elements[0]?.id ?? ''),
+      );
       setResult('Canvas updated.');
     });
   }
@@ -178,6 +199,42 @@ export function CanvasWorkspace({
     if (checked && !config.enabled) {
       enableAlertConfig(config);
     }
+  }
+
+  function addElement(type: CanvasElementType) {
+    if (!selected) return;
+    const count = selected.settings.elements.filter((element) => element.type === type).length + 1;
+    const element = createCanvasElement(type, count, selected.settings.elements.length + 1);
+    patchCanvas(selected.slug, {
+      settings: { elements: [...selected.settings.elements, element] },
+    });
+    setSelectedElementId(element.id);
+  }
+
+  function patchElement(elementId: string, patch: Partial<CanvasElement>) {
+    if (!selected) return;
+    patchCanvas(selected.slug, {
+      settings: {
+        elements: selected.settings.elements.map((element) =>
+          element.id === elementId ? { ...element, ...patch } : element,
+        ),
+      },
+    });
+  }
+
+  function patchElementStyles(element: CanvasElement, styles: CanvasElement['styles']) {
+    patchElement(element.id, { styles: { ...element.styles, ...styles } });
+  }
+
+  function patchElementBindings(element: CanvasElement, bindings: CanvasElement['bindings']) {
+    patchElement(element.id, { bindings: { ...element.bindings, ...bindings } });
+  }
+
+  function deleteElement(elementId: string) {
+    if (!selected || selected.settings.elements.length <= 1) return;
+    const elements = selected.settings.elements.filter((element) => element.id !== elementId);
+    patchCanvas(selected.slug, { settings: { elements } });
+    setSelectedElementId(elements[0]?.id ?? '');
   }
 
   function enableAlertConfig(config: AlertConfig) {
@@ -266,6 +323,61 @@ export function CanvasWorkspace({
             </button>
           ))}
         </div>
+        <section className="canvas-panel-section">
+          <h2>Elements</h2>
+          <div className="canvas-tool-grid">
+            {(['text', 'alert-message', 'alert-image', 'shape'] as const).map((type) => (
+              <button
+                className="palette-button"
+                key={type}
+                type="button"
+                disabled={isPending}
+                onClick={() => addElement(type)}
+              >
+                {elementTypeLabel(type)}
+              </button>
+            ))}
+          </div>
+        </section>
+        <section className="canvas-panel-section">
+          <h2>Layers</h2>
+          <div className="layer-list">
+            {[...selected.settings.elements]
+              .sort((a, b) => b.zIndex - a.zIndex)
+              .map((element) => (
+                <button
+                  className={`layer-row${element.id === selectedElement?.id ? ' layer-row-active' : ''}`}
+                  key={element.id}
+                  type="button"
+                  onClick={() => setSelectedElementId(element.id)}
+                >
+                  <span>{element.name}</span>
+                  <span className="muted small">{element.hidden ? 'Hidden' : 'Shown'}</span>
+                </button>
+              ))}
+          </div>
+        </section>
+        <section className="canvas-panel-section">
+          <h2>Variables</h2>
+          <div className="token-list">
+            {EVENT_VARIABLES.map((token) => (
+              <button
+                className="token-button"
+                key={token}
+                type="button"
+                disabled={!selectedElement}
+                onClick={() => {
+                  if (!selectedElement) return;
+                  patchElementBindings(selectedElement, {
+                    textTemplate: `${selectedElement.bindings.textTemplate ?? ''}${token}`,
+                  });
+                }}
+              >
+                {token}
+              </button>
+            ))}
+          </div>
+        </section>
       </aside>
 
       <main className="canvas-main">
@@ -281,12 +393,60 @@ export function CanvasWorkspace({
         </section>
 
         <section className="canvas-preview-shell">
-          <div
-            className={`canvas-preview canvas-preview-${selected.settings.background}`}
-            style={{ aspectRatio: `${selected.settings.width} / ${selected.settings.height}` }}
-          >
-            <iframe title={`${selected.name} preview`} src={selected.url} />
+          <div className="canvas-stage-scroll">
+            <div
+              className={`canvas-design-stage canvas-preview-${selected.settings.background}`}
+              style={{
+                aspectRatio: `${selected.settings.width} / ${selected.settings.height}`,
+                width: 'min(100%, 960px)',
+              }}
+            >
+              {selected.settings.elements
+                .filter((element) => !element.hidden)
+                .sort((a, b) => a.zIndex - b.zIndex)
+                .map((element) => (
+                  <button
+                    className={`canvas-design-element${
+                      element.id === selectedElement?.id ? ' canvas-design-element-selected' : ''
+                    } canvas-design-element-${element.type}`}
+                    key={element.id}
+                    type="button"
+                    onClick={() => setSelectedElementId(element.id)}
+                    style={{
+                      left: `${(element.x / selected.settings.width) * 100}%`,
+                      top: `${(element.y / selected.settings.height) * 100}%`,
+                      width: `${(element.width / selected.settings.width) * 100}%`,
+                      height: `${(element.height / selected.settings.height) * 100}%`,
+                      zIndex: element.zIndex,
+                      opacity: element.opacity,
+                      transform: `rotate(${element.rotation}deg)`,
+                      color: element.styles.color,
+                      background: element.styles.backgroundColor,
+                      borderRadius: element.styles.borderRadius,
+                      fontFamily: element.styles.fontFamily,
+                      fontSize: Math.max(10, (element.styles.fontSize ?? 32) / 2.8),
+                      fontWeight: element.styles.fontWeight,
+                      textShadow: element.styles.textShadow,
+                    }}
+                  >
+                    {element.type === 'alert-image' ? (
+                      <span className="canvas-image-placeholder">Event image</span>
+                    ) : element.type === 'shape' ? null : (
+                      renderCanvasText(element.bindings.textTemplate ?? element.name, null)
+                    )}
+                  </button>
+                ))}
+            </div>
           </div>
+          <details className="runtime-preview-toggle">
+            <summary>OBS browser-source preview</summary>
+            <div
+              className={`canvas-preview canvas-preview-${selected.settings.background}`}
+              style={{ aspectRatio: `${selected.settings.width} / ${selected.settings.height}` }}
+            >
+              <iframe title={`${selected.name} runtime preview`} src={selected.url} />
+            </div>
+          </details>
         </section>
 
         <section className="canvas-settings-grid">
@@ -405,39 +565,162 @@ export function CanvasWorkspace({
       </main>
 
       <aside className="canvas-panel">
-        <h2>Alert Types</h2>
-        {Object.entries(groupedConfigs).map(([platform, configs]) => (
-          <div className="canvas-alert-group" key={platform}>
-            <h3>{platformLabel(platform)}</h3>
-            {configs.map((config) => (
-              <label className="canvas-alert-row" key={config.id}>
+        <h2>Inspector</h2>
+        {selectedElement ? (
+          <section className="property-stack">
+            <label className="field">
+              <span>Layer name</span>
+              <input
+                className="input"
+                value={selectedElement.name}
+                onChange={(event) => patchElement(selectedElement.id, { name: event.target.value })}
+              />
+            </label>
+            <div className="number-fields">
+              {(['x', 'y', 'width', 'height'] as const).map((key) => (
+                <label className="field" key={key}>
+                  <span>{key}</span>
+                  <input
+                    className="input"
+                    type="number"
+                    min={key === 'width' || key === 'height' ? 1 : 0}
+                    value={selectedElement[key]}
+                    onChange={(event) =>
+                      patchElement(selectedElement.id, { [key]: Number(event.target.value) })
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+            <div className="number-fields">
+              <label className="field">
+                <span>Opacity</span>
                 <input
-                  type="checkbox"
-                  checked={assignedKeys.has(config.alertEventType.eventKey)}
-                  onChange={(event) => toggleAlert(config, event.currentTarget.checked)}
+                  className="input"
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={selectedElement.opacity}
+                  onChange={(event) =>
+                    patchElement(selectedElement.id, { opacity: Number(event.target.value) })
+                  }
                 />
-                <span>
-                  <strong>{config.alertEventType.displayName}</strong>
-                  <span className="muted small">
-                    {config.alertEventType.eventKey}
-                    {config.enabled ? '' : ' / disabled'}
-                  </span>
-                </span>
-                <button
-                  className="link-button"
-                  type="button"
-                  disabled={isPending}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    testAlert(config.alertEventType.eventKey);
-                  }}
-                >
-                  Test
-                </button>
               </label>
-            ))}
-          </div>
-        ))}
+              <label className="field">
+                <span>Layer</span>
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  value={selectedElement.zIndex}
+                  onChange={(event) =>
+                    patchElement(selectedElement.id, { zIndex: Number(event.target.value) })
+                  }
+                />
+              </label>
+            </div>
+            <label className="field">
+              <span>Text / variables</span>
+              <textarea
+                className="input"
+                value={selectedElement.bindings.textTemplate ?? ''}
+                onChange={(event) =>
+                  patchElementBindings(selectedElement, { textTemplate: event.target.value })
+                }
+              />
+            </label>
+            <div className="number-fields">
+              <label className="field">
+                <span>Text color</span>
+                <input
+                  className="input"
+                  type="color"
+                  value={selectedElement.styles.color ?? '#f0f0f0'}
+                  onChange={(event) =>
+                    patchElementStyles(selectedElement, { color: event.target.value })
+                  }
+                />
+              </label>
+              <label className="field">
+                <span>Fill</span>
+                <input
+                  className="input"
+                  type="color"
+                  value={solidColor(selectedElement.styles.backgroundColor) ?? '#2c2c2c'}
+                  onChange={(event) =>
+                    patchElementStyles(selectedElement, { backgroundColor: event.target.value })
+                  }
+                />
+              </label>
+            </div>
+            <label className="toggle-line">
+              <input
+                type="checkbox"
+                checked={!selectedElement.hidden}
+                onChange={(event) =>
+                  patchElement(selectedElement.id, { hidden: !event.target.checked })
+                }
+              />
+              Visible
+            </label>
+            <label className="toggle-line">
+              <input
+                type="checkbox"
+                checked={selectedElement.locked}
+                onChange={(event) =>
+                  patchElement(selectedElement.id, { locked: event.target.checked })
+                }
+              />
+              Locked
+            </label>
+            <button
+              className="button-secondary"
+              type="button"
+              disabled={selected.settings.elements.length <= 1}
+              onClick={() => deleteElement(selectedElement.id)}
+            >
+              Delete layer
+            </button>
+          </section>
+        ) : (
+          <p className="muted">Select a layer to edit it.</p>
+        )}
+        <section className="canvas-panel-section">
+          <h2>Alert Bindings</h2>
+          {Object.entries(groupedConfigs).map(([platform, configs]) => (
+            <div className="canvas-alert-group" key={platform}>
+              <h3>{platformLabel(platform)}</h3>
+              {configs.map((config) => (
+                <label className="canvas-alert-row" key={config.id}>
+                  <input
+                    type="checkbox"
+                    checked={assignedKeys.has(config.alertEventType.eventKey)}
+                    onChange={(event) => toggleAlert(config, event.currentTarget.checked)}
+                  />
+                  <span>
+                    <strong>{config.alertEventType.displayName}</strong>
+                    <span className="muted small">
+                      {config.alertEventType.eventKey}
+                      {config.enabled ? '' : ' / disabled'}
+                    </span>
+                  </span>
+                  <button
+                    className="link-button"
+                    type="button"
+                    disabled={isPending}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      testAlert(config.alertEventType.eventKey);
+                    }}
+                  >
+                    Test
+                  </button>
+                </label>
+              ))}
+            </div>
+          ))}
+        </section>
       </aside>
     </div>
   );
@@ -473,18 +756,7 @@ function clientOrigin() {
 }
 
 function readSettings(value: unknown): CanvasSettings {
-  const settings = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  const raw = settings as Partial<CanvasSettings>;
-  return {
-    width: Number.isFinite(raw.width) ? Number(raw.width) : 1920,
-    height: Number.isFinite(raw.height) ? Number(raw.height) : 1080,
-    background: raw.background === 'dark' ? 'dark' : 'transparent',
-    alertEventKeys: Array.isArray(raw.alertEventKeys) ? raw.alertEventKeys.filter(isString) : [],
-  };
-}
-
-function isString(value: unknown): value is string {
-  return typeof value === 'string';
+  return normalizeCanvasSettings(value).settings;
 }
 
 export function applyAlertAssignment(currentKeys: string[], eventKey: string, assigned: boolean) {
@@ -506,4 +778,18 @@ function platformLabel(platform: string) {
     youtube: 'YouTube',
   };
   return labels[platform] ?? platform;
+}
+
+function elementTypeLabel(type: CanvasElementType) {
+  const labels: Record<CanvasElementType, string> = {
+    text: 'Text',
+    'alert-message': 'Message',
+    'alert-image': 'Image',
+    shape: 'Shape',
+  };
+  return labels[type];
+}
+
+function solidColor(value: string | undefined) {
+  return value?.startsWith('#') ? value : undefined;
 }

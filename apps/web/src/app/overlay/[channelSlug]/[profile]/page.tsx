@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { OverlayClient } from '@/components/OverlayClient';
+import { normalizeCanvasSettings } from '@/lib/canvas-schema';
 import {
   getClientIp,
   isOverlayRouteRateLimited,
@@ -57,14 +58,5 @@ export default async function ScopedOverlayPage({
 }
 
 function readCanvasSettings(value: unknown) {
-  const settings = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  const alertEventKeys = Array.isArray((settings as { alertEventKeys?: unknown }).alertEventKeys)
-    ? ((settings as { alertEventKeys: unknown[] }).alertEventKeys.filter(
-        (key): key is string => typeof key === 'string',
-      ) ?? [])
-    : [];
-
-  return {
-    alertEventKeys,
-  };
+  return normalizeCanvasSettings(value).settings;
 }

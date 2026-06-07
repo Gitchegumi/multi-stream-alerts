@@ -8,6 +8,7 @@ import {
 import { requireDashboardSession } from '@/lib/session';
 import { CanvasWorkspace } from '@/components/CanvasWorkspace';
 import { RecentAlertFeed } from '@/components/RecentAlertFeed';
+import { normalizeCanvasSettings } from '@/lib/canvas-schema';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,21 +98,5 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
 }
 
 function readCanvasSettings(value: unknown, fallbackEventKeys: string[]) {
-  const settings = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  const raw = settings as {
-    width?: unknown;
-    height?: unknown;
-    background?: unknown;
-    alertEventKeys?: unknown;
-  };
-  const alertEventKeys = Array.isArray(raw.alertEventKeys)
-    ? raw.alertEventKeys.filter((key): key is string => typeof key === 'string')
-    : fallbackEventKeys;
-
-  return {
-    width: typeof raw.width === 'number' ? raw.width : 1920,
-    height: typeof raw.height === 'number' ? raw.height : 1080,
-    background: raw.background === 'dark' ? ('dark' as const) : ('transparent' as const),
-    alertEventKeys,
-  };
+  return normalizeCanvasSettings(value, fallbackEventKeys).settings;
 }
