@@ -72,7 +72,7 @@ test('shouldRenderAlertOnCanvas respects assigned event keys', () => {
 test('renderCanvasText replaces known variables and leaves unknown variables intact', () => {
   assert.equal(
     renderCanvasText('{{viewerName}} {{platform}} {{eventType}} {{unknown}}', alert),
-    'DockeGumi twitch follow {{unknown}}',
+    'DockeGumi twitch followed {{unknown}}',
   );
 });
 

@@ -1,6 +1,12 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import {
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import type { AlertEvent } from '@multi-stream-alerts/shared';
 import {
   createCanvasElement,
@@ -35,12 +41,6 @@ type AlertConfig = {
   };
 };
 
-type AlertLayout = {
-  id: string;
-  name: string;
-  style: string;
-};
-
 type WorkspaceAsset = {
   id: string;
   assetType: 'image' | 'video' | 'audio';
@@ -49,19 +49,24 @@ type WorkspaceAsset = {
   previewUrl: string;
 };
 
+type ResizeMode = 'n' | 'e' | 's' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+
+type ElementStart = Pick<CanvasElement, 'x' | 'y' | 'width' | 'height'> & {
+  clientX: number;
+  clientY: number;
+};
+
 export function CanvasWorkspace({
   channelId,
   channelSlug,
   initialCanvases,
   alertConfigs,
-  layouts,
   assets,
 }: {
   channelId: string;
   channelSlug: string;
   initialCanvases: CanvasProfile[];
   alertConfigs: AlertConfig[];
-  layouts: AlertLayout[];
   assets: WorkspaceAsset[];
 }) {
   const [canvases, setCanvases] = useState(initialCanvases);
@@ -73,7 +78,9 @@ export function CanvasWorkspace({
   );
   const [result, setResult] = useState<string | null>(null);
   const [previewAlert, setPreviewAlert] = useState<AlertEvent | null>(null);
+  const [snapGuides, setSnapGuides] = useState({ horizontal: false, vertical: false });
   const [isPending, startTransition] = useTransition();
+  const canvasStageRef = useRef<HTMLDivElement | null>(null);
 
   const selected = canvases.find((canvas) => canvas.slug === selectedSlug) ?? canvases[0];
   const selectedElement =
@@ -246,6 +253,91 @@ export function CanvasWorkspace({
     patchElement(element.id, { bindings: { ...element.bindings, ...bindings } });
   }
 
+  function updateCanvasElements(elements: CanvasElement[]) {
+    if (!selected) return;
+    setCanvases((current) =>
+      current.map((canvas) =>
+        canvas.id === selected.id
+          ? {
+              ...canvas,
+              settings: {
+                ...canvas.settings,
+                elements,
+              },
+            }
+          : canvas,
+      ),
+    );
+  }
+
+  function centerElement(element: CanvasElement, axis: 'horizontal' | 'vertical' | 'both') {
+    if (!selected) return;
+    patchElement(element.id, {
+      x:
+        axis === 'horizontal' || axis === 'both'
+          ? Math.round((selected.settings.width - element.width) / 2)
+          : element.x,
+      y:
+        axis === 'vertical' || axis === 'both'
+          ? Math.round((selected.settings.height - element.height) / 2)
+          : element.y,
+    });
+  }
+
+  function startElementPointer(
+    event: ReactPointerEvent<HTMLElement>,
+    element: CanvasElement,
+    mode: ResizeMode | 'move',
+  ) {
+    if (!selected || element.locked) return;
+    const activeCanvas = selected;
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedElementId(element.id);
+    const stage = canvasStageRef.current;
+    if (!stage) return;
+
+    const stageRect = stage.getBoundingClientRect();
+    const scaleX = activeCanvas.settings.width / stageRect.width;
+    const scaleY = activeCanvas.settings.height / stageRect.height;
+    const start = {
+      clientX: event.clientX,
+      clientY: event.clientY,
+      x: element.x,
+      y: element.y,
+      width: element.width,
+      height: element.height,
+    };
+    let latestElements = activeCanvas.settings.elements;
+    let moved = false;
+
+    function move(pointerEvent: PointerEvent) {
+      moved = true;
+      const dx = (pointerEvent.clientX - start.clientX) * scaleX;
+      const dy = (pointerEvent.clientY - start.clientY) * scaleY;
+      const transform = transformElement(start, mode, dx, dy, activeCanvas.settings);
+      latestElements = activeCanvas.settings.elements.map((item) =>
+        item.id === element.id ? { ...item, ...transform.element } : item,
+      );
+      setSnapGuides(transform.guides);
+      updateCanvasElements(latestElements);
+    }
+
+    function stop() {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
+      setSnapGuides({ horizontal: false, vertical: false });
+      if (moved) {
+        patchCanvas(activeCanvas.slug, { settings: { elements: latestElements } });
+      }
+    }
+
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+  }
+
   function deleteElement(elementId: string) {
     if (!selected || selected.settings.elements.length <= 1) return;
     const elements = selected.settings.elements.filter((element) => element.id !== elementId);
@@ -359,61 +451,6 @@ export function CanvasWorkspace({
             </button>
           ))}
         </div>
-        <section className="canvas-panel-section">
-          <h2>Elements</h2>
-          <div className="canvas-tool-grid">
-            {(['text', 'alert-message', 'alert-image', 'shape'] as const).map((type) => (
-              <button
-                className="palette-button"
-                key={type}
-                type="button"
-                disabled={isPending}
-                onClick={() => addElement(type)}
-              >
-                {elementTypeLabel(type)}
-              </button>
-            ))}
-          </div>
-        </section>
-        <section className="canvas-panel-section">
-          <h2>Layers</h2>
-          <div className="layer-list">
-            {[...selected.settings.elements]
-              .sort((a, b) => b.zIndex - a.zIndex)
-              .map((element) => (
-                <button
-                  className={`layer-row${element.id === selectedElement?.id ? ' layer-row-active' : ''}`}
-                  key={element.id}
-                  type="button"
-                  onClick={() => setSelectedElementId(element.id)}
-                >
-                  <span>{element.name}</span>
-                  <span className="muted small">{element.hidden ? 'Hidden' : 'Shown'}</span>
-                </button>
-              ))}
-          </div>
-        </section>
-        <section className="canvas-panel-section">
-          <h2>Variables</h2>
-          <div className="token-list">
-            {EVENT_VARIABLES.map((token) => (
-              <button
-                className="token-button"
-                key={token}
-                type="button"
-                disabled={!selectedElement}
-                onClick={() => {
-                  if (!selectedElement) return;
-                  patchElementBindings(selectedElement, {
-                    textTemplate: `${selectedElement.bindings.textTemplate ?? ''}${token}`,
-                  });
-                }}
-              >
-                {token}
-              </button>
-            ))}
-          </div>
-        </section>
       </aside>
 
       <main className="canvas-main">
@@ -432,11 +469,18 @@ export function CanvasWorkspace({
           <div className="canvas-stage-scroll">
             <div
               className={`canvas-design-stage canvas-preview-${selected.settings.background}`}
+              ref={canvasStageRef}
               style={{
                 aspectRatio: `${selected.settings.width} / ${selected.settings.height}`,
                 width: 'min(100%, 960px)',
               }}
             >
+              {snapGuides.vertical ? (
+                <span className="canvas-snap-guide canvas-snap-guide-v" />
+              ) : null}
+              {snapGuides.horizontal ? (
+                <span className="canvas-snap-guide canvas-snap-guide-h" />
+              ) : null}
               {selected.settings.elements
                 .filter((element) => !element.hidden)
                 .sort((a, b) => a.zIndex - b.zIndex)
@@ -448,6 +492,7 @@ export function CanvasWorkspace({
                     key={element.id}
                     type="button"
                     onClick={() => setSelectedElementId(element.id)}
+                    onPointerDown={(event) => startElementPointer(event, element, 'move')}
                     style={{
                       left: `${(element.x / selected.settings.width) * 100}%`,
                       top: `${(element.y / selected.settings.height) * 100}%`,
@@ -468,11 +513,24 @@ export function CanvasWorkspace({
                     {element.type === 'alert-image' ? (
                       <PreviewAsset
                         asset={assetForElement(element, assets)}
+                        eventUrl={previewAlert?.visualAssetUrl}
                         fallback={previewAlert ? 'Event image' : 'Event image'}
+                        previewKey={previewAlert?.id}
                       />
                     ) : element.type === 'shape' ? null : (
                       renderCanvasText(element.bindings.textTemplate ?? element.name, previewAlert)
                     )}
+                    {element.id === selectedElement?.id && !element.locked
+                      ? (['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'] as const).map((handle) => (
+                          <span
+                            aria-label={`Resize ${handle}`}
+                            className={`canvas-resize-handle canvas-resize-handle-${handle}`}
+                            key={handle}
+                            role="presentation"
+                            onPointerDown={(event) => startElementPointer(event, element, handle)}
+                          />
+                        ))
+                      : null}
                   </button>
                 ))}
             </div>
@@ -548,45 +606,6 @@ export function CanvasWorkspace({
               <option value="dark">Dark preview</option>
             </select>
           </label>
-          <label className="field">
-            <span>Audio</span>
-            <select
-              className="select"
-              value={selected.settings.audioAssetId ?? ''}
-              onChange={(event) =>
-                patchCanvas(selected.slug, {
-                  settings: {
-                    audioAssetId: event.currentTarget.value || null,
-                    audioAssetUrl:
-                      audioAssets.find((asset) => asset.id === event.currentTarget.value)
-                        ?.externalUrl ?? null,
-                  },
-                })
-              }
-            >
-              <option value="">Use event/default audio</option>
-              {audioAssets.map((asset) => (
-                <option key={asset.id} value={asset.id}>
-                  {assetLabel(asset)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Volume</span>
-            <input
-              className="input"
-              type="number"
-              min={0}
-              max={100}
-              value={selected.settings.volume}
-              onChange={(event) =>
-                patchCanvas(selected.slug, {
-                  settings: { volume: Number(event.currentTarget.value) },
-                })
-              }
-            />
-          </label>
           <label className="toggle-line canvas-active-toggle">
             <input
               type="checkbox"
@@ -625,175 +644,332 @@ export function CanvasWorkspace({
             Delete
           </button>
         </div>
-
-        <section className="panel">
-          <h2>Legacy alert presets</h2>
-          <p className="muted small">
-            These presets still feed existing alert-type defaults. New overlay editing should happen
-            on the selected canvas above.
-          </p>
-          <div className="canvas-layout-links">
-            {layouts.map((layout) => (
-              <a
-                className="button-secondary"
-                key={layout.id}
-                href={`/dashboard/${encodeURIComponent(channelSlug)}/overlay/${encodeURIComponent(layout.id)}/edit`}
-              >
-                Edit {layout.name}
-              </a>
-            ))}
-          </div>
-        </section>
       </main>
 
-      <aside className="canvas-panel">
-        <h2>Inspector</h2>
-        {selectedElement ? (
-          <section className="property-stack">
-            <label className="field">
-              <span>Layer name</span>
-              <input
-                className="input"
-                value={selectedElement.name}
-                onChange={(event) => patchElement(selectedElement.id, { name: event.target.value })}
-              />
-            </label>
-            {selectedElement.type === 'alert-image' ? (
-              <label className="field">
-                <span>Stored asset</span>
-                <select
-                  className="select"
-                  value={selectedElement.bindings.assetId ?? ''}
-                  onChange={(event) => {
-                    const asset = assets.find((item) => item.id === event.currentTarget.value);
-                    patchElementBindings(selectedElement, {
-                      assetRole: event.currentTarget.value ? undefined : 'eventVisual',
-                      assetId: event.currentTarget.value || undefined,
-                      assetUrl: asset?.externalUrl ?? undefined,
-                    });
-                  }}
+      <aside className="canvas-panel canvas-components-panel">
+        <h2 className="component-panel-title">On-screen components</h2>
+        <div className="component-stack">
+          {[...selected.settings.elements]
+            .sort((a, b) => a.zIndex - b.zIndex)
+            .map((element) => {
+              const expanded = element.id === selectedElement?.id;
+              return (
+                <section
+                  className={`component-card${expanded ? ' component-card-open' : ''}`}
+                  key={element.id}
                 >
-                  <option value="">Use event image/video</option>
-                  {imageAssets.map((asset) => (
-                    <option key={asset.id} value={asset.id}>
-                      {assetLabel(asset)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-            <div className="number-fields">
-              {(['x', 'y', 'width', 'height'] as const).map((key) => (
-                <label className="field" key={key}>
-                  <span>{key}</span>
-                  <input
-                    className="input"
-                    type="number"
-                    min={key === 'width' || key === 'height' ? 1 : 0}
-                    value={selectedElement[key]}
-                    onChange={(event) =>
-                      patchElement(selectedElement.id, { [key]: Number(event.target.value) })
-                    }
-                  />
-                </label>
-              ))}
-            </div>
-            <div className="number-fields">
-              <label className="field">
-                <span>Opacity</span>
-                <input
-                  className="input"
-                  type="number"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={selectedElement.opacity}
-                  onChange={(event) =>
-                    patchElement(selectedElement.id, { opacity: Number(event.target.value) })
-                  }
-                />
-              </label>
-              <label className="field">
-                <span>Layer</span>
-                <input
-                  className="input"
-                  type="number"
-                  min={0}
-                  value={selectedElement.zIndex}
-                  onChange={(event) =>
-                    patchElement(selectedElement.id, { zIndex: Number(event.target.value) })
-                  }
-                />
-              </label>
-            </div>
+                  <button
+                    className="component-card-header"
+                    type="button"
+                    onClick={() => setSelectedElementId(element.id)}
+                  >
+                    <span>{element.name}</span>
+                    <span className="component-card-menu">...</span>
+                    <span aria-hidden>{expanded ? '^' : 'v'}</span>
+                  </button>
+                  {expanded ? (
+                    <div className="component-card-body">
+                      <label className="field">
+                        <span>Name</span>
+                        <input
+                          className="input"
+                          value={element.name}
+                          onChange={(event) =>
+                            patchElement(element.id, { name: event.target.value })
+                          }
+                        />
+                      </label>
+                      {element.type === 'alert-image' ? (
+                        <>
+                          <div className="component-media-preview">
+                            <PreviewAsset
+                              asset={assetForElement(element, assets)}
+                              eventUrl={previewAlert?.visualAssetUrl}
+                              fallback="Event image"
+                              previewKey={previewAlert?.id}
+                            />
+                          </div>
+                          <label className="field">
+                            <span>Stored asset</span>
+                            <select
+                              className="select"
+                              value={element.bindings.assetId ?? ''}
+                              onChange={(event) => {
+                                const asset = assets.find(
+                                  (item) => item.id === event.currentTarget.value,
+                                );
+                                patchElementBindings(element, {
+                                  assetRole: event.currentTarget.value ? undefined : 'eventVisual',
+                                  assetId: event.currentTarget.value || undefined,
+                                  assetUrl: asset?.externalUrl ?? undefined,
+                                });
+                              }}
+                            >
+                              <option value="">Use event image/video</option>
+                              {imageAssets.map((asset) => (
+                                <option key={asset.id} value={asset.id}>
+                                  {assetLabel(asset)}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </>
+                      ) : element.type === 'shape' ? null : (
+                        <>
+                          <label className="field">
+                            <span>Content</span>
+                            <textarea
+                              className="input"
+                              value={element.bindings.textTemplate ?? ''}
+                              onChange={(event) =>
+                                patchElementBindings(element, { textTemplate: event.target.value })
+                              }
+                            />
+                          </label>
+                          <span className="component-data-hint">Type / to see available data</span>
+                          <div className="token-list component-token-list">
+                            {EVENT_VARIABLES.map((token) => (
+                              <button
+                                className="token-button"
+                                key={token}
+                                type="button"
+                                onClick={() =>
+                                  patchElementBindings(element, {
+                                    textTemplate: `${element.bindings.textTemplate ?? ''}${token}`,
+                                  })
+                                }
+                              >
+                                {token}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      <div className="component-control-row">
+                        <label className="compact-field">
+                          <span>A</span>
+                          <input
+                            type="color"
+                            value={element.styles.color ?? '#f0f0f0'}
+                            onChange={(event) =>
+                              patchElementStyles(element, { color: event.target.value })
+                            }
+                          />
+                        </label>
+                        <label className="compact-field">
+                          <span>Fill</span>
+                          <input
+                            type="color"
+                            value={solidColor(element.styles.backgroundColor) ?? '#2c2c2c'}
+                            onChange={(event) =>
+                              patchElementStyles(element, {
+                                backgroundColor: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                        <label className="compact-field compact-field-wide">
+                          <span>Size</span>
+                          <input
+                            className="input"
+                            type="number"
+                            min={8}
+                            max={300}
+                            value={element.styles.fontSize ?? 32}
+                            onChange={(event) =>
+                              patchElementStyles(element, {
+                                fontSize: Number(event.target.value),
+                              })
+                            }
+                          />
+                        </label>
+                      </div>
+                      <div className="component-control-row">
+                        <span>Fade-In</span>
+                        <span>Fade-Out</span>
+                        <span>{Math.round((element.animation.durationMs ?? 0) / 1000)} s</span>
+                      </div>
+                      <div className="component-metric-row">
+                        {(['x', 'y', 'width'] as const).map((key) => (
+                          <label className="metric-field" key={key}>
+                            <span>{key.toUpperCase()}</span>
+                            <input
+                              className="input"
+                              type="number"
+                              min={key === 'width' ? 1 : 0}
+                              value={element[key]}
+                              onChange={(event) =>
+                                patchElement(element.id, { [key]: Number(event.target.value) })
+                              }
+                            />
+                          </label>
+                        ))}
+                      </div>
+                      <div className="component-metric-row">
+                        <label className="metric-field">
+                          <span>H</span>
+                          <input
+                            className="input"
+                            type="number"
+                            min={1}
+                            value={element.height}
+                            onChange={(event) =>
+                              patchElement(element.id, { height: Number(event.target.value) })
+                            }
+                          />
+                        </label>
+                        <label className="metric-field">
+                          <span>Layer</span>
+                          <input
+                            className="input"
+                            type="number"
+                            min={0}
+                            value={element.zIndex}
+                            onChange={(event) =>
+                              patchElement(element.id, { zIndex: Number(event.target.value) })
+                            }
+                          />
+                        </label>
+                        <label className="metric-field">
+                          <span>Opacity</span>
+                          <input
+                            className="input"
+                            type="number"
+                            min={0}
+                            max={1}
+                            step={0.05}
+                            value={element.opacity}
+                            onChange={(event) =>
+                              patchElement(element.id, { opacity: Number(event.target.value) })
+                            }
+                          />
+                        </label>
+                      </div>
+                      <div className="canvas-align-actions">
+                        <button
+                          className="button-secondary"
+                          type="button"
+                          onClick={() => centerElement(element, 'horizontal')}
+                        >
+                          Center X
+                        </button>
+                        <button
+                          className="button-secondary"
+                          type="button"
+                          onClick={() => centerElement(element, 'vertical')}
+                        >
+                          Center Y
+                        </button>
+                        <button
+                          className="button-secondary"
+                          type="button"
+                          onClick={() => centerElement(element, 'both')}
+                        >
+                          Center
+                        </button>
+                      </div>
+                      <div className="component-toggle-row">
+                        <label className="toggle-line">
+                          <input
+                            type="checkbox"
+                            checked={!element.hidden}
+                            onChange={(event) =>
+                              patchElement(element.id, { hidden: !event.target.checked })
+                            }
+                          />
+                          Visible
+                        </label>
+                        <label className="toggle-line">
+                          <input
+                            type="checkbox"
+                            checked={element.locked}
+                            onChange={(event) =>
+                              patchElement(element.id, { locked: event.target.checked })
+                            }
+                          />
+                          Locked
+                        </label>
+                      </div>
+                      <button
+                        className="button-secondary"
+                        type="button"
+                        disabled={selected.settings.elements.length <= 1}
+                        onClick={() => deleteElement(element.id)}
+                      >
+                        Delete layer
+                      </button>
+                    </div>
+                  ) : null}
+                </section>
+              );
+            })}
+        </div>
+        <details className="component-add-menu">
+          <summary>+ Add element</summary>
+          <div className="component-add-grid">
+            {(['text', 'alert-message', 'alert-image', 'shape'] as const).map((type) => (
+              <button
+                className="palette-button"
+                key={type}
+                type="button"
+                disabled={isPending}
+                onClick={() => addElement(type)}
+              >
+                {elementTypeLabel(type)}
+              </button>
+            ))}
+          </div>
+        </details>
+        <section className="component-card">
+          <div className="component-card-header component-card-header-static">
+            <span>Audio</span>
+            <span className="component-card-menu">...</span>
+            <span aria-hidden>^</span>
+          </div>
+          <div className="component-card-body">
             <label className="field">
-              <span>Text / variables</span>
-              <textarea
+              <span>Stored sound</span>
+              <select
+                className="select"
+                value={selected.settings.audioAssetId ?? ''}
+                onChange={(event) =>
+                  patchCanvas(selected.slug, {
+                    settings: {
+                      audioAssetId: event.currentTarget.value || null,
+                      audioAssetUrl:
+                        audioAssets.find((asset) => asset.id === event.currentTarget.value)
+                          ?.externalUrl ?? null,
+                    },
+                  })
+                }
+              >
+                <option value="">Use event/default audio</option>
+                {audioAssets.map((asset) => (
+                  <option key={asset.id} value={asset.id}>
+                    {assetLabel(asset)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="metric-field">
+              <span>Volume</span>
+              <input
                 className="input"
-                value={selectedElement.bindings.textTemplate ?? ''}
+                type="number"
+                min={0}
+                max={100}
+                value={selected.settings.volume}
                 onChange={(event) =>
-                  patchElementBindings(selectedElement, { textTemplate: event.target.value })
+                  patchCanvas(selected.slug, {
+                    settings: { volume: Number(event.currentTarget.value) },
+                  })
                 }
               />
             </label>
-            <div className="number-fields">
-              <label className="field">
-                <span>Text color</span>
-                <input
-                  className="input"
-                  type="color"
-                  value={selectedElement.styles.color ?? '#f0f0f0'}
-                  onChange={(event) =>
-                    patchElementStyles(selectedElement, { color: event.target.value })
-                  }
-                />
-              </label>
-              <label className="field">
-                <span>Fill</span>
-                <input
-                  className="input"
-                  type="color"
-                  value={solidColor(selectedElement.styles.backgroundColor) ?? '#2c2c2c'}
-                  onChange={(event) =>
-                    patchElementStyles(selectedElement, { backgroundColor: event.target.value })
-                  }
-                />
-              </label>
-            </div>
-            <label className="toggle-line">
-              <input
-                type="checkbox"
-                checked={!selectedElement.hidden}
-                onChange={(event) =>
-                  patchElement(selectedElement.id, { hidden: !event.target.checked })
-                }
-              />
-              Visible
-            </label>
-            <label className="toggle-line">
-              <input
-                type="checkbox"
-                checked={selectedElement.locked}
-                onChange={(event) =>
-                  patchElement(selectedElement.id, { locked: event.target.checked })
-                }
-              />
-              Locked
-            </label>
-            <button
-              className="button-secondary"
-              type="button"
-              disabled={selected.settings.elements.length <= 1}
-              onClick={() => deleteElement(selectedElement.id)}
-            >
-              Delete layer
-            </button>
-          </section>
-        ) : (
-          <p className="muted">Select a layer to edit it.</p>
-        )}
-        <section className="canvas-panel-section">
-          <h2>Alert Bindings</h2>
+          </div>
+        </section>
+        <section className="canvas-panel-section component-alert-bindings">
+          <h2>Alert bindings</h2>
           {Object.entries(groupedConfigs).map(([platform, configs]) => (
             <div className="canvas-alert-group" key={platform}>
               <h3>{platformLabel(platform)}</h3>
@@ -827,6 +1003,16 @@ export function CanvasWorkspace({
             </div>
           ))}
         </section>
+        <div className="component-preview-footer">
+          <button
+            className="button-secondary"
+            type="button"
+            disabled={isPending}
+            onClick={() => testAlert()}
+          >
+            ▶ Preview
+          </button>
+        </div>
       </aside>
     </div>
   );
@@ -912,17 +1098,23 @@ function assetForElement(element: CanvasElement, assets: WorkspaceAsset[]) {
 
 function PreviewAsset({
   asset,
+  eventUrl,
   fallback,
+  previewKey,
 }: {
   asset: WorkspaceAsset | null | undefined;
+  eventUrl?: string;
   fallback: string;
+  previewKey?: string;
 }) {
-  if (!asset) return <span className="canvas-image-placeholder">{fallback}</span>;
-  if (asset.assetType === 'video') {
+  const url = asset?.previewUrl ?? eventUrl;
+  if (!url) return <span className="canvas-image-placeholder">{fallback}</span>;
+  if (asset?.assetType === 'video' || /\.(mp4|webm)(\?|$)/i.test(url)) {
     return (
       <video
         className="canvas-preview-asset"
-        src={asset.previewUrl}
+        key={previewKey ?? url}
+        src={url}
         muted
         loop
         playsInline
@@ -930,5 +1122,73 @@ function PreviewAsset({
       />
     );
   }
-  return <img className="canvas-preview-asset" alt="" src={asset.previewUrl} />;
+  return <img className="canvas-preview-asset" alt="" src={url} />;
+}
+
+function transformElement(
+  start: ElementStart,
+  mode: ResizeMode | 'move',
+  dx: number,
+  dy: number,
+  settings: CanvasSettings,
+) {
+  let x = start.x;
+  let y = start.y;
+  let width = start.width;
+  let height = start.height;
+
+  if (mode === 'move') {
+    x = start.x + dx;
+    y = start.y + dy;
+  } else {
+    if (mode.includes('e')) width = start.width + dx;
+    if (mode.includes('s')) height = start.height + dy;
+    if (mode.includes('w')) {
+      x = start.x + dx;
+      width = start.width - dx;
+    }
+    if (mode.includes('n')) {
+      y = start.y + dy;
+      height = start.height - dy;
+    }
+  }
+
+  width = clamp(Math.round(width), 16, settings.width);
+  height = clamp(Math.round(height), 16, settings.height);
+  x = clamp(Math.round(x), 0, settings.width - width);
+  y = clamp(Math.round(y), 0, settings.height - height);
+
+  const snapped = snapToCanvasCenter({ x, y, width, height }, settings);
+  return {
+    element: snapped.element,
+    guides: snapped.guides,
+  };
+}
+
+function snapToCanvasCenter(
+  element: Pick<CanvasElement, 'x' | 'y' | 'width' | 'height'>,
+  settings: CanvasSettings,
+) {
+  const threshold = Math.max(8, Math.round(settings.width * 0.006));
+  const centerX = settings.width / 2;
+  const centerY = settings.height / 2;
+  const elementCenterX = element.x + element.width / 2;
+  const elementCenterY = element.y + element.height / 2;
+  const guides = {
+    vertical: Math.abs(elementCenterX - centerX) <= threshold,
+    horizontal: Math.abs(elementCenterY - centerY) <= threshold,
+  };
+
+  return {
+    element: {
+      ...element,
+      x: guides.vertical ? Math.round(centerX - element.width / 2) : element.x,
+      y: guides.horizontal ? Math.round(centerY - element.height / 2) : element.y,
+    },
+    guides,
+  };
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
 }

@@ -40,19 +40,6 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
       displayName: config.alertEventType.displayName,
     },
   }));
-  const alertLayouts = alertSetup.layouts.map((layout) => ({
-    id: layout.id,
-    name: layout.name,
-    style: layout.style,
-    visualAssetUrl: layout.visualAssetUrl,
-    soundAssetUrl: layout.soundAssetUrl,
-    visualAssetId: layout.visualAssetId,
-    soundAssetId: layout.soundAssetId,
-    defaultDurationMs: layout.defaultDurationMs,
-    defaultVolume: layout.defaultVolume,
-    isSystemPreset: layout.isSystemPreset,
-  }));
-
   const recentEvents = await prisma.alertEvent.findMany({
     where: { channelId: channel.id },
     orderBy: { createdAt: 'desc' },
@@ -90,7 +77,6 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
         channelSlug={channel.slug}
         initialCanvases={canvases}
         alertConfigs={alertConfigs}
-        layouts={alertLayouts}
         assets={assets.map((asset) => ({
           id: asset.id,
           assetType: asset.assetType,

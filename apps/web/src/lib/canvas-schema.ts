@@ -275,7 +275,7 @@ function eventValues(alert: AlertEvent): Record<string, string> {
     tier: alert.tier ?? '',
     months: alert.quantity ? String(alert.quantity) : '',
     platform: alert.platform,
-    eventType: alert.type,
+    eventType: eventTypeAction(alert.type),
   };
 }
 
@@ -287,8 +287,35 @@ function sampleValues(): Record<string, string> {
     tier: 'Prime',
     months: '6',
     platform: 'twitch',
-    eventType: 'follow',
+    eventType: 'followed',
   };
+}
+
+function eventTypeAction(type: AlertEvent['type']) {
+  const labels: Record<AlertEvent['type'], string> = {
+    tip: 'tipped',
+    follow: 'followed',
+    subscription: 'subscribed',
+    resubscription: 'resubscribed',
+    membership: 'became a member',
+    superchat: 'sent a Superchat',
+    supersticker: 'sent a Super Sticker',
+    raid: 'raided',
+    cheer: 'cheered',
+    gift: 'gifted subs',
+    shop_order: 'placed a shop order',
+    commission: 'sent a commission',
+    channel_point: 'redeemed channel points',
+    stream_online: 'went live',
+    stream_offline: 'ended stream',
+    test: 'sent a test alert',
+    widget_event: 'triggered a widget event',
+    external_purchase: 'made a purchase',
+    hypechat: 'sent a Hypechat',
+    charity_donation: 'made a charity donation',
+    redemption: 'redeemed a reward',
+  };
+  return labels[type] ?? 'triggered an alert';
 }
 
 function isCanvasElementType(value: unknown): value is CanvasElementType {

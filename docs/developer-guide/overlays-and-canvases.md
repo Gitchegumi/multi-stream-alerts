@@ -5,7 +5,6 @@ The user-facing model is canvas-first.
 - `OverlayProfile` acts as the canvas/browser-source surface.
 - `displayKey` authorizes browser-source access.
 - `settingsJson` stores the runtime canvas schema: size, background behavior, assigned alert event keys, default duration, ordered elements, fixed asset bindings, and canvas audio.
-- `WorkspaceAlertLayout` is a legacy/default-preset layer used by existing alert configuration and event enrichment. It should not be presented as a peer concept to canvases in the main editor.
 - `WorkspaceAlertConfig` stores per-channel alert type defaults.
 
 The dashboard route `/dashboard/:channelSlug/alerts` presents canvases, layers/elements, variable tokens, the selected browser-source URL, a design preview, runtime preview, alert type assignment, and the selected element inspector.
@@ -18,6 +17,5 @@ The browser-source route reads the saved canvas schema directly and renders only
 It does not load dashboard controls. Alert events are filtered against the canvas `alertEventKeys`
 assignment list before they enter the display queue.
 
-Product direction: canvases are the primary editing and runtime unit. Alert layouts can continue to
-exist internally while older alert defaults depend on them, but new editor work should attach visual
-elements, stored media, audio, and alert bindings to the canvas schema.
+Product direction: canvases are the primary editing and runtime unit. New editor work should attach
+visual elements, stored media, audio, and alert bindings to the canvas schema.

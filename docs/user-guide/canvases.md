@@ -20,5 +20,5 @@ From **Alerts**, you can:
 
 Transparent backgrounds are recommended for production browser sources. Dark background is useful for previewing transparent content in the dashboard.
 
-Canvases are the overlay surfaces you use in OBS. Older alert layout presets may still appear for
-backward-compatible defaults, but the main editor workflow is canvas-first.
+Canvases are the overlay surfaces you use in OBS. The main editor workflow is canvas-first: place
+elements, attach media, assign alert types, and copy the browser-source URL from the selected canvas.
