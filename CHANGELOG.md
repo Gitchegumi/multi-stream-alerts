@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.6](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.1.5...v0.1.6) (2026-06-07)
+
+
+### Bug Fixes
+
+* **web:** redirect guide link to valid docs ([1139320](https://github.com/Gitchegumi/multi-stream-alerts/commit/11393202c88f7791d39b305f22e7b1ac12e8656d))
+
 ## [0.1.5](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.1.4...v0.1.5) (2026-06-06)
 
 
