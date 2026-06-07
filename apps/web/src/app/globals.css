@@ -675,7 +675,6 @@ textarea {
 }
 
 .component-alert-bindings {
-  min-height: 0;
   overflow: visible;
 }
 
