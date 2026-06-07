@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.8](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.1.7...v0.1.8) (2026-06-07)
+
+
+### Bug Fixes
+
+* **database:** avoid bootstrap display key collisions ([da50dac](https://github.com/Gitchegumi/multi-stream-alerts/commit/da50dac65123346483449a2134b0889461fdb32d))
+* **database:** avoid bootstrap display key collisions ([067a0a8](https://github.com/Gitchegumi/multi-stream-alerts/commit/067a0a81204e45222bc983404e8581ebd3f1d252))
+
 ## [0.1.7](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.1.6...v0.1.7) (2026-06-07)
 
 
