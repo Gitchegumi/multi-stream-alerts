@@ -2,7 +2,85 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mock } from 'node:test';
 
-import { createStoredAlertEvent, __setResolveAlertConfig, __setPrisma } from '../bootstrap';
+import {
+  createStoredAlertEvent,
+  ensureDefaultChannel,
+  __setEnsureWorkspaceAlertDefaults,
+  __setResolveAlertConfig,
+  __setPrisma,
+} from '../bootstrap';
+
+test('ensureDefaultChannel avoids colliding overlay profile display keys', async () => {
+  const previousDefaultSlug = process.env.DEFAULT_CHANNEL_SLUG;
+  const previousDefaultName = process.env.DEFAULT_CHANNEL_NAME;
+  const previousDisplayKey = process.env.INITIAL_DISPLAY_KEY;
+  process.env.DEFAULT_CHANNEL_SLUG = 'default-channel';
+  process.env.DEFAULT_CHANNEL_NAME = 'Default Channel';
+  process.env.INITIAL_DISPLAY_KEY = 'colliding-display-key';
+
+  const createMock = mock.fn(async (args: { data: Record<string, unknown> }) => ({
+    id: `profile-${String(args.data.slug)}`,
+    ...args.data,
+  }));
+  const findUniqueMock = mock.fn(async (args: { where: Record<string, unknown> }) => {
+    if ('channelId_slug' in args.where) {
+      return null;
+    }
+    if (args.where.displayKey === 'colliding-display-key') {
+      return { id: 'existing-profile' };
+    }
+    return null;
+  });
+  const ensureDefaultsMock = mock.fn(async () => undefined);
+
+  const prismaMock = {
+    channel: {
+      upsert: mock.fn(async () => ({ id: 'channel-1', slug: 'default-channel' })),
+    },
+    overlayProfile: {
+      findUnique: findUniqueMock,
+      create: createMock,
+    },
+  };
+
+  __setPrisma(prismaMock as unknown as Parameters<typeof __setPrisma>[0]);
+  __setEnsureWorkspaceAlertDefaults(
+    ensureDefaultsMock as unknown as Parameters<typeof __setEnsureWorkspaceAlertDefaults>[0],
+  );
+
+  try {
+    await ensureDefaultChannel();
+
+    const createCalls = createMock.mock.calls as unknown as Array<{
+      arguments: [{ data: Record<string, unknown> }];
+    }>;
+    assert.equal(createCalls.length, 3);
+
+    const createdProfiles = createCalls.map((call) => call.arguments[0].data);
+    const mainProfile = createdProfiles.find((profile) => profile.slug === 'main');
+    assert.ok(mainProfile);
+    assert.notEqual(mainProfile.displayKey, 'colliding-display-key');
+    assert.equal(String(mainProfile.displayKey).length, 64);
+  } finally {
+    if (previousDefaultSlug === undefined) {
+      delete process.env.DEFAULT_CHANNEL_SLUG;
+    } else {
+      process.env.DEFAULT_CHANNEL_SLUG = previousDefaultSlug;
+    }
+    if (previousDefaultName === undefined) {
+      delete process.env.DEFAULT_CHANNEL_NAME;
+    } else {
+      process.env.DEFAULT_CHANNEL_NAME = previousDefaultName;
+    }
+    if (previousDisplayKey === undefined) {
+      delete process.env.INITIAL_DISPLAY_KEY;
+    } else {
+      process.env.INITIAL_DISPLAY_KEY = previousDisplayKey;
+    }
+    __setEnsureWorkspaceAlertDefaults(undefined);
+    __setPrisma(undefined);
+  }
+});
 
 test('createStoredAlertEvent with layoutIdOverride uses layout defaults over config values', async () => {
   const resolveMock = mock.fn(async () => ({
