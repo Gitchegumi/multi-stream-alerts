@@ -45,7 +45,7 @@ Important deployment-specific values:
 
 ```env
 PUBLIC_BASE_URL=https://<your-alerts-domain>
-NEXT_PUBLIC_DOCS_URL=https://gitchegumi.github.io/multi-stream-alerts/
+# NEXT_PUBLIC_DOCS_URL=
 INGRESS_PUBLIC_BASE_URL=https://<your-alerts-domain>
 NEXTAUTH_URL=https://<your-alerts-domain>
 APP_DATA_PATH=/path/to/your/app/data
