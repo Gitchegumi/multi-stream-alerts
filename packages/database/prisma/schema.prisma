@@ -73,6 +73,7 @@ model User {
   inviteCodes       InviteCode[]           @relation("InviteCodeCreator")
   inviteRedemptions InviteCodeRedemption[]
   localCredential   LocalCredential?
+  linkedAccounts    LinkedAccount[]
 
   @@unique([authProvider, authSubject])
   @@map("users")
@@ -402,4 +403,25 @@ model DeduplicationKey {
 
   @@unique([provider, rawEventId, channelId])
   @@map("deduplication_keys")
+}
+
+model LinkedAccount {
+  id                    String    @id @default(cuid())
+  userId                String    @map("user_id")
+  platform              String
+  platformAccountId     String    @map("platform_account_id")
+  platformAccountName   String?   @map("platform_account_name")
+  encryptedAccessToken  String    @map("encrypted_access_token")
+  encryptedRefreshToken String?   @map("encrypted_refresh_token")
+  tokenExpiresAt        DateTime? @map("token_expires_at")
+  isActive              Boolean   @default(true) @map("is_active")
+  isPrimary             Boolean   @default(false) @map("is_primary")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platform, platformAccountId])
+  @@index([userId, platform])
+  @@map("linked_accounts")
 }
