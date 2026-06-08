@@ -23,16 +23,19 @@
     "apps/web": {
       "package-name": "alerts-web",
       "include-component-in-tag": true,
+      "skip-github-release": true,
       "changelog-path": "CHANGELOG.md"
     },
     "apps/ingress": {
       "package-name": "alerts-ingress",
       "include-component-in-tag": true,
+      "skip-github-release": true,
       "changelog-path": "CHANGELOG.md"
     },
     "apps/worker": {
       "package-name": "alerts-worker",
       "include-component-in-tag": true,
+      "skip-github-release": true,
       "changelog-path": "CHANGELOG.md"
     }
   }
