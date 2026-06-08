@@ -5,22 +5,32 @@ import { authOptions } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-async function requireAdmin() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return { error: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
-  }
-  if (session.user.role !== 'admin') {
-    return { error: NextResponse.json({ error: 'Admin access required' }, { status: 403 }) };
-  }
-  return { userId: session.user.id };
-}
+export type HandlerDeps = {
+  prisma: typeof prisma;
+  getServerSession: typeof getServerSession;
+};
+
+const defaultDeps: HandlerDeps = {
+  prisma,
+  getServerSession,
+};
 
 export async function GET() {
-  const guard = await requireAdmin();
-  if ('error' in guard) return guard.error;
+  return handleGet(defaultDeps);
+}
 
-  const channels = await prisma.channel.findMany({
+export async function handleGet(
+  deps: HandlerDeps = defaultDeps,
+) {
+  const session = await deps.getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
+  if (session.user.role !== 'admin') {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+  }
+
+  const channels = await deps.prisma.channel.findMany({
     orderBy: { createdAt: 'asc' },
     select: {
       id: true,

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { handleGet, type HandlerDeps } from '../route.ts';
 
 function makeDeps(overrides: { role?: string | null; userId?: string; channels?: unknown[] } = {}) {
   return {
@@ -12,48 +13,12 @@ function makeDeps(overrides: { role?: string | null; userId?: string; channels?:
         findMany: async () => overrides.channels ?? [],
       },
     },
-  };
-}
-
-async function getRoute(deps: ReturnType<typeof makeDeps>) {
-  // Re-evaluate route with injected deps by importing fresh module
-  const { GET: rawGET } = await import('../route.ts');
-
-  // Since the real GET depends on next-auth and @multi-stream-alerts/database,
-  // which are hard to stub in ESM, we test the response contract by
-  // replicating the guard + mapping logic inline.
-  const session = await deps.getServerSession();
-  if (!session?.user?.id) {
-    return new Response(JSON.stringify({ error: 'Authentication required' }), { status: 401 });
-  }
-  if (session.user.role !== 'admin') {
-    return new Response(JSON.stringify({ error: 'Admin access required' }), { status: 403 });
-  }
-
-  const channels = await deps.prisma.channel.findMany();
-  const total = channels.length;
-  const workspaces = (channels as any[]).map((ch) => ({
-    id: ch.id,
-    name: ch.name,
-    slug: ch.slug,
-    createdAt: ch.createdAt.toISOString(),
-    updatedAt: ch.updatedAt.toISOString(),
-    owner: ch.owner
-      ? {
-          id: ch.owner.id,
-          email: ch.owner.email,
-          displayName: ch.owner.displayName,
-        }
-      : null,
-    memberCount: ch._count.memberships,
-  }));
-
-  return new Response(JSON.stringify({ total, workspaces }), { status: 200 });
+  } as unknown as HandlerDeps;
 }
 
 test('GET returns 401 when unauthenticated', async () => {
   const deps = makeDeps({ role: null });
-  const res = await getRoute(deps);
+  const res = await handleGet(deps);
   assert.equal(res.status, 401);
   const body = await res.json();
   assert.equal(body.error, 'Authentication required');
@@ -61,7 +26,7 @@ test('GET returns 401 when unauthenticated', async () => {
 
 test('GET returns 403 for non-admin user', async () => {
   const deps = makeDeps({ role: 'owner' });
-  const res = await getRoute(deps);
+  const res = await handleGet(deps);
   assert.equal(res.status, 403);
   const body = await res.json();
   assert.equal(body.error, 'Admin access required');
@@ -86,7 +51,7 @@ test('GET returns workspace metadata for admin', async () => {
       },
     ],
   });
-  const res = await getRoute(deps);
+  const res = await handleGet(deps);
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.total, 1);
@@ -122,7 +87,7 @@ test('GET handles workspace without owner', async () => {
       },
     ],
   });
-  const res = await getRoute(deps);
+  const res = await handleGet(deps);
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.total, 1);
