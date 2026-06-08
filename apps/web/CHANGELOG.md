@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.1.9](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.1.8...alerts-web-v0.1.9) (2026-06-08)
+
+
+### Features
+
+* **admin:** add admin workspace overview page and API ([2cb63cc](https://github.com/Gitchegumi/multi-stream-alerts/commit/2cb63cc36c1325533c0d9100aabd1617a37239e3)), closes [#56](https://github.com/Gitchegumi/multi-stream-alerts/issues/56)
+* **admin:** workspace overview for admin panel ([#56](https://github.com/Gitchegumi/multi-stream-alerts/issues/56)) ([d6344fd](https://github.com/Gitchegumi/multi-stream-alerts/commit/d6344fd52002ad27ffebd56018e189017ba696a1))
+* **alerts:** add canvas workspace and docs site ([431c479](https://github.com/Gitchegumi/multi-stream-alerts/commit/431c479cba765ad03ef425ec85868371581e3b96))
+* **overlays:** add canvas runtime schema editor ([c35abb5](https://github.com/Gitchegumi/multi-stream-alerts/commit/c35abb54eee8b559fcef05375c17b345e67cb9dc)), closes [#60](https://github.com/Gitchegumi/multi-stream-alerts/issues/60)
+* **overlays:** make canvas editor interactive ([848e0fc](https://github.com/Gitchegumi/multi-stream-alerts/commit/848e0fc6acf37bbfe4d8317dc8fd43546f654737))
+* **web:** add recent alert feed pills ([eee76ea](https://github.com/Gitchegumi/multi-stream-alerts/commit/eee76ea5f5a124829c9ec10e267b5f6ab27da288))
+* **web:** align UI with brand palette ([7790aab](https://github.com/Gitchegumi/multi-stream-alerts/commit/7790aabd05a2fdd0f73f3b70188a8dd29d830e78))
+* **web:** align UI with brand palette ([1e65c59](https://github.com/Gitchegumi/multi-stream-alerts/commit/1e65c5956de67ecce737dbb3dcd360798fcef57f))
+* **web:** embed guide in dashboard ([8f54619](https://github.com/Gitchegumi/multi-stream-alerts/commit/8f54619b91d11b29f171589e85aaff4d1a605c5d))
+* **web:** polish branded dashboard surfaces ([fbb4645](https://github.com/Gitchegumi/multi-stream-alerts/commit/fbb464592dfcdb71586c7eb2972da3a212ea9387))
+
+
+### Bug Fixes
+
+* adjusted height restriction for .component-alert-bindings ([2511c2e](https://github.com/Gitchegumi/multi-stream-alerts/commit/2511c2e92f4a0da108a6490b93ee8ab9447c5a40))
+* **admin-workspaces:** use direct Prisma call instead of internal fetch ([5493dc3](https://github.com/Gitchegumi/multi-stream-alerts/commit/5493dc33425f880d62fb498a12c129caa6e3d159))
+* **overlay:** remove conflicting legacy route ([0ede83e](https://github.com/Gitchegumi/multi-stream-alerts/commit/0ede83e8fd35f0b2d8941c7568b17d71a58e1593))
+* **overlays:** refresh canvas urls and docs ([6fb1384](https://github.com/Gitchegumi/multi-stream-alerts/commit/6fb1384a4d2a33c535089ba3a45e181b0f8aa262))
+* **overlays:** repair canvas editor media controls ([4ff39c3](https://github.com/Gitchegumi/multi-stream-alerts/commit/4ff39c30c19c4057cd43c2f52fea05bc8a05607b))
+* **overlays:** stabilize canvas editor controls ([2bee415](https://github.com/Gitchegumi/multi-stream-alerts/commit/2bee4153bf2cea5be1b31f1285494f0e8124e719))
+* **overlays:** wire canvas assets and test preview ([e5949fe](https://github.com/Gitchegumi/multi-stream-alerts/commit/e5949fe6f64b960e77c4aacbdefcf3fac7bb7b61))
+* **web:** keep dashboard nav exact ([131a51f](https://github.com/Gitchegumi/multi-stream-alerts/commit/131a51fd91b81d595c1d4cec0deca30c3f806b70))
+* **web:** localize recent alert times ([8c233a7](https://github.com/Gitchegumi/multi-stream-alerts/commit/8c233a740e3ddb39349a7d6b7dc083e22aa074d9))
+* **web:** localize update check time ([1e268eb](https://github.com/Gitchegumi/multi-stream-alerts/commit/1e268ebf3cd5372ea93ca7984dc2eb0eeeb53e52))
+* **web:** prevent alerts workspace overlap ([262fc93](https://github.com/Gitchegumi/multi-stream-alerts/commit/262fc93b615866edff65a8227ca93a7617f47561))
+* **web:** redirect guide link to valid docs ([1139320](https://github.com/Gitchegumi/multi-stream-alerts/commit/11393202c88f7791d39b305f22e7b1ac12e8656d))
+* **web:** use valid local time options ([1cc92d3](https://github.com/Gitchegumi/multi-stream-alerts/commit/1cc92d3a78b09ba72378080fb76c8d5231b8a469))
+* **web:** widen alerts dashboard workspace ([376cfaa](https://github.com/Gitchegumi/multi-stream-alerts/commit/376cfaab605d908f99458ecba74a276a17f13459))
+
 ## [0.1.8](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.1.7...alerts-web-v0.1.8) (2026-06-08)
 
 
