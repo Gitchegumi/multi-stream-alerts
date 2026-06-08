@@ -15,7 +15,7 @@ import { INVITE_CODE_COOKIE, validateInviteCodeForCookie } from './oidc-state';
 import { createChannelWithUniqueSlug } from './channel-slug';
 import { readOnboardingConfig } from './onboarding';
 import { encrypt } from './crypto';
-import { consumeLinkingUserId } from '@/lib/linking-state';
+import { consumeLinkingUserId, peekLinkingUserId } from '@/lib/linking-state';
 
 type OidcProfile = Profile & {
   sub?: string;
@@ -283,8 +283,26 @@ export const authOptions: NextAuthOptions = {
       return handleOidcSignIn({ account, profile: oidcProfile }, oidcSignInDeps);
     },
     async jwt({ token, account, profile }) {
+      // Existing sessions already carry our custom claims — short-circuit.
       if (token.userId && token.role) {
         return token;
+      }
+
+      // OAuth linking fallback: the signIn callback may have consumed the
+      // linking cookie, but if the cookie is still present (e.g. token was
+      // regenerated without userId), use it to hydrate the original app user.
+      const linkingUserId = await peekLinkingUserId();
+      if (linkingUserId) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: linkingUserId },
+        });
+        if (dbUser) {
+          token.userId = dbUser.id;
+          token.role = dbUser.role;
+          token.email = dbUser.email;
+          token.name = dbUser.displayName ?? dbUser.email;
+          return token;
+        }
       }
 
       if (token.email) {
@@ -327,6 +345,9 @@ export const authOptions: NextAuthOptions = {
       if (!token.userId || !token.role) {
         throw new Error('Missing authenticated user');
       }
+
+      // Consume any lingering linking cookie — the link has been established.
+      await consumeLinkingUserId();
 
       session.user.id = token.userId;
       session.user.role = token.role;

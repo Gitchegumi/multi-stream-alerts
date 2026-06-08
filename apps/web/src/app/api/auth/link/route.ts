@@ -18,13 +18,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid provider' }, { status: 400 });
   }
 
-  // Verify the caller is authenticated
+  // Verify the caller is authenticated and use our custom userId field
+  // (not token.sub, which may be the OIDC provider subject for OIDC users).
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET });
-  if (!token?.sub) {
+  const userId = token?.userId as string | undefined;
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const linkingToken = await createLinkingToken(token.sub as string);
+  const linkingToken = await createLinkingToken(userId);
   const callbackUrl = `/dashboard/settings/integrations?connected=${provider === 'google' ? 'youtube' : provider}`;
   const response = NextResponse.redirect(
     `/api/auth/signin/${provider}?callbackUrl=${encodeURIComponent(callbackUrl)}`,

@@ -42,13 +42,29 @@ export async function verifyLinkingToken(token: string): Promise<string | null> 
   }
 }
 
-export async function consumeLinkingUserId(): Promise<string | null> {
+/**
+ * Peek at the linking cookie without consuming it.
+ * Use in callbacks that need to know the linking user but shouldn't
+ * delete the cookie yet (e.g. jwt callback before signIn).
+ */
+export async function peekLinkingUserId(): Promise<string | null> {
   const cookieJar = await cookies();
   const token = cookieJar.get(COOKIE_NAME)?.value;
   if (!token) return null;
-
-  cookieJar.delete(COOKIE_NAME);
   return verifyLinkingToken(token);
+}
+
+/**
+ * Read and clear the linking state cookie, returning the user ID.
+ * One-time use — safe to call from signIn callback.
+ */
+export async function consumeLinkingUserId(): Promise<string | null> {
+  const userId = await peekLinkingUserId();
+  if (userId) {
+    const cookieJar = await cookies();
+    cookieJar.delete(COOKIE_NAME);
+  }
+  return userId;
 }
 
 export function linkingCookieOptions() {
