@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.7](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-web-v0.1.6...alerts-web-v0.1.7) (2026-06-08)
+
+
+### Features
+
+* **admin:** add admin workspace overview page and API ([2cb63cc](https://github.com/Gitchegumi/multi-stream-alerts/commit/2cb63cc36c1325533c0d9100aabd1617a37239e3)), closes [#56](https://github.com/Gitchegumi/multi-stream-alerts/issues/56)
+* **admin:** workspace overview for admin panel ([#56](https://github.com/Gitchegumi/multi-stream-alerts/issues/56)) ([d6344fd](https://github.com/Gitchegumi/multi-stream-alerts/commit/d6344fd52002ad27ffebd56018e189017ba696a1))
+
+
+### Bug Fixes
+
+* **admin-workspaces:** use direct Prisma call instead of internal fetch ([5493dc3](https://github.com/Gitchegumi/multi-stream-alerts/commit/5493dc33425f880d62fb498a12c129caa6e3d159))
+
 ## [0.1.6](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-web-v0.1.5...alerts-web-v0.1.6) (2026-06-07)
 
 
