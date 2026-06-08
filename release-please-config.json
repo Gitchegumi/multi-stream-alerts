@@ -5,12 +5,12 @@
   "include-v-in-release-name": true,
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
-  "group-pull-request-title-pattern": "chore(release): release ${branch}",
+  "group-pull-request-title-pattern": "chore${scope}: release${component} ${version}",
   "packages": {
     ".": {
       "package-name": "gitchalerts",
       "include-component-in-tag": false,
-      "pull-request-title-pattern": "chore(release): release ${version}",
+      "pull-request-title-pattern": "chore${scope}: release${component} ${version}",
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
         {
