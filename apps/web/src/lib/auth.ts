@@ -1,5 +1,7 @@
 import type { NextAuthOptions, Profile } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import TwitchProvider from 'next-auth/providers/twitch';
+import GoogleProvider from 'next-auth/providers/google';
 import { cookies } from 'next/headers';
 import {
   prisma,
@@ -12,6 +14,7 @@ import {
 import { INVITE_CODE_COOKIE, validateInviteCodeForCookie } from './oidc-state';
 import { createChannelWithUniqueSlug } from './channel-slug';
 import { readOnboardingConfig } from './onboarding';
+import { encrypt } from './crypto';
 
 type OidcProfile = Profile & {
   sub?: string;
@@ -164,6 +167,35 @@ if (credentialsEnabled) {
   providers.push(buildCredentialsProvider());
 }
 
+const twitchEnabled = !!process.env.TWITCH_CLIENT_ID && !!process.env.TWITCH_CLIENT_SECRET;
+const googleEnabled = !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
+
+if (twitchEnabled) {
+  providers.push(
+    TwitchProvider({
+      clientId: process.env.TWITCH_CLIENT_ID!,
+      clientSecret: process.env.TWITCH_CLIENT_SECRET!,
+      authorization: { params: { scope: '' } },
+    }),
+  );
+}
+
+if (googleEnabled) {
+  providers.push(
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          scope: 'https://www.googleapis.com/auth/youtube.readonly',
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    }),
+  );
+}
+
 export const authOptions: NextAuthOptions = {
   secret: process.env.AUTH_SECRET,
   session: { strategy: 'jwt' },
@@ -184,6 +216,59 @@ export const authOptions: NextAuthOptions = {
       // Credentials sign-in: the authorize callback already validated the
       // password, so short-circuit.
       if (account?.provider === 'credentials') {
+        return true;
+      }
+
+      // OAuth account linking for Twitch / YouTube
+      if (account?.provider === 'twitch' || account?.provider === 'google') {
+        const email = profile?.email;
+        if (!email) {
+          console.warn('OAuth sign-in: no email in profile', { provider: account.provider });
+          return false;
+        }
+
+        const dbUser = await prisma.user.findUnique({ where: { email } });
+        if (!dbUser) {
+          console.warn('OAuth sign-in: no user found for email', { email, provider: account.provider });
+          return false;
+        }
+
+        const platform = account.provider === 'google' ? 'youtube' : 'twitch';
+        const platformAccountName =
+          (profile as Record<string, unknown>)?.name as string | undefined;
+
+        const existingCount = await prisma.linkedAccount.count({
+          where: { userId: dbUser.id, platform },
+        });
+
+        await prisma.linkedAccount.upsert({
+          where: {
+            userId_platform_platformAccountId: {
+              userId: dbUser.id,
+              platform,
+              platformAccountId: account.providerAccountId,
+            },
+          },
+          create: {
+            userId: dbUser.id,
+            platform,
+            platformAccountId: account.providerAccountId,
+            platformAccountName: platformAccountName ?? null,
+            encryptedAccessToken: encrypt(account.access_token ?? ''),
+            encryptedRefreshToken: account.refresh_token ? encrypt(account.refresh_token) : null,
+            tokenExpiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
+            isActive: true,
+            isPrimary: existingCount === 0,
+          },
+          update: {
+            platformAccountName: platformAccountName ?? undefined,
+            encryptedAccessToken: encrypt(account.access_token ?? ''),
+            encryptedRefreshToken: account.refresh_token ? encrypt(account.refresh_token) : null,
+            tokenExpiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
+            isActive: true,
+          },
+        });
+
         return true;
       }
 
@@ -242,7 +327,7 @@ export const authOptions: NextAuthOptions = {
   },
 };
 
-export { oidcEnabled, credentialsEnabled };
+export { oidcEnabled, credentialsEnabled, twitchEnabled, googleEnabled };
 
 export async function handleOidcSignIn(
   {
