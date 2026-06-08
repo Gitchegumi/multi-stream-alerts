@@ -98,14 +98,26 @@ export function NavBar({ user, defaultChannelSlug, versionStatus }: NavBarProps)
           </Link>
         ))}
         {user.role === 'admin' && (
-          <Link
-            href="/dashboard/admin/invites"
-            className={`nav-link${pathname?.startsWith('/dashboard/admin') ? ' nav-link-active' : ''}`}
-            aria-current={pathname?.startsWith('/dashboard/admin') ? 'page' : undefined}
-            onClick={() => setMobileOpen(false)}
-          >
-            Invite Codes
-          </Link>
+          <>
+            <Link
+              href="/dashboard/admin/workspaces"
+              className={`nav-link${pathname?.startsWith('/dashboard/admin/workspaces') ? ' nav-link-active' : ''}`}
+              aria-current={
+                pathname?.startsWith('/dashboard/admin/workspaces') ? 'page' : undefined
+              }
+              onClick={() => setMobileOpen(false)}
+            >
+              Workspaces
+            </Link>
+            <Link
+              href="/dashboard/admin/invites"
+              className={`nav-link${pathname?.startsWith('/dashboard/admin/invites') ? ' nav-link-active' : ''}`}
+              aria-current={pathname?.startsWith('/dashboard/admin/invites') ? 'page' : undefined}
+              onClick={() => setMobileOpen(false)}
+            >
+              Invite Codes
+            </Link>
+          </>
         )}
       </div>
 
