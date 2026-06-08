@@ -15,6 +15,7 @@ import { INVITE_CODE_COOKIE, validateInviteCodeForCookie } from './oidc-state';
 import { createChannelWithUniqueSlug } from './channel-slug';
 import { readOnboardingConfig } from './onboarding';
 import { encrypt } from './crypto';
+import { consumeLinkingUserId } from '@/lib/linking-state';
 
 type OidcProfile = Profile & {
   sub?: string;
@@ -175,7 +176,11 @@ if (twitchEnabled) {
     TwitchProvider({
       clientId: process.env.TWITCH_CLIENT_ID!,
       clientSecret: process.env.TWITCH_CLIENT_SECRET!,
-      authorization: { params: { scope: '' } },
+      authorization: {
+        params: {
+          scope: 'openid user:read:email',
+        },
+      },
     }),
   );
 }
@@ -187,7 +192,7 @@ if (googleEnabled) {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          scope: 'https://www.googleapis.com/auth/youtube.readonly',
+          scope: 'openid email profile https://www.googleapis.com/auth/youtube.readonly',
           access_type: 'offline',
           prompt: 'consent',
         },
@@ -221,15 +226,18 @@ export const authOptions: NextAuthOptions = {
 
       // OAuth account linking for Twitch / YouTube
       if (account?.provider === 'twitch' || account?.provider === 'google') {
-        const email = profile?.email;
-        if (!email) {
-          console.warn('OAuth sign-in: no email in profile', { provider: account.provider });
+        // Read the signed cookie set by /api/auth/link which stores the
+        // currently authenticated user's ID. This binds the linked account
+        // to the user who clicked Connect, not to the OAuth email.
+        const linkingUserId = await consumeLinkingUserId();
+        if (!linkingUserId) {
+          console.warn('OAuth sign-in: missing or invalid linking cookie', { provider: account.provider });
           return false;
         }
 
-        const dbUser = await prisma.user.findUnique({ where: { email } });
+        const dbUser = await prisma.user.findUnique({ where: { id: linkingUserId } });
         if (!dbUser) {
-          console.warn('OAuth sign-in: no user found for email', { email, provider: account.provider });
+          console.warn('OAuth sign-in: no user found for linkingUserId', { linkingUserId, provider: account.provider });
           return false;
         }
 

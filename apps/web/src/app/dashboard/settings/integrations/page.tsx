@@ -52,7 +52,9 @@ export default function IntegrationsPage() {
 
   const handleConnect = (platform: 'twitch' | 'youtube') => {
     const provider = platform === 'youtube' ? 'google' : 'twitch';
-    window.location.href = `/api/auth/signin/${provider}?callbackUrl=/dashboard/settings/integrations?connected=${platform}`;
+    // Use the dedicated linking endpoint which stores the current user's
+    // ID in a signed cookie before redirecting to the OAuth provider.
+    window.location.href = `/api/auth/link?provider=${provider}`;
   };
 
   const handleDisconnect = async (id: string) => {
