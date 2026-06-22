@@ -15,7 +15,7 @@ jobs:
       image: returntocorp/semgrep:latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Run Semgrep
         run: semgrep ci --config p/typescript --config p/javascript --config p/owasp-top-ten --sarif --output semgrep.sarif
