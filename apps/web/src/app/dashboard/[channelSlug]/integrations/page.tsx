@@ -44,6 +44,7 @@ export default async function IntegrationsPage({
 
   return (
     <main className="dashboard-shell">
+      <p className="muted small">Settings / Integrations</p>
       <section className="grid">
         {statuses.map(({ provider, status }) => (
           <div className="panel" key={provider}>

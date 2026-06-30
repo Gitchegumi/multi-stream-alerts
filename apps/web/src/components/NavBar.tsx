@@ -4,28 +4,39 @@ import { useState } from 'react';
 import { usePathname, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import type { getVersionStatus } from '@/lib/update-check';
 
 type NavUser = {
   email: string;
   role: string;
 };
 
+type NavVersionStatus = Awaited<ReturnType<typeof getVersionStatus>>;
+
 type NavBarProps = {
   user: NavUser;
   defaultChannelSlug: string | null;
+  versionStatus: NavVersionStatus;
 };
 
-export function NavBar({ user, defaultChannelSlug }: NavBarProps) {
+export function NavBar({ user, defaultChannelSlug, versionStatus }: NavBarProps) {
   const pathname = usePathname();
   const params = useParams();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const channelSlug = (params?.channelSlug as string | undefined) ?? defaultChannelSlug;
+  const updateLabel = getUpdateLabel(versionStatus.update.status);
+  const updateClass = getUpdateClass(versionStatus.update.status);
+  const latestLabel = versionStatus.update.latest?.tagName ?? null;
+  const statusTitle = latestLabel
+    ? `${versionStatus.build.releaseTag} deployed. Latest release: ${latestLabel}.`
+    : `${versionStatus.build.releaseTag} deployed. Update status: ${updateLabel}.`;
 
   const links = [
     {
       label: 'Dashboard',
       href: channelSlug ? `/dashboard/${encodeURIComponent(channelSlug)}` : '/dashboard',
+      exact: true,
     },
     {
       label: 'Alerts',
@@ -36,24 +47,19 @@ export function NavBar({ user, defaultChannelSlug }: NavBarProps) {
       href: channelSlug ? `/dashboard/${encodeURIComponent(channelSlug)}/assets` : '/dashboard',
     },
     {
-      label: 'Integrations',
-      href: channelSlug
-        ? `/dashboard/${encodeURIComponent(channelSlug)}/integrations`
-        : '/dashboard',
-    },
-    {
       label: 'Settings',
       href: channelSlug ? `/dashboard/${encodeURIComponent(channelSlug)}/settings` : '/dashboard',
     },
     {
-      label: 'Overlay',
-      href: channelSlug ? `/dashboard/${encodeURIComponent(channelSlug)}/overlay` : '/dashboard',
+      label: 'Guide',
+      href: channelSlug ? `/dashboard/${encodeURIComponent(channelSlug)}/guide` : '/dashboard',
     },
   ];
 
-  const isActive = (href: string): boolean => {
+  const isActive = (href: string, exact = false): boolean => {
     if (!pathname) return false;
     if (href === pathname) return true;
+    if (exact) return false;
     if (href !== '/dashboard' && pathname.startsWith(href)) return true;
     if (href === '/dashboard' && pathname === '/dashboard') return true;
     return false;
@@ -63,7 +69,7 @@ export function NavBar({ user, defaultChannelSlug }: NavBarProps) {
     <nav className="nav-bar" aria-label="Main">
       <div className="nav-brand">
         <Link href="/" aria-label="GitcheGumi Alerts – Home">
-          <Image src="/logo.svg" alt="GitcheGumi Alerts logo" width={160} height={40} priority />
+          <Image src="/logo.svg" alt="GitcheGumi Alerts logo" width={320} height={80} priority />
         </Link>
       </div>
 
@@ -84,26 +90,42 @@ export function NavBar({ user, defaultChannelSlug }: NavBarProps) {
           <Link
             key={link.label}
             href={link.href}
-            className={`nav-link${isActive(link.href) ? ' nav-link-active' : ''}`}
-            aria-current={isActive(link.href) ? 'page' : undefined}
+            className={`nav-link${isActive(link.href, link.exact) ? ' nav-link-active' : ''}`}
+            aria-current={isActive(link.href, link.exact) ? 'page' : undefined}
             onClick={() => setMobileOpen(false)}
           >
             {link.label}
           </Link>
         ))}
         {user.role === 'admin' && (
-          <Link
-            href="/dashboard/admin/invites"
-            className={`nav-link${pathname?.startsWith('/dashboard/admin') ? ' nav-link-active' : ''}`}
-            aria-current={pathname?.startsWith('/dashboard/admin') ? 'page' : undefined}
-            onClick={() => setMobileOpen(false)}
-          >
-            Invite Codes
-          </Link>
+          <>
+            <Link
+              href="/dashboard/admin/workspaces"
+              className={`nav-link${pathname?.startsWith('/dashboard/admin/workspaces') ? ' nav-link-active' : ''}`}
+              aria-current={
+                pathname?.startsWith('/dashboard/admin/workspaces') ? 'page' : undefined
+              }
+              onClick={() => setMobileOpen(false)}
+            >
+              Workspaces
+            </Link>
+            <Link
+              href="/dashboard/admin/invites"
+              className={`nav-link${pathname?.startsWith('/dashboard/admin/invites') ? ' nav-link-active' : ''}`}
+              aria-current={pathname?.startsWith('/dashboard/admin/invites') ? 'page' : undefined}
+              onClick={() => setMobileOpen(false)}
+            >
+              Invite Codes
+            </Link>
+          </>
         )}
       </div>
 
       <div className="nav-user">
+        <div className="nav-release" title={statusTitle} aria-label={statusTitle}>
+          <span className="nav-release-version">{versionStatus.build.releaseTag}</span>
+          <span className={`pill ${updateClass}`}>{updateLabel}</span>
+        </div>
         <span className="nav-user-email" title={user.email}>
           {user.email}
         </span>
@@ -113,4 +135,28 @@ export function NavBar({ user, defaultChannelSlug }: NavBarProps) {
       </div>
     </nav>
   );
+}
+
+function getUpdateLabel(status: NavVersionStatus['update']['status']) {
+  switch (status) {
+    case 'update-available':
+      return 'Update available';
+    case 'up-to-date':
+      return 'Up to date';
+    case 'disabled':
+      return 'Updates off';
+    default:
+      return 'Update unknown';
+  }
+}
+
+function getUpdateClass(status: NavVersionStatus['update']['status']) {
+  switch (status) {
+    case 'update-available':
+      return 'pill-warn';
+    case 'up-to-date':
+      return 'pill-ok';
+    default:
+      return 'pill-muted';
+  }
 }

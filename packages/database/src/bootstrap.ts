@@ -1,15 +1,35 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { prisma, toAlertEvent } from './client';
+import { prisma as realPrisma, toAlertEvent } from './client';
 import { publishAlertEvent } from './redis';
-import { ensureWorkspaceAlertDefaults, resolveAlertConfig } from './alert-catalog';
+import {
+  ensureWorkspaceAlertDefaults as realEnsureWorkspaceAlertDefaults,
+  resolveAlertConfig as realResolveAlertConfig,
+} from './alert-catalog';
 import type { AlertEvent, AlertPlatform, AlertType } from '@multi-stream-alerts/shared';
+
+// Test injection hooks — only used in __tests__
+let _resolveAlertConfig = realResolveAlertConfig;
+let _ensureWorkspaceAlertDefaults = realEnsureWorkspaceAlertDefaults;
+let _prisma = realPrisma;
+export function __setResolveAlertConfig(fn: typeof realResolveAlertConfig | undefined) {
+  _resolveAlertConfig = fn ?? realResolveAlertConfig;
+}
+export function __setEnsureWorkspaceAlertDefaults(
+  fn: typeof realEnsureWorkspaceAlertDefaults | undefined,
+) {
+  _ensureWorkspaceAlertDefaults = fn ?? realEnsureWorkspaceAlertDefaults;
+}
+export function __setPrisma(mockPrisma: Partial<typeof realPrisma> | undefined) {
+  _prisma = (mockPrisma ?? realPrisma) as typeof realPrisma;
+}
+export { realResolveAlertConfig as resolveAlertConfig };
 
 export async function ensureDefaultChannel() {
   const slug = requiredEnv('DEFAULT_CHANNEL_SLUG');
   const name = requiredEnv('DEFAULT_CHANNEL_NAME');
   const displayKey = requiredEnv('INITIAL_DISPLAY_KEY');
 
-  const channel = await prisma.channel.upsert({
+  const channel = await _prisma.channel.upsert({
     where: { slug },
     update: { name },
     create: { slug, name },
@@ -20,22 +40,90 @@ export async function ensureDefaultChannel() {
     { slug: 'vertical', name: 'Vertical' },
     { slug: 'test', name: 'Test' },
   ]) {
-    await prisma.overlayProfile.upsert({
+    const existingProfile = await _prisma.overlayProfile.findUnique({
       where: { channelId_slug: { channelId: channel.id, slug: profile.slug } },
-      update: {},
-      create: {
-        channelId: channel.id,
-        slug: profile.slug,
-        name: profile.name,
-        displayKey: profile.slug === 'main' ? displayKey : randomBytes(32).toString('hex'),
-        settingsJson: {},
-      },
+    });
+
+    if (existingProfile) {
+      continue;
+    }
+
+    await createOverlayProfileWithUniqueKey({
+      channelId: channel.id,
+      slug: profile.slug,
+      name: profile.name,
+      preferredDisplayKey: profile.slug === 'main' ? displayKey : undefined,
     });
   }
 
-  await ensureWorkspaceAlertDefaults(channel.id);
+  await _ensureWorkspaceAlertDefaults(channel.id);
 
   return channel;
+}
+
+async function createOverlayProfileWithUniqueKey(input: {
+  channelId: string;
+  slug: string;
+  name: string;
+  preferredDisplayKey?: string;
+}) {
+  let preferredDisplayKey = input.preferredDisplayKey;
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const displayKey = await resolveUniqueOverlayDisplayKey(preferredDisplayKey);
+
+    try {
+      return await _prisma.overlayProfile.create({
+        data: {
+          channelId: input.channelId,
+          slug: input.slug,
+          name: input.name,
+          displayKey,
+          settingsJson: {},
+        },
+      });
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) {
+        throw error;
+      }
+
+      const existingProfile = await _prisma.overlayProfile.findUnique({
+        where: { channelId_slug: { channelId: input.channelId, slug: input.slug } },
+      });
+      if (existingProfile) {
+        return existingProfile;
+      }
+
+      preferredDisplayKey = undefined;
+    }
+  }
+
+  throw new Error(`Could not create overlay profile "${input.slug}" with a unique display key`);
+}
+
+async function resolveUniqueOverlayDisplayKey(preferredDisplayKey?: string) {
+  if (preferredDisplayKey) {
+    const existing = await _prisma.overlayProfile.findUnique({
+      where: { displayKey: preferredDisplayKey },
+      select: { id: true },
+    });
+    if (!existing) {
+      return preferredDisplayKey;
+    }
+  }
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const candidate = randomBytes(32).toString('hex');
+    const existing = await _prisma.overlayProfile.findUnique({
+      where: { displayKey: candidate },
+      select: { id: true },
+    });
+    if (!existing) {
+      return candidate;
+    }
+  }
+
+  throw new Error('Could not generate a unique overlay display key');
 }
 
 export async function createStoredAlertEvent(input: {
@@ -54,7 +142,7 @@ export async function createStoredAlertEvent(input: {
   rawPayload?: unknown;
   layoutIdOverride?: string;
 }): Promise<AlertEvent | null> {
-  const config = await resolveAlertConfig({
+  const config = await _resolveAlertConfig({
     channelId: input.channelId,
     platform: input.platform,
     type: input.type,
@@ -73,12 +161,12 @@ export async function createStoredAlertEvent(input: {
 
   const layout =
     input.layoutIdOverride !== undefined
-      ? await prisma.workspaceAlertLayout.findFirst({
+      ? await _prisma.workspaceAlertLayout.findFirst({
           where: { id: input.layoutIdOverride, channelId: input.channelId },
         })
       : config.layout;
   const eventType = config.alertEventType;
-  const row = await prisma.alertEvent.create({
+  const row = await _prisma.alertEvent.create({
     data: {
       id: randomUUID(),
       channelId: input.channelId,
@@ -88,9 +176,15 @@ export async function createStoredAlertEvent(input: {
       layoutId: layout?.id,
       layoutName: layout?.name,
       layoutStyle: layout?.style,
-      durationMs: config.durationMs ?? layout?.defaultDurationMs,
-      volume: config.volume ?? layout?.defaultVolume,
-      templateText: config.templateText,
+      durationMs:
+        input.layoutIdOverride !== undefined
+          ? layout?.defaultDurationMs
+          : (config.durationMs ?? layout?.defaultDurationMs),
+      volume:
+        input.layoutIdOverride !== undefined
+          ? layout?.defaultVolume
+          : (config.volume ?? layout?.defaultVolume),
+      templateText: input.layoutIdOverride !== undefined ? undefined : config.templateText,
       visualAssetUrl: layout?.visualAssetId
         ? `/api/assets/${layout.visualAssetId}/content`
         : layout?.visualAssetUrl,
@@ -139,7 +233,7 @@ export async function claimDeduplicationKey(input: {
   channelId: string;
 }) {
   try {
-    await prisma.deduplicationKey.create({ data: input });
+    await _prisma.deduplicationKey.create({ data: input });
     return true;
   } catch (error) {
     if (isUniqueConstraintError(error)) {

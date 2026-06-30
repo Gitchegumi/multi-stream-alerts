@@ -1,6 +1,6 @@
 {
   "name": "@multi-stream-alerts/worker",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,7 +15,7 @@
     "@multi-stream-alerts/shared": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^25.9.1",
+    "@types/node": "^26.0.1",
     "tsx": "^4.19.2",
     "typescript": "^6.0.3"
   }

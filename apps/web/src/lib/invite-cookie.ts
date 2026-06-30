@@ -8,7 +8,7 @@ import { INVITE_CODE_COOKIE, INVITE_CODE_COOKIE_MAX_AGE_SECONDS } from './oidc-s
  * (which land on the public HTTPS domain via Nginx Proxy Manager) are marked
  * `secure=true` even when Next.js sees the internal HTTP connection.
  */
-function isSecureRequest(): boolean {
+export function isSecureRequest(): boolean {
   if (process.env.NODE_ENV !== 'production') {
     return false;
   }

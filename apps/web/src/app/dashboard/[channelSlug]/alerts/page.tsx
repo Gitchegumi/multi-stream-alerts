@@ -6,7 +6,9 @@ import {
   toAlertEvent,
 } from '@multi-stream-alerts/database';
 import { requireDashboardSession } from '@/lib/session';
-import { AlertCatalogManager } from '@/components/AlertCatalogManager';
+import { CanvasWorkspace } from '@/components/CanvasWorkspace';
+import { RecentAlertFeed } from '@/components/RecentAlertFeed';
+import { normalizeCanvasSettings } from '@/lib/canvas-schema';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +16,10 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
   const session = await requireDashboardSession();
   const { channelSlug } = await params;
 
-  const channel = await prisma.channel.findUnique({ where: { slug: channelSlug } });
+  const channel = await prisma.channel.findUnique({
+    where: { slug: channelSlug },
+    include: { overlayProfiles: { orderBy: { createdAt: 'asc' } } },
+  });
   if (!channel) notFound();
 
   const canView = await canViewChannel(session.user.id, session.user.role, channel.id);
@@ -35,64 +40,60 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
       displayName: config.alertEventType.displayName,
     },
   }));
-  const alertLayouts = alertSetup.layouts.map((layout) => ({
-    id: layout.id,
-    name: layout.name,
-    style: layout.style,
-    visualAssetUrl: layout.visualAssetUrl,
-    soundAssetUrl: layout.soundAssetUrl,
-    visualAssetId: layout.visualAssetId,
-    soundAssetId: layout.soundAssetId,
-    defaultDurationMs: layout.defaultDurationMs,
-    defaultVolume: layout.defaultVolume,
-    isSystemPreset: layout.isSystemPreset,
-  }));
-
   const recentEvents = await prisma.alertEvent.findMany({
     where: { channelId: channel.id },
     orderBy: { createdAt: 'desc' },
     take: 5,
   });
-
   const assets = await prisma.workspaceAsset.findMany({
     where: { channelId: channel.id },
     orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      assetType: true,
-      originalFilename: true,
-      externalUrl: true,
-    },
+  });
+
+  const publicBaseUrl = process.env.PUBLIC_BASE_URL ?? 'https://<your-alerts-domain>';
+  const enabledEventKeys = alertConfigs
+    .filter((config) => config.enabled)
+    .map((config) => config.alertEventType.eventKey);
+  const canvases = channel.overlayProfiles.map((profile) => {
+    const settings = readCanvasSettings(profile.settingsJson, enabledEventKeys);
+    return {
+      id: profile.id,
+      name: profile.name,
+      slug: profile.slug,
+      displayKey: profile.displayKey,
+      isActive: profile.isActive,
+      updatedAt: profile.updatedAt.toISOString(),
+      url: `${publicBaseUrl}/overlay/${channel.slug}/${profile.slug}?displayKey=${encodeURIComponent(
+        profile.displayKey,
+      )}`,
+      settings,
+    };
   });
 
   return (
     <main className="dashboard-shell">
-      <AlertCatalogManager
+      <CanvasWorkspace
         channelId={channel.id}
         channelSlug={channel.slug}
-        initialConfigs={alertConfigs}
-        initialLayouts={alertLayouts}
-        initialAssets={assets}
+        initialCanvases={canvases}
+        alertConfigs={alertConfigs}
+        assets={assets.map((asset) => ({
+          id: asset.id,
+          assetType: asset.assetType,
+          originalFilename: asset.originalFilename,
+          externalUrl: asset.externalUrl,
+          previewUrl: asset.externalUrl ?? `/api/assets/${encodeURIComponent(asset.id)}/content`,
+        }))}
       />
 
       <section className="panel" style={{ marginTop: 16 }}>
         <h2>Recent alerts</h2>
-        {recentEvents.length === 0 ? (
-          <p className="muted">No alerts have been received yet.</p>
-        ) : (
-          recentEvents.map((row) => {
-            const event = toAlertEvent(row);
-            return (
-              <div className="event-row" key={event.id}>
-                <strong>
-                  {event.platform} / {event.type} from {event.displayName}
-                </strong>
-                <span className="muted">{new Date(event.createdAt).toLocaleString()}</span>
-              </div>
-            );
-          })
-        )}
+        <RecentAlertFeed events={recentEvents.map(toAlertEvent)} />
       </section>
     </main>
   );
+}
+
+function readCanvasSettings(value: unknown, fallbackEventKeys: string[]) {
+  return normalizeCanvasSettings(value, fallbackEventKeys).settings;
 }

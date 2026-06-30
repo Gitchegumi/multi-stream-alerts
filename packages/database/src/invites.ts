@@ -6,6 +6,7 @@ import { encryptSecret } from './secrets';
 const DEFAULT_CODE_LENGTH = 16;
 // Skip lookalikes: 0/O, 1/I/L.
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'.replace(/[0O1IL]/g, '');
+const MAX_UNBIASED_BYTE = Math.floor(256 / ALPHABET.length) * ALPHABET.length;
 
 export type InviteCodeSummary = {
   id: string;
@@ -48,14 +49,20 @@ export class InviteCodeError extends Error {
 
 export function generateInviteCode(length: number = DEFAULT_CODE_LENGTH): string {
   const safeLength = Math.max(8, Math.min(48, Math.floor(length)));
-  const bytes = randomBytes(safeLength);
   let out = '';
-  for (let i = 0; i < safeLength; i++) {
-    const byte = bytes[i] ?? 0;
+  let generated = 0;
+
+  while (generated < safeLength) {
+    const byte = randomBytes(1)[0] ?? 0;
+    if (byte >= MAX_UNBIASED_BYTE) {
+      continue;
+    }
+
     const char = ALPHABET[byte % ALPHABET.length];
     if (!char) continue;
     out += char;
-    if (i > 0 && i < safeLength - 1 && (i + 1) % 4 === 0) {
+    generated += 1;
+    if (generated > 0 && generated < safeLength && generated % 4 === 0) {
       out += '-';
     }
   }

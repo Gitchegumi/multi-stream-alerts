@@ -45,6 +45,7 @@ Important deployment-specific values:
 
 ```env
 PUBLIC_BASE_URL=https://<your-alerts-domain>
+# NEXT_PUBLIC_DOCS_URL=
 INGRESS_PUBLIC_BASE_URL=https://<your-alerts-domain>
 NEXTAUTH_URL=https://<your-alerts-domain>
 APP_DATA_PATH=/path/to/your/app/data
@@ -53,6 +54,9 @@ UPLOAD_DIR=/app/uploads
 STORAGE_PROVIDER=local
 WEB_PORT=3000
 INGRESS_PORT=8080
+GITCHALERTS_VERSION=v0.1.0
+UPDATE_CHECK_ENABLED=true
+UPDATE_CHECK_REPO=Gitchegumi/multi-stream-alerts
 ```
 
 `NEXTAUTH_URL` must match the browser-facing origin used to open the dashboard. For reverse proxy deployments, use `https://<your-alerts-domain>`. For local-only testing without a proxy, use the local origin you are opening in the browser.
@@ -63,7 +67,7 @@ Set `INITIAL_DISPLAY_KEY` to a long random value before first startup. The defau
 
 The `.env` file is for instance plumbing and bootstrap values only:
 
-- Public origins and ports (`PUBLIC_BASE_URL`, `INGRESS_PUBLIC_BASE_URL`, `NEXTAUTH_URL`, `WEB_PORT`, `INGRESS_PORT`).
+- Public origins and ports (`PUBLIC_BASE_URL`, `NEXT_PUBLIC_DOCS_URL`, `INGRESS_PUBLIC_BASE_URL`, `NEXTAUTH_URL`, `WEB_PORT`, `INGRESS_PORT`).
 - Database, Redis, upload, and optional S3 storage settings.
 - Auth/session/OIDC settings (`AUTH_SECRET`, `AUTH_OIDC_*`, onboarding flags, and `INITIAL_ADMIN_EMAIL`).
 - Bootstrap defaults (`DEFAULT_CHANNEL_*`, `INITIAL_DISPLAY_KEY`) and the encryption-at-rest key (`INSTANCE_ENCRYPTION_KEY`).
@@ -204,12 +208,12 @@ Dashboard routes and dashboard API routes require OIDC.
 Overlays:
 
 ```text
-https://<your-alerts-domain>/overlay/main?displayKey=<valid-display-key>
-https://<your-alerts-domain>/overlay/vertical?displayKey=<valid-display-key>
-https://<your-alerts-domain>/overlay/test?displayKey=<valid-display-key>
+https://<your-alerts-domain>/overlay/<your-channel-slug>/main?displayKey=<valid-display-key>
+https://<your-alerts-domain>/overlay/<your-channel-slug>/vertical?displayKey=<valid-display-key>
+https://<your-alerts-domain>/overlay/<your-channel-slug>/test?displayKey=<valid-display-key>
 ```
 
-Overlay routes do not use cookies or OIDC. They require a valid `displayKey`, scoped to one overlay profile and its channel.
+Overlay routes do not use cookies or OIDC. They require a valid `displayKey`, channel slug, and canvas/profile slug match.
 
 Event stream:
 
@@ -339,6 +343,19 @@ Start the stack after configuring `.env`:
 docker compose up --build
 ```
 
+For self-hosted production deployments, pin a readable release tag instead of
+using `latest`:
+
+```env
+GITCHALERTS_VERSION=v0.1.0
+```
+
+Compose references the release-tagged GHCR images and still keeps local `build`
+settings for development. Published images also include `sha-<shortsha>` tags
+and OCI labels for release version, Git revision, source, title, and
+description. See [Release and Container Versioning](docs/releases.md) for the
+maintainer release process.
+
 Services:
 
 ```text
@@ -421,18 +438,18 @@ https://<your-alerts-domain>/api/webhooks/youtube/<your-channel-slug>
 Use the overlay URL shown in the dashboard for the profile you want:
 
 ```text
-https://<your-alerts-domain>/overlay/main?displayKey=<valid-display-key>
+https://<your-alerts-domain>/overlay/<your-channel-slug>/main?displayKey=<valid-display-key>
 ```
 
 Use a transparent browser source background. Overlay pages are full-screen, display-only, and do not expose dashboard controls.
 
 ## Overlay Setup
 
-Overlay URLs are managed from the dashboard at **Dashboard → Overlay Profiles**. Each profile (e.g., `main`, `vertical`, `test`) has a dedicated overlay URL with a unique `displayKey`.
+Overlay URLs are managed from the dashboard at **Dashboard > Alerts**. Each canvas has a dedicated browser-source URL with a unique `displayKey`.
 
 ### Display keys
 
-- A `displayKey` is a long random string scoped to one overlay profile and its channel.
+- A `displayKey` is a long random string that must match the channel slug and canvas/profile slug in the browser-source URL.
 - It grants **overlay-only access**: the browser source can connect to the SSE event stream and load assets for that same workspace, but it cannot open dashboard pages or act as a session.
 - Display keys are **not** user passwords or OIDC tokens. They are separate credentials meant for OBS / Meld browser sources.
 

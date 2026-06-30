@@ -8,6 +8,9 @@ import {
   toAlertEvent,
 } from '@multi-stream-alerts/database';
 import { requireDashboardSession } from '@/lib/session';
+import { getVersionStatus } from '@/lib/update-check';
+import { RecentAlertFeed } from '@/components/RecentAlertFeed';
+import { UserLocalTime } from '@/components/UserLocalTime';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -29,24 +32,25 @@ export default async function ChannelDashboardPage({
   const canView = await canViewChannel(session.user.id, session.user.role, channel.id);
   if (!canView) redirect('/dashboard?error=forbidden');
 
-  const [alertSetup, recentEvents, storageUsage, storageSettings] = await Promise.all([
-    getWorkspaceAlertSetup(channel.id),
-    prisma.alertEvent.findMany({
-      where: { channelId: channel.id },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    }),
-    getWorkspaceStorageUsage(channel.id),
-    getWorkspaceStorageSettings(channel.id),
-  ]);
+  const [alertSetup, recentEvents, storageUsage, storageSettings, versionStatus] =
+    await Promise.all([
+      getWorkspaceAlertSetup(channel.id),
+      prisma.alertEvent.findMany({
+        where: { channelId: channel.id },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      }),
+      getWorkspaceStorageUsage(channel.id),
+      getWorkspaceStorageSettings(channel.id),
+      getVersionStatus(process.env, { force: true }),
+    ]);
 
   const activeAlertsCount = alertSetup.configs.filter((c) => c.enabled).length;
-
   const navCards = [
     {
       label: 'Alerts',
       href: `/dashboard/${encodeURIComponent(channel.slug)}/alerts`,
-      description: 'Configure alert types and layouts',
+      description: 'Manage canvases, browser-source URLs, and alert assignments',
     },
     {
       label: 'Assets',
@@ -54,19 +58,14 @@ export default async function ChannelDashboardPage({
       description: 'Manage images, videos, and audio files',
     },
     {
-      label: 'Integrations',
-      href: `/dashboard/${encodeURIComponent(channel.slug)}/integrations`,
-      description: 'Connect Twitch, YouTube, Ko-fi',
-    },
-    {
-      label: 'Overlay',
-      href: `/dashboard/${encodeURIComponent(channel.slug)}/overlay`,
-      description: 'Copy overlay URLs for OBS',
-    },
-    {
       label: 'Settings',
       href: `/dashboard/${encodeURIComponent(channel.slug)}/settings`,
-      description: 'Workspace name and danger zone',
+      description: 'Workspace settings and integrations',
+    },
+    {
+      label: 'Guide',
+      href: `/dashboard/${encodeURIComponent(channel.slug)}/guide`,
+      description: 'User and developer documentation',
     },
   ];
 
@@ -98,21 +97,57 @@ export default async function ChannelDashboardPage({
 
       <section className="panel" style={{ marginTop: 16 }}>
         <h2>Recent alerts</h2>
-        {recentEvents.length === 0 ? (
-          <p className="muted">No alerts have been received yet.</p>
-        ) : (
-          recentEvents.map((row) => {
-            const event = toAlertEvent(row);
-            return (
-              <div className="event-row" key={event.id}>
-                <strong>
-                  {event.platform} / {event.type} from {event.displayName}
-                </strong>
-                <span className="muted">{new Date(event.createdAt).toLocaleString()}</span>
-              </div>
-            );
-          })
-        )}
+        <RecentAlertFeed events={recentEvents.map(toAlertEvent)} />
+      </section>
+
+      <section className="panel version-panel" style={{ marginTop: 16 }}>
+        <div className="version-panel-header">
+          <div>
+            <h2>Deployment</h2>
+            <p className="muted small">Current release and container build metadata.</p>
+          </div>
+          {versionStatus.update.status === 'update-available' ? (
+            <span className="pill pill-warn">Update available</span>
+          ) : versionStatus.update.status === 'up-to-date' ? (
+            <span className="pill pill-ok">Up to date</span>
+          ) : versionStatus.update.status === 'disabled' ? (
+            <span className="pill pill-muted">Update checks off</span>
+          ) : (
+            <span className="pill pill-muted">Update unknown</span>
+          )}
+        </div>
+
+        <dl className="version-grid">
+          <div>
+            <dt>Project release</dt>
+            <dd>{versionStatus.build.releaseTag}</dd>
+          </div>
+          <div>
+            <dt>Commit</dt>
+            <dd>{versionStatus.build.shortCommitSha ?? 'unknown'}</dd>
+          </div>
+          {Object.entries(versionStatus.build.serviceVersions).map(([service, version]) => (
+            <div key={service}>
+              <dt>{service} service</dt>
+              <dd>{version}</dd>
+            </div>
+          ))}
+        </dl>
+
+        {versionStatus.update.latest ? (
+          <p className="muted small">
+            Latest release:{' '}
+            <a href={versionStatus.update.latest.htmlUrl}>{versionStatus.update.latest.tagName}</a>
+            {versionStatus.update.checkedAt ? (
+              <>
+                {' checked '}
+                <UserLocalTime value={versionStatus.update.checkedAt} />
+              </>
+            ) : null}
+          </p>
+        ) : versionStatus.update.error ? (
+          <p className="muted small">Latest release could not be checked.</p>
+        ) : null}
       </section>
     </main>
   );

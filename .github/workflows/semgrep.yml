@@ -15,7 +15,7 @@ jobs:
       image: returntocorp/semgrep:latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Run Semgrep
         run: semgrep ci --config p/typescript --config p/javascript --config p/owasp-top-ten --sarif --output semgrep.sarif
@@ -24,6 +24,6 @@ jobs:
 
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: semgrep.sarif

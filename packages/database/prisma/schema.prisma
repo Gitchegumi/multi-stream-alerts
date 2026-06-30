@@ -238,6 +238,7 @@ model WorkspaceAlertLayout {
   visualAssetId     String?                @map("visual_asset_id")
   soundAssetId      String?                @map("sound_asset_id")
   animationSettings Json                   @default("{}") @map("animation_settings")
+  editorLayout      Json                   @default("{}") @map("editor_layout")
   defaultDurationMs Int                    @default(6500) @map("default_duration_ms")
   defaultVolume     Int                    @default(80) @map("default_volume")
   isSystemPreset    Boolean                @default(false) @map("is_system_preset")
