@@ -14,7 +14,7 @@ import {
 import { INVITE_CODE_COOKIE, validateInviteCodeForCookie } from './oidc-state';
 import { createChannelWithUniqueSlug } from './channel-slug';
 import { readOnboardingConfig } from './onboarding';
-import { encrypt } from './crypto';
+import { encrypt } from '@multi-stream-alerts/shared';
 import { consumeLinkingUserId, peekLinkingUserId } from '@/lib/linking-state';
 
 type OidcProfile = Profile & {
@@ -234,24 +234,31 @@ export const authOptions: NextAuthOptions = {
 
       // OAuth account linking for Twitch / YouTube
       if (account?.provider === 'twitch' || account?.provider === 'google') {
-        // Read the signed cookie set by /api/auth/link which stores the
+        // Peek at the signed cookie set by /api/auth/link which stores the
         // currently authenticated user's ID. This binds the linked account
         // to the user who clicked Connect, not to the OAuth email.
-        const linkingUserId = await consumeLinkingUserId();
+        // Do NOT consume (delete) the cookie here — the jwt callback needs
+        // to read it again to hydrate the session as the original app user.
+        const linkingUserId = await peekLinkingUserId();
         if (!linkingUserId) {
-          console.warn('OAuth sign-in: missing or invalid linking cookie', { provider: account.provider });
+          console.warn('OAuth sign-in: missing or invalid linking cookie', {
+            provider: account.provider,
+          });
           return false;
         }
 
         const dbUser = await prisma.user.findUnique({ where: { id: linkingUserId } });
         if (!dbUser) {
-          console.warn('OAuth sign-in: no user found for linkingUserId', { linkingUserId, provider: account.provider });
+          console.warn('OAuth sign-in: no user found for linkingUserId', {
+            linkingUserId,
+            provider: account.provider,
+          });
           return false;
         }
 
         const platform = account.provider === 'google' ? 'youtube' : 'twitch';
-        const platformAccountName =
-          (profile as Record<string, unknown>)?.name as string | undefined;
+        const platformAccountName = (profile as Record<string, unknown>)?.name as
+          string | undefined;
 
         const existingCount = await prisma.linkedAccount.count({
           where: { userId: dbUser.id, platform },
@@ -296,10 +303,11 @@ export const authOptions: NextAuthOptions = {
         return token;
       }
 
-      // OAuth linking fallback: the signIn callback may have consumed the
-      // linking cookie, but if the cookie is still present (e.g. token was
-      // regenerated without userId), use it to hydrate the original app user.
-      const linkingUserId = await peekLinkingUserId();
+      // OAuth linking: the signIn callback peeked at the linking cookie
+      // without deleting it. Consume it here (read + delete) when the
+      // session token is actually being hydrated, so we can restore the
+      // original app user after the OAuth round trip.
+      const linkingUserId = await consumeLinkingUserId();
       if (linkingUserId) {
         const dbUser = await prisma.user.findUnique({
           where: { id: linkingUserId },
@@ -353,9 +361,6 @@ export const authOptions: NextAuthOptions = {
       if (!token.userId || !token.role) {
         throw new Error('Missing authenticated user');
       }
-
-      // Consume any lingering linking cookie — the link has been established.
-      await consumeLinkingUserId();
 
       session.user.id = token.userId;
       session.user.role = token.role;

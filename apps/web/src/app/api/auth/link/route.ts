@@ -2,9 +2,9 @@
  * API route to initiate OAuth account linking.
  *
  * Stores the current user's ID in a short-lived signed cookie, then
- * redirects to NextAuth's signin endpoint for the given provider.
- * The OAuth callback reads the cookie and binds the linked account
- * to the stored user, not the OAuth profile's email.
+ * returns a status payload. The client component calls NextAuth's
+ * signIn(provider) directly (POST) to seamlessly redirect to the
+ * OAuth provider without an intermediate sign-in page.
  */
 
 import { getToken } from 'next-auth/jwt';
@@ -20,19 +20,19 @@ export async function GET(req: NextRequest) {
 
   // Verify the caller is authenticated and use our custom userId field
   // (not token.sub, which may be the OIDC provider subject for OIDC users).
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET });
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
+  });
   const userId = token?.userId as string | undefined;
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const linkingToken = await createLinkingToken(userId);
-  const callbackUrl = `/dashboard/settings/integrations?connected=${provider === 'google' ? 'youtube' : provider}`;
-  const response = NextResponse.redirect(
-    `/api/auth/signin/${provider}?callbackUrl=${encodeURIComponent(callbackUrl)}`,
-  );
-
   const opts = linkingCookieOptions();
+  const response = NextResponse.json({ provider, ok: true });
+
   response.cookies.set({
     name: opts.name,
     value: linkingToken,

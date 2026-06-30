@@ -9,6 +9,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import { IntegrationCard, type LinkedAccount } from '@/components/IntegrationCard';
 
 export default function IntegrationsPage() {
@@ -22,7 +23,10 @@ export default function IntegrationsPage() {
     const connected = searchParams.get('connected');
     const error = searchParams.get('error');
     if (connected) {
-      setToast({ message: `${capitalize(connected)} account connected successfully ✅`, type: 'success' });
+      setToast({
+        message: `${capitalize(connected)} account connected successfully ✅`,
+        type: 'success',
+      });
     } else if (error) {
       setToast({ message: 'Failed to connect account. Please try again.', type: 'error' });
     }
@@ -50,11 +54,24 @@ export default function IntegrationsPage() {
     fetchAccounts();
   }, [fetchAccounts]);
 
-  const handleConnect = (platform: 'twitch' | 'youtube') => {
+  const handleConnect = async (platform: 'twitch' | 'youtube') => {
     const provider = platform === 'youtube' ? 'google' : 'twitch';
-    // Use the dedicated linking endpoint which stores the current user's
-    // ID in a signed cookie before redirecting to the OAuth provider.
-    window.location.href = `/api/auth/link?provider=${provider}`;
+    const callbackUrl = `/dashboard/settings/integrations?connected=${platform}`;
+    try {
+      // Set the signed linking cookie via the dedicated endpoint, then
+      // call NextAuth's signIn() which POSTs to /api/auth/signin/:provider
+      // and seamlessly redirects to the OAuth provider without an
+      // intermediate sign-in page.
+      const res = await fetch(`/api/auth/link?provider=${provider}`);
+      if (!res.ok) {
+        setToast({ message: 'Failed to start linking flow. Please try again.', type: 'error' });
+        return;
+      }
+      await signIn(provider, { callbackUrl });
+    } catch (err) {
+      console.error('OAuth linking failed:', err);
+      setToast({ message: 'Failed to start linking flow. Please try again.', type: 'error' });
+    }
   };
 
   const handleDisconnect = async (id: string) => {
@@ -104,9 +121,7 @@ export default function IntegrationsPage() {
       {toast && (
         <div
           className={`mb-6 rounded-lg px-4 py-3 text-sm font-medium ${
-            toast.type === 'success'
-              ? 'bg-green-100 text-green-800'
-              : 'bg-red-100 text-red-800'
+            toast.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
           }`}
         >
           {toast.message}
