@@ -8,6 +8,7 @@ import {
 import { requireDashboardSession } from '@/lib/session';
 import { CanvasWorkspace } from '@/components/CanvasWorkspace';
 import { RecentAlertFeed } from '@/components/RecentAlertFeed';
+import { LinkedAccountBanner } from '@/components/LinkedAccountBanner';
 import { normalizeCanvasSettings } from '@/lib/canvas-schema';
 
 export const dynamic = 'force-dynamic';
@@ -72,6 +73,13 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
 
   return (
     <main className="dashboard-shell">
+      <section className="panel" style={{ marginBottom: 16 }}>
+        <LinkedAccountBanner
+          callbackUrl={`/dashboard/${encodeURIComponent(channel.slug)}/alerts?connected=PLATFORM`}
+          compact
+        />
+      </section>
+
       <CanvasWorkspace
         channelId={channel.id}
         channelSlug={channel.slug}
