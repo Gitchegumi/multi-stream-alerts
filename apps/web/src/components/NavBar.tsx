@@ -19,6 +19,15 @@ type NavBarProps = {
   versionStatus: NavVersionStatus;
 };
 
+export function isActive(pathname: string | null, href: string, exact = false): boolean {
+  if (!pathname) return false;
+  if (href === pathname) return true;
+  if (exact) return false;
+  if (href !== '/dashboard' && pathname.startsWith(href)) return true;
+  if (href === '/dashboard' && pathname === '/dashboard') return true;
+  return false;
+}
+
 export function NavBar({ user, defaultChannelSlug, versionStatus }: NavBarProps) {
   const pathname = usePathname();
   const params = useParams();
@@ -51,19 +60,14 @@ export function NavBar({ user, defaultChannelSlug, versionStatus }: NavBarProps)
       href: channelSlug ? `/dashboard/${encodeURIComponent(channelSlug)}/settings` : '/dashboard',
     },
     {
+      label: 'Integrations',
+      href: '/dashboard/settings/integrations',
+    },
+    {
       label: 'Guide',
       href: channelSlug ? `/dashboard/${encodeURIComponent(channelSlug)}/guide` : '/dashboard',
     },
   ];
-
-  const isActive = (href: string, exact = false): boolean => {
-    if (!pathname) return false;
-    if (href === pathname) return true;
-    if (exact) return false;
-    if (href !== '/dashboard' && pathname.startsWith(href)) return true;
-    if (href === '/dashboard' && pathname === '/dashboard') return true;
-    return false;
-  };
 
   return (
     <nav className="nav-bar" aria-label="Main">
@@ -90,8 +94,8 @@ export function NavBar({ user, defaultChannelSlug, versionStatus }: NavBarProps)
           <Link
             key={link.label}
             href={link.href}
-            className={`nav-link${isActive(link.href, link.exact) ? ' nav-link-active' : ''}`}
-            aria-current={isActive(link.href, link.exact) ? 'page' : undefined}
+            className={`nav-link${isActive(pathname, link.href, link.exact ?? false) ? ' nav-link-active' : ''}`}
+            aria-current={isActive(pathname, link.href, link.exact ?? false) ? 'page' : undefined}
             onClick={() => setMobileOpen(false)}
           >
             {link.label}
