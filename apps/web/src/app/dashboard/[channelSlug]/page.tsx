@@ -60,7 +60,7 @@ export default async function ChannelDashboardPage({
     {
       label: 'Settings',
       href: `/dashboard/${encodeURIComponent(channel.slug)}/settings`,
-      description: 'Workspace settings and integrations',
+      description: 'Workspace settings',
     },
     {
       label: 'Guide',
