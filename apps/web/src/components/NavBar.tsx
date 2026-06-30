@@ -28,6 +28,20 @@ export function isActive(pathname: string | null, href: string, exact = false): 
   return false;
 }
 
+export function buildNavLinks(
+  channelSlug: string | null,
+): { label: string; href: string; exact?: boolean }[] {
+  const base = channelSlug ? `/dashboard/${encodeURIComponent(channelSlug)}` : '/dashboard';
+  return [
+    { label: 'Dashboard', href: base, exact: true },
+    { label: 'Alerts', href: channelSlug ? `${base}/alerts` : '/dashboard' },
+    { label: 'Assets', href: channelSlug ? `${base}/assets` : '/dashboard' },
+    { label: 'Settings', href: channelSlug ? `${base}/settings` : '/dashboard' },
+    { label: 'Integrations', href: channelSlug ? `${base}/integrations` : '/dashboard' },
+    { label: 'Guide', href: channelSlug ? `${base}/guide` : '/dashboard' },
+  ];
+}
+
 export function NavBar({ user, defaultChannelSlug, versionStatus }: NavBarProps) {
   const pathname = usePathname();
   const params = useParams();
@@ -41,33 +55,7 @@ export function NavBar({ user, defaultChannelSlug, versionStatus }: NavBarProps)
     ? `${versionStatus.build.releaseTag} deployed. Latest release: ${latestLabel}.`
     : `${versionStatus.build.releaseTag} deployed. Update status: ${updateLabel}.`;
 
-  const links = [
-    {
-      label: 'Dashboard',
-      href: channelSlug ? `/dashboard/${encodeURIComponent(channelSlug)}` : '/dashboard',
-      exact: true,
-    },
-    {
-      label: 'Alerts',
-      href: channelSlug ? `/dashboard/${encodeURIComponent(channelSlug)}/alerts` : '/dashboard',
-    },
-    {
-      label: 'Assets',
-      href: channelSlug ? `/dashboard/${encodeURIComponent(channelSlug)}/assets` : '/dashboard',
-    },
-    {
-      label: 'Settings',
-      href: channelSlug ? `/dashboard/${encodeURIComponent(channelSlug)}/settings` : '/dashboard',
-    },
-    {
-      label: 'Integrations',
-      href: '/dashboard/settings/integrations',
-    },
-    {
-      label: 'Guide',
-      href: channelSlug ? `/dashboard/${encodeURIComponent(channelSlug)}/guide` : '/dashboard',
-    },
-  ];
+  const links = buildNavLinks(channelSlug);
 
   return (
     <nav className="nav-bar" aria-label="Main">
