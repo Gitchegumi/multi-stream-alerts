@@ -16,6 +16,7 @@
     "@multi-stream-alerts/shared": "workspace:*",
     "@multi-stream-alerts/ui": "workspace:*",
     "@next/env": "16.2.9",
+    "jose": "^6.2.3",
     "next": "16.2.9",
     "next-auth": "^4.24.14",
     "react": "^19.2.7",

@@ -1,5 +1,7 @@
 import type { NextAuthOptions, Profile } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import TwitchProvider from 'next-auth/providers/twitch';
+import GoogleProvider from 'next-auth/providers/google';
 import { cookies } from 'next/headers';
 import {
   prisma,
@@ -12,6 +14,8 @@ import {
 import { INVITE_CODE_COOKIE, validateInviteCodeForCookie } from './oidc-state';
 import { createChannelWithUniqueSlug } from './channel-slug';
 import { readOnboardingConfig } from './onboarding';
+import { encrypt } from '@multi-stream-alerts/shared';
+import { consumeLinkingUserId, peekLinkingUserId } from '@/lib/linking-state';
 
 type OidcProfile = Profile & {
   sub?: string;
@@ -172,6 +176,39 @@ if (credentialsEnabled) {
   providers.push(buildCredentialsProvider());
 }
 
+const twitchEnabled = !!process.env.TWITCH_CLIENT_ID && !!process.env.TWITCH_CLIENT_SECRET;
+const googleEnabled = !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
+
+if (twitchEnabled) {
+  providers.push(
+    TwitchProvider({
+      clientId: process.env.TWITCH_CLIENT_ID!,
+      clientSecret: process.env.TWITCH_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          scope: 'openid user:read:email',
+        },
+      },
+    }),
+  );
+}
+
+if (googleEnabled) {
+  providers.push(
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          scope: 'openid email profile https://www.googleapis.com/auth/youtube.readonly',
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    }),
+  );
+}
+
 export const authOptions: NextAuthOptions = {
   secret: process.env.AUTH_SECRET,
   session: { strategy: 'jwt' },
@@ -195,11 +232,93 @@ export const authOptions: NextAuthOptions = {
         return true;
       }
 
+      // OAuth account linking for Twitch / YouTube
+      if (account?.provider === 'twitch' || account?.provider === 'google') {
+        // Peek at the signed cookie set by /api/auth/link which stores the
+        // currently authenticated user's ID. This binds the linked account
+        // to the user who clicked Connect, not to the OAuth email.
+        // Do NOT consume (delete) the cookie here — the jwt callback needs
+        // to read it again to hydrate the session as the original app user.
+        const linkingUserId = await peekLinkingUserId();
+        if (!linkingUserId) {
+          console.warn('OAuth sign-in: missing or invalid linking cookie', {
+            provider: account.provider,
+          });
+          return false;
+        }
+
+        const dbUser = await prisma.user.findUnique({ where: { id: linkingUserId } });
+        if (!dbUser) {
+          console.warn('OAuth sign-in: no user found for linkingUserId', {
+            linkingUserId,
+            provider: account.provider,
+          });
+          return false;
+        }
+
+        const platform = account.provider === 'google' ? 'youtube' : 'twitch';
+        const platformAccountName = (profile as Record<string, unknown>)?.name as
+          string | undefined;
+
+        const existingCount = await prisma.linkedAccount.count({
+          where: { userId: dbUser.id, platform },
+        });
+
+        await prisma.linkedAccount.upsert({
+          where: {
+            userId_platform_platformAccountId: {
+              userId: dbUser.id,
+              platform,
+              platformAccountId: account.providerAccountId,
+            },
+          },
+          create: {
+            userId: dbUser.id,
+            platform,
+            platformAccountId: account.providerAccountId,
+            platformAccountName: platformAccountName ?? null,
+            encryptedAccessToken: encrypt(account.access_token ?? ''),
+            encryptedRefreshToken: account.refresh_token ? encrypt(account.refresh_token) : null,
+            tokenExpiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
+            isActive: true,
+            isPrimary: existingCount === 0,
+          },
+          update: {
+            platformAccountName: platformAccountName ?? undefined,
+            encryptedAccessToken: encrypt(account.access_token ?? ''),
+            encryptedRefreshToken: account.refresh_token ? encrypt(account.refresh_token) : null,
+            tokenExpiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
+            isActive: true,
+          },
+        });
+
+        return true;
+      }
+
       return handleOidcSignIn({ account, profile: oidcProfile }, oidcSignInDeps);
     },
     async jwt({ token, account, profile }) {
+      // Existing sessions already carry our custom claims — short-circuit.
       if (token.userId && token.role) {
         return token;
+      }
+
+      // OAuth linking: the signIn callback peeked at the linking cookie
+      // without deleting it. Consume it here (read + delete) when the
+      // session token is actually being hydrated, so we can restore the
+      // original app user after the OAuth round trip.
+      const linkingUserId = await consumeLinkingUserId();
+      if (linkingUserId) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: linkingUserId },
+        });
+        if (dbUser) {
+          token.userId = dbUser.id;
+          token.role = dbUser.role;
+          token.email = dbUser.email;
+          token.name = dbUser.displayName ?? dbUser.email;
+          return token;
+        }
       }
 
       if (token.email) {
@@ -250,7 +369,7 @@ export const authOptions: NextAuthOptions = {
   },
 };
 
-export { oidcEnabled, credentialsEnabled };
+export { oidcEnabled, credentialsEnabled, twitchEnabled, googleEnabled };
 
 export async function handleOidcSignIn(
   {
