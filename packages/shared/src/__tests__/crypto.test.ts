@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
-import { encrypt, decrypt } from '../crypto.ts';
+import { encrypt, decrypt } from '../crypto';
 
 // Set up a valid ENCRYPTION_KEY for tests
 process.env.ENCRYPTION_KEY = randomBytes(32).toString('hex');
@@ -25,9 +25,11 @@ test('encrypt produces different ciphertexts for the same plaintext (random IV)'
 
 test('decrypt throws on tampered ciphertext', () => {
   const ciphertext = encrypt('secret');
-  // Flip a byte in the middle of the ciphertext
+  // Flip a byte at the end of the ciphertext
   const buf = Buffer.from(ciphertext, 'base64');
-  buf[buf.length - 1] ^= 0x01;
+  const lastIdx = buf.length - 1;
+  if (lastIdx < 0) throw new Error('ciphertext too short to tamper');
+  buf.writeUInt8(buf.readUInt8(lastIdx) ^ 0x01, lastIdx);
   const tampered = buf.toString('base64');
   assert.throws(
     () => decrypt(tampered),
@@ -48,7 +50,7 @@ test('encrypt throws when ENCRYPTION_KEY is missing (fresh process)', async () =
   const saved = process.env.ENCRYPTION_KEY;
   delete process.env.ENCRYPTION_KEY;
   try {
-    const mod = await import(`../crypto.ts?t=${Date.now()}`);
+    const mod = await import(`../crypto?t=${Date.now()}`);
     assert.throws(() => mod.encrypt('test'), /ENCRYPTION_KEY/);
   } finally {
     process.env.ENCRYPTION_KEY = saved;
@@ -59,7 +61,7 @@ test('encrypt throws when ENCRYPTION_KEY is too short (fresh process)', async ()
   const saved = process.env.ENCRYPTION_KEY;
   process.env.ENCRYPTION_KEY = 'short';
   try {
-    const mod = await import(`../crypto.ts?t=${Date.now()}`);
+    const mod = await import(`../crypto?t=${Date.now()}`);
     assert.throws(() => mod.encrypt('test'), /ENCRYPTION_KEY/);
   } finally {
     process.env.ENCRYPTION_KEY = saved;
