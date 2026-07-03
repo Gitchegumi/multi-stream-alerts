@@ -37,7 +37,6 @@ export function buildNavLinks(
     { label: 'Alerts', href: channelSlug ? `${base}/alerts` : '/dashboard' },
     { label: 'Assets', href: channelSlug ? `${base}/assets` : '/dashboard' },
     { label: 'Settings', href: channelSlug ? `${base}/settings` : '/dashboard' },
-    { label: 'Integrations', href: channelSlug ? `${base}/integrations` : '/dashboard' },
     { label: 'Guide', href: channelSlug ? `${base}/guide` : '/dashboard' },
   ];
 }

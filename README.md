@@ -72,7 +72,18 @@ The `.env` file is for instance plumbing and bootstrap values only:
 - Auth/session/OIDC settings (`AUTH_SECRET`, `AUTH_OIDC_*`, onboarding flags, and `INITIAL_ADMIN_EMAIL`).
 - Bootstrap defaults (`DEFAULT_CHANNEL_*`, `INITIAL_DISPLAY_KEY`) and the encryption-at-rest key (`INSTANCE_ENCRYPTION_KEY`).
 
-Ko-fi, Twitch, and YouTube platform credentials are configured per workspace in the dashboard at **Settings -> Integrations**. They are encrypted at rest and are not sent to browser clients after save.
+Ko-fi, Twitch, and YouTube platform credentials are configured per workspace in the dashboard at **[workspace] -> Settings -> Integrations**. They are encrypted at rest and are not sent to browser clients after save.
+
+Twitch and YouTube also support OAuth account linking (connect/disconnect platform accounts from the dashboard without manually pasting secrets). This requires instance-level provider credentials in `.env`:
+
+```env
+TWITCH_CLIENT_ID=<your-twitch-app-client-id>
+TWITCH_CLIENT_SECRET=<your-twitch-app-client-secret>
+GOOGLE_CLIENT_ID=<your-google-oauth-client-id>
+GOOGLE_CLIENT_SECRET=<your-google-oauth-client-secret>
+```
+
+When these are set, the Settings -> Integrations page shows OAuth connect/disconnect cards for Twitch and YouTube. When they are missing, the cards show a clear disabled state explaining that an administrator must configure the provider credentials. The per-workspace manual credential fields remain available regardless.
 
 ## Authentication Model
 
@@ -395,7 +406,7 @@ Configure platform credentials from the dashboard. The webhook URL pattern is sh
 https://<your-alerts-domain>/api/webhooks/kofi/<your-channel-slug>
 ```
 
-Set the matching verification token in Dashboard → Settings → Integrations → Ko-fi. The token is stored encrypted at rest using `INSTANCE_ENCRYPTION_KEY`.
+Set the matching verification token in Dashboard → [workspace] → Settings → Integrations → Ko-fi. The token is stored encrypted at rest using `INSTANCE_ENCRYPTION_KEY`.
 
 Supported Ko-fi types:
 
@@ -408,7 +419,7 @@ Duplicate Ko-fi `message_id` values are ignored. Private Ko-fi messages are not 
 
 ## Twitch Setup
 
-Configure per-channel Twitch credentials from Dashboard → Settings → Integrations → Twitch. Each channel stores four fields:
+Configure per-channel Twitch credentials from Dashboard → [workspace] → Settings → Integrations → Twitch. Each channel stores four fields:
 
 - `eventsubSecret` — per-channel secret used to verify EventSub HMAC signatures. Generate a random 16+ character string; set this in your Twitch app's EventSub subscription callback URL settings **and** store it in the dashboard. The webhook handler matches inbound HMACs against stored secrets to identify the receiving channel.
 - `clientId` / `clientSecret` — Twitch app OAuth credentials used to call the Twitch API (subscriptions, user lookups, etc.).
@@ -420,7 +431,7 @@ The Twitch EventSub callback URL is global per app. The receiving channel is ide
 
 ## YouTube Setup
 
-Configure per-channel YouTube credentials from Dashboard → Settings → Integrations → YouTube. Each channel stores two fields:
+Configure per-channel YouTube credentials from Dashboard → [workspace] → Settings → Integrations → YouTube. Each channel stores two fields:
 
 - `clientId` — Google OAuth client ID for YouTube Data API access.
 - `clientSecret` — Google OAuth client secret paired with the client ID.
