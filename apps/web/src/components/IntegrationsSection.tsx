@@ -86,7 +86,7 @@ export function IntegrationsSection({
   const fetchAccounts = useCallback(async () => {
     setIsLoadingAccounts(true);
     try {
-      const res = await fetch('/api/linked-accounts');
+      const res = await fetch(`/api/linked-accounts?channelSlug=${encodeURIComponent(channelSlug)}`);
       if (res.ok) {
         const data = await res.json();
         setAccounts(data.accounts ?? []);
@@ -96,7 +96,7 @@ export function IntegrationsSection({
     } finally {
       setIsLoadingAccounts(false);
     }
-  }, []);
+  }, [channelSlug]);
 
   useEffect(() => {
     fetchAccounts();
@@ -106,7 +106,9 @@ export function IntegrationsSection({
     const provider = platform === 'youtube' ? 'google' : 'twitch';
     const callbackUrl = `/dashboard/${encodeURIComponent(channelSlug)}/settings?connected=${platform}#integrations`;
     try {
-      const res = await fetch(`/api/auth/link?provider=${provider}`);
+      const res = await fetch(
+        `/api/auth/link?provider=${provider}&channelSlug=${encodeURIComponent(channelSlug)}`,
+      );
       if (!res.ok) {
         setToast({ message: 'Failed to start linking flow. Please try again.', type: 'error' });
         return;

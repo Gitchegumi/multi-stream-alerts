@@ -15,7 +15,7 @@ import { INVITE_CODE_COOKIE, validateInviteCodeForCookie } from './oidc-state';
 import { createChannelWithUniqueSlug } from './channel-slug';
 import { readOnboardingConfig } from './onboarding';
 import { encrypt } from '@multi-stream-alerts/shared';
-import { consumeLinkingUserId, peekLinkingUserId } from '@/lib/linking-state';
+import { consumeLinkingState, peekLinkingState } from '@/lib/linking-state';
 
 type OidcProfile = Profile & {
   sub?: string;
@@ -235,17 +235,21 @@ export const authOptions: NextAuthOptions = {
       // OAuth account linking for Twitch / YouTube
       if (account?.provider === 'twitch' || account?.provider === 'google') {
         // Peek at the signed cookie set by /api/auth/link which stores the
-        // currently authenticated user's ID. This binds the linked account
-        // to the user who clicked Connect, not to the OAuth email.
-        // Do NOT consume (delete) the cookie here — the jwt callback needs
-        // to read it again to hydrate the session as the original app user.
-        const linkingUserId = await peekLinkingUserId();
-        if (!linkingUserId) {
+        // currently authenticated user's ID (and optionally the channelId
+        // of the workspace the link should be scoped to). This binds the
+        // linked account to the user who clicked Connect, not to the OAuth
+        // email. Do NOT consume (delete) the cookie here — the jwt callback
+        // needs to read it again to hydrate the session as the original
+        // app user.
+        const linkingState = await peekLinkingState();
+        if (!linkingState) {
           console.warn('OAuth sign-in: missing or invalid linking cookie', {
             provider: account.provider,
           });
           return false;
         }
+
+        const { userId: linkingUserId, channelId: linkingChannelId } = linkingState;
 
         const dbUser = await prisma.user.findUnique({ where: { id: linkingUserId } });
         if (!dbUser) {
@@ -274,6 +278,7 @@ export const authOptions: NextAuthOptions = {
           },
           create: {
             userId: dbUser.id,
+            channelId: linkingChannelId ?? null,
             platform,
             platformAccountId: account.providerAccountId,
             platformAccountName: platformAccountName ?? null,
@@ -284,6 +289,7 @@ export const authOptions: NextAuthOptions = {
             isPrimary: existingCount === 0,
           },
           update: {
+            channelId: linkingChannelId ?? null,
             platformAccountName: platformAccountName ?? undefined,
             encryptedAccessToken: encrypt(account.access_token ?? ''),
             encryptedRefreshToken: account.refresh_token ? encrypt(account.refresh_token) : null,
@@ -307,10 +313,10 @@ export const authOptions: NextAuthOptions = {
       // without deleting it. Consume it here (read + delete) when the
       // session token is actually being hydrated, so we can restore the
       // original app user after the OAuth round trip.
-      const linkingUserId = await consumeLinkingUserId();
-      if (linkingUserId) {
+      const linkingState = await consumeLinkingState();
+      if (linkingState) {
         const dbUser = await prisma.user.findUnique({
-          where: { id: linkingUserId },
+          where: { id: linkingState.userId },
         });
         if (dbUser) {
           token.userId = dbUser.id;

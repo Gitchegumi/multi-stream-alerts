@@ -16,6 +16,7 @@ export interface LinkedAccount {
   platform: 'twitch' | 'youtube';
   platformAccountId: string;
   platformAccountName: string | null;
+  channelId: string | null;
   isActive: boolean;
   isPrimary: boolean;
   createdAt: string;
