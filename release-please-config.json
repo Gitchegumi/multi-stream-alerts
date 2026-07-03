@@ -3,6 +3,7 @@
   "release-type": "node",
   "include-v-in-tag": true,
   "include-v-in-release-name": true,
+  "pull-request-title-pattern": "chore(main): release ${version}",
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
   "packages": {
