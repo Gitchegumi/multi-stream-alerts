@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-ingress-v0.1.1...alerts-ingress-v0.1.2) (2026-07-03)
+
+
+### Features
+
+* support multiple authenticated accounts per alert ([96debd7](https://github.com/Gitchegumi/multi-stream-alerts/commit/96debd7b10a132d01d7064a381c673bd57face3b)), closes [#97](https://github.com/Gitchegumi/multi-stream-alerts/issues/97)
+
 ## [0.1.1](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-ingress-v0.1.0...alerts-ingress-v0.1.1) (2026-06-05)
 
 
