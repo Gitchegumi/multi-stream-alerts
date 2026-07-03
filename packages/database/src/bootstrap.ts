@@ -165,58 +165,55 @@ export async function createStoredAlertEvent(input: {
   // the selected linked accounts' platformAccountId. An empty or missing
   // selection means the alert will NOT fire — users must explicitly choose
   // which accounts the alert listens to.
-  const configJson = (config.configJson ?? {}) as Record<string, unknown>;
-  const selectedLinkedAccountIds = Array.isArray(configJson.selectedLinkedAccountIds)
-    ? (configJson.selectedLinkedAccountIds as string[])
-    : [];
+  if (input.platform === 'twitch' || input.platform === 'youtube') {
+    const configJson = (config.configJson ?? {}) as Record<string, unknown>;
+    const selectedLinkedAccountIds = Array.isArray(configJson.selectedLinkedAccountIds)
+      ? (configJson.selectedLinkedAccountIds as string[])
+      : [];
 
-  if (selectedLinkedAccountIds.length === 0) {
-    console.info('alert suppressed by account targeting', {
-      channelId: input.channelId,
-      platform: input.platform,
-      type: input.type,
-      eventKey: input.eventKey,
-      reason: 'no_accounts_selected',
+    if (selectedLinkedAccountIds.length === 0) {
+      console.info('alert suppressed by account targeting', {
+        channelId: input.channelId,
+        platform: input.platform,
+        type: input.type,
+        eventKey: input.eventKey,
+        reason: 'no_accounts_selected',
+      });
+      return null;
+    }
+
+    if (!input.platformAccountId) {
+      console.info('alert suppressed by account targeting', {
+        channelId: input.channelId,
+        platform: input.platform,
+        type: input.type,
+        eventKey: input.eventKey,
+        reason: 'missing_platform_account_id',
+      });
+      return null;
+    }
+
+    const selectedAccounts = await _prisma.linkedAccount.findMany({
+      where: {
+        id: { in: selectedLinkedAccountIds },
+        channelId: input.channelId,
+        platform: input.platform,
+        isActive: true,
+      },
+      select: { platformAccountId: true },
     });
-    return null;
-  }
 
-  if (!input.platformAccountId) {
-    console.info('alert suppressed by account targeting', {
-      channelId: input.channelId,
-      platform: input.platform,
-      type: input.type,
-      eventKey: input.eventKey,
-      reason: 'missing_platform_account_id',
-    });
-    return null;
-  }
-
-  const selectedAccounts = await _prisma.linkedAccount.findMany({
-    where: {
-      id: { in: selectedLinkedAccountIds },
-      channelId: input.channelId,
-      platform:
-        input.platform === 'twitch'
-          ? 'twitch'
-          : input.platform === 'youtube'
-            ? 'youtube'
-            : undefined,
-      isActive: true,
-    },
-    select: { platformAccountId: true },
-  });
-
-  if (!selectedAccounts.some((account) => account.platformAccountId === input.platformAccountId)) {
-    console.info('alert suppressed by account targeting', {
-      channelId: input.channelId,
-      platform: input.platform,
-      type: input.type,
-      eventKey: input.eventKey,
-      reason: 'account_not_selected',
-      platformAccountId: input.platformAccountId,
-    });
-    return null;
+    if (!selectedAccounts.some((account) => account.platformAccountId === input.platformAccountId)) {
+      console.info('alert suppressed by account targeting', {
+        channelId: input.channelId,
+        platform: input.platform,
+        type: input.type,
+        eventKey: input.eventKey,
+        reason: 'account_not_selected',
+        platformAccountId: input.platformAccountId,
+      });
+      return null;
+    }
   }
 
   const layout =
