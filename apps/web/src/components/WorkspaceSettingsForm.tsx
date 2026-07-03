@@ -13,7 +13,6 @@ export function WorkspaceSettingsForm({
 }) {
   const [name, setName] = useState(initialName);
   const [result, setResult] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   function updateName() {
@@ -29,20 +28,6 @@ export function WorkspaceSettingsForm({
         return;
       }
       setResult('Workspace name updated.');
-    });
-  }
-
-  function deleteWorkspace() {
-    setResult(null);
-    startTransition(async () => {
-      const response = await fetch(`/api/channels/${encodeURIComponent(channelSlug)}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) {
-        setResult('Could not delete workspace.');
-        return;
-      }
-      window.location.href = '/dashboard';
     });
   }
 
@@ -67,43 +52,6 @@ export function WorkspaceSettingsForm({
       >
         Save name
       </button>
-
-      <div className="danger-zone" style={{ marginTop: 24 }}>
-        <h3>Danger zone</h3>
-        {!confirmDelete ? (
-          <button
-            className="button-secondary"
-            type="button"
-            disabled={!canManage || isPending}
-            onClick={() => setConfirmDelete(true)}
-          >
-            Delete workspace
-          </button>
-        ) : (
-          <div className="stack" style={{ gap: 8 }}>
-            <p className="muted">
-              This will permanently delete the workspace and all associated data. Are you sure?
-            </p>
-            <div className="stack" style={{ flexDirection: 'row', gap: 8 }}>
-              <button
-                className="button-secondary"
-                type="button"
-                onClick={() => setConfirmDelete(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="button"
-                type="button"
-                disabled={isPending}
-                onClick={deleteWorkspace}
-              >
-                Confirm delete
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

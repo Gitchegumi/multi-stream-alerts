@@ -21,6 +21,7 @@ export interface LinkStatus {
 interface LinkedAccountBannerProps {
   callbackUrl?: string;
   compact?: boolean;
+  channelSlug?: string;
 }
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -39,7 +40,7 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export function LinkedAccountBanner({ callbackUrl, compact = true }: LinkedAccountBannerProps) {
+export function LinkedAccountBanner({ callbackUrl, compact = true, channelSlug }: LinkedAccountBannerProps) {
   const searchParams = useSearchParams();
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,7 +67,10 @@ export function LinkedAccountBanner({ callbackUrl, compact = true }: LinkedAccou
   const fetchAccounts = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/linked-accounts');
+      const url = channelSlug
+        ? `/api/linked-accounts?channelSlug=${encodeURIComponent(channelSlug)}`
+        : '/api/linked-accounts';
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setAccounts(data.accounts ?? []);
@@ -76,7 +80,7 @@ export function LinkedAccountBanner({ callbackUrl, compact = true }: LinkedAccou
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [channelSlug]);
 
   useEffect(() => {
     fetchAccounts();
@@ -86,7 +90,10 @@ export function LinkedAccountBanner({ callbackUrl, compact = true }: LinkedAccou
     const provider = platform === 'youtube' ? 'google' : 'twitch';
     const callback = effectiveCallbackUrl.replace('PLATFORM', platform);
     try {
-      const res = await fetch(`/api/auth/link?provider=${provider}`);
+      const linkUrl = channelSlug
+        ? `/api/auth/link?provider=${provider}&channelSlug=${encodeURIComponent(channelSlug)}`
+        : `/api/auth/link?provider=${provider}`;
+      const res = await fetch(linkUrl);
       if (!res.ok) {
         setToast({ message: 'Failed to start linking flow. Please try again.', type: 'error' });
         return;

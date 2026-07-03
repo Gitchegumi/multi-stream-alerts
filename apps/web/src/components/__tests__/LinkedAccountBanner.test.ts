@@ -10,6 +10,7 @@ function makeAccount(
     id: 'acc-1',
     platformAccountId: 'platform-id',
     platformAccountName: 'Display Name',
+    channelId: null,
     isActive: true,
     isPrimary: false,
     createdAt: '2024-01-01T00:00:00Z',

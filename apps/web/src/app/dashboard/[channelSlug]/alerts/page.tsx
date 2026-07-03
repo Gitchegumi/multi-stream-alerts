@@ -76,6 +76,7 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
       <section className="panel" style={{ marginBottom: 16 }}>
         <LinkedAccountBanner
           callbackUrl={`/dashboard/${encodeURIComponent(channel.slug)}/alerts?connected=PLATFORM`}
+          channelSlug={channel.slug}
           compact
         />
       </section>

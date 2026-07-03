@@ -20,15 +20,15 @@ function getSigningKey(): Uint8Array {
   return new TextEncoder().encode(`msa-linking:${secret}`);
 }
 
-export async function createLinkingToken(userId: string): Promise<string> {
-  return new SignJWT({ sub: userId, purpose: 'oauth-linking' })
+export async function createLinkingToken(userId: string, channelId?: string): Promise<string> {
+  return new SignJWT({ sub: userId, channelId: channelId ?? null, purpose: 'oauth-linking' })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(`${COOKIE_MAX_AGE}s`)
     .sign(getSigningKey());
 }
 
-export async function verifyLinkingToken(token: string): Promise<string | null> {
+export async function verifyLinkingToken(token: string): Promise<{ userId: string; channelId: string | null } | null> {
   try {
     const { payload } = await jwtVerify(token, getSigningKey(), {
       clockTolerance: 30,
@@ -36,7 +36,10 @@ export async function verifyLinkingToken(token: string): Promise<string | null> 
     if (payload.purpose !== 'oauth-linking' || typeof payload.sub !== 'string') {
       return null;
     }
-    return payload.sub;
+    return {
+      userId: payload.sub,
+      channelId: typeof payload.channelId === 'string' ? payload.channelId : null,
+    };
   } catch {
     return null;
   }
@@ -47,7 +50,7 @@ export async function verifyLinkingToken(token: string): Promise<string | null> 
  * Use in callbacks that need to know the linking user but shouldn't
  * delete the cookie yet (e.g. jwt callback before signIn).
  */
-export async function peekLinkingUserId(): Promise<string | null> {
+export async function peekLinkingState(): Promise<{ userId: string; channelId: string | null } | null> {
   const cookieJar = await cookies();
   const token = cookieJar.get(COOKIE_NAME)?.value;
   if (!token) return null;
@@ -55,16 +58,16 @@ export async function peekLinkingUserId(): Promise<string | null> {
 }
 
 /**
- * Read and clear the linking state cookie, returning the user ID.
- * One-time use — safe to call from signIn callback.
+ * Read and clear the linking state cookie, returning the user ID and
+ * optional channel ID. One-time use — safe to call from signIn callback.
  */
-export async function consumeLinkingUserId(): Promise<string | null> {
-  const userId = await peekLinkingUserId();
-  if (userId) {
+export async function consumeLinkingState(): Promise<{ userId: string; channelId: string | null } | null> {
+  const state = await peekLinkingState();
+  if (state) {
     const cookieJar = await cookies();
     cookieJar.delete(COOKIE_NAME);
   }
-  return userId;
+  return state;
 }
 
 export function linkingCookieOptions() {
