@@ -31,6 +31,7 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
     id: config.id,
     enabled: config.enabled,
     layoutId: config.layoutId,
+    configJson: config.configJson as Record<string, unknown> | null,
     displayName: config.displayName,
     templateText: config.templateText,
     durationMs: config.durationMs,
@@ -49,6 +50,24 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
   const assets = await prisma.workspaceAsset.findMany({
     where: { channelId: channel.id },
     orderBy: { createdAt: 'desc' },
+  });
+
+  // Fetch linked accounts scoped to this channel for account targeting
+  const linkedAccounts = await prisma.linkedAccount.findMany({
+    where: {
+      userId: session.user.id,
+      channelId: channel.id,
+      isActive: true,
+      platform: { in: ['twitch', 'youtube'] },
+    },
+    select: {
+      id: true,
+      platform: true,
+      platformAccountId: true,
+      platformAccountName: true,
+      isActive: true,
+      isPrimary: true,
+    },
   });
 
   const publicBaseUrl = process.env.PUBLIC_BASE_URL ?? 'https://<your-alerts-domain>';
@@ -86,6 +105,14 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
         channelSlug={channel.slug}
         initialCanvases={canvases}
         alertConfigs={alertConfigs}
+        linkedAccounts={linkedAccounts.map((a) => ({
+          id: a.id,
+          platform: a.platform as 'twitch' | 'youtube',
+          platformAccountId: a.platformAccountId,
+          platformAccountName: a.platformAccountName,
+          isActive: a.isActive,
+          isPrimary: a.isPrimary,
+        }))}
         assets={assets.map((asset) => ({
           id: asset.id,
           assetType: asset.assetType,

@@ -132,6 +132,7 @@ export async function createStoredAlertEvent(input: {
   type: AlertType;
   eventKey?: string;
   displayName: string;
+  platformAccountId?: string;
   amount?: number;
   currency?: string;
   message?: string;
@@ -157,6 +158,39 @@ export async function createStoredAlertEvent(input: {
       reason: 'no_config_or_disabled',
     });
     return null;
+  }
+
+  // Account targeting: if the config has selectedLinkedAccountIds in
+  // configJson, the incoming event's platformAccountId must match one
+  // of the selected linked accounts' platformAccountId. If the config
+  // has no selectedLinkedAccountIds, the alert fires for any account
+  // (backward-compatible with pre-targeting configs).
+  const configJson = (config.configJson ?? {}) as Record<string, unknown>;
+  const selectedLinkedAccountIds = Array.isArray(configJson.selectedLinkedAccountIds)
+    ? (configJson.selectedLinkedAccountIds as string[])
+    : null;
+
+  if (selectedLinkedAccountIds && selectedLinkedAccountIds.length > 0 && input.platformAccountId) {
+    const matchingAccount = await _prisma.linkedAccount.findFirst({
+      where: {
+        id: { in: selectedLinkedAccountIds },
+        platform: input.platform === 'twitch' ? 'twitch' : input.platform === 'youtube' ? 'youtube' : undefined,
+        isActive: true,
+      },
+      select: { platformAccountId: true },
+    });
+
+    if (!matchingAccount || matchingAccount.platformAccountId !== input.platformAccountId) {
+      console.info('alert suppressed by account targeting', {
+        channelId: input.channelId,
+        platform: input.platform,
+        type: input.type,
+        eventKey: input.eventKey,
+        reason: 'account_not_selected',
+        platformAccountId: input.platformAccountId,
+      });
+      return null;
+    }
   }
 
   const layout =
