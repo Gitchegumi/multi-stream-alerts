@@ -76,13 +76,9 @@ export function EditorStage({ editor }: { editor: UseCanvasEditorReturn }) {
   );
 
   return (
-    <section
-      className="canvas-editor-stage"
-      ref={editor.stageRef}
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
-    >
+    <section className="canvas-editor-stage" tabIndex={0} onKeyDown={handleKeyDown}>
       <div
+        ref={editor.stageRef}
         className={`canvas-editor-stage-canvas canvas-editor-stage-canvas-${selected?.settings.background ?? 'transparent'}`}
         style={{
           aspectRatio: selected
@@ -190,7 +186,10 @@ function ElementView({
     editor.startElementPointer(event, element.id, 'move');
   }
 
-  function handleResizePointerDown(event: ReactPointerEvent, mode: 'n' | 'e' | 's' | 'w' | 'ne' | 'nw' | 'se' | 'sw') {
+  function handleResizePointerDown(
+    event: ReactPointerEvent,
+    mode: 'n' | 'e' | 's' | 'w' | 'ne' | 'nw' | 'se' | 'sw',
+  ) {
     event.stopPropagation();
     editor.startElementPointer(event, element.id, mode);
   }
@@ -230,7 +229,9 @@ function ElementView({
       }}
     >
       {selected ? (
-        <span className="canvas-editor-element-badge canvas-editor-element-name">{element.name}</span>
+        <span className="canvas-editor-element-badge canvas-editor-element-name">
+          {element.name}
+        </span>
       ) : null}
 
       <div className="canvas-editor-element-content">

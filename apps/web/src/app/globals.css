@@ -1548,10 +1548,10 @@ textarea.input {
 }
 
 .canvas-editor-logo {
-  font-weight: 800;
-  font-size: 16px;
-  letter-spacing: -0.02em;
-  color: var(--accent);
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: block;
 }
 
 .canvas-editor-switcher {
@@ -1898,22 +1898,21 @@ textarea.input {
 
 .canvas-editor-add-row {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
 }
 
 .canvas-editor-add-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
+  display: grid;
+  place-items: center;
+  gap: 2px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--panel);
   color: var(--text);
-  padding: 8px 6px;
+  padding: 7px 4px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 10.5px;
 }
 
 .canvas-editor-add-button:hover {

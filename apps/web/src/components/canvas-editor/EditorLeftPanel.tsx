@@ -2,7 +2,12 @@
 
 import { useMemo, useRef, useState } from 'react';
 import type { CanvasElement, CanvasElementType } from '@/lib/canvas-schema';
-import type { AlertConfig, LinkedAccountInfo, UseCanvasEditorReturn, WorkspaceAsset } from './useCanvasEditor';
+import type {
+  AlertConfig,
+  LinkedAccountInfo,
+  UseCanvasEditorReturn,
+  WorkspaceAsset,
+} from './useCanvasEditor';
 
 const TABS = ['layers', 'alerts', 'assets'] as const;
 type Tab = (typeof TABS)[number];
@@ -134,19 +139,31 @@ function LayersPanel({ editor }: { editor: UseCanvasEditorReturn }) {
   return (
     <div className="canvas-editor-layers">
       <div className="canvas-editor-add-row">
-        {(['text', 'alert-image', 'shape', 'alert-message'] as const).map((type) => (
+        {(['text', 'alert-image', 'shape'] as const).map((type) => (
           <button
             key={type}
             className="canvas-editor-add-button"
             type="button"
             disabled={editor.isPending || !canvas}
             onClick={() => editor.addElement(type)}
-            title={addButtonLabel(type)}
+            title={ADD_BUTTON_LABELS[type]}
           >
             <span className="canvas-editor-add-glyph">{typeGlyph(type)}</span>
-            <span className="canvas-editor-add-label">{addButtonLabel(type)}</span>
+            <span className="canvas-editor-add-label">{ADD_BUTTON_LABELS[type]}</span>
           </button>
         ))}
+        {/* Audio is a canvas-level setting, not an element — surface the canvas
+            inspector (stored sound + volume) by clearing the element selection. */}
+        <button
+          className="canvas-editor-add-button"
+          type="button"
+          disabled={!canvas}
+          onClick={() => editor.selectElement(null)}
+          title="Canvas audio settings"
+        >
+          <span className="canvas-editor-add-glyph">♪</span>
+          <span className="canvas-editor-add-label">Audio</span>
+        </button>
       </div>
 
       <div className="canvas-editor-section-header">
@@ -237,7 +254,6 @@ function LayersPanel({ editor }: { editor: UseCanvasEditorReturn }) {
                       onClick={() => {
                         const canvas = editor.selectedCanvas;
                         if (!canvas) return;
-                        const count = canvas.settings.elements.filter((el) => el.type === element.type).length + 1;
                         // Duplicate by creating a new element with same base properties, offset slightly.
                         const duplicate: CanvasElement = {
                           ...element,
@@ -382,7 +398,8 @@ function AccountTargetingControl({
 
 function AssetsPanel({ editor }: { editor: UseCanvasEditorReturn }) {
   const selectedElementId = editor.selectedElement;
-  const selectedElement = editor.selectedCanvas?.settings.elements.find((e) => e.id === selectedElementId) ?? null;
+  const selectedElement =
+    editor.selectedCanvas?.settings.elements.find((e) => e.id === selectedElementId) ?? null;
   const canAssignImage = selectedElement?.type === 'alert-image';
 
   function onAssetClick(asset: WorkspaceAsset) {
@@ -408,7 +425,10 @@ function AssetsPanel({ editor }: { editor: UseCanvasEditorReturn }) {
             draggable
             onClick={() => onAssetClick(asset)}
             onDragStart={(event) => {
-              event.dataTransfer.setData('text/plain', JSON.stringify({ assetId: asset.id, assetType: asset.assetType }));
+              event.dataTransfer.setData(
+                'text/plain',
+                JSON.stringify({ assetId: asset.id, assetType: asset.assetType }),
+              );
               event.dataTransfer.effectAllowed = 'copy';
             }}
           >
@@ -420,7 +440,7 @@ function AssetsPanel({ editor }: { editor: UseCanvasEditorReturn }) {
         ))
       )}
     </div>
-      );
+  );
 }
 
 function platformLabel(platform: string) {
@@ -434,15 +454,11 @@ function platformLabel(platform: string) {
   return labels[platform] ?? platform;
 }
 
-function addButtonLabel(type: CanvasElementType) {
-  const labels: Record<CanvasElementType, string> = {
-    text: 'Text',
-    'alert-image': 'Image',
-    shape: 'Shape',
-    'alert-message': 'Audio',
-  };
-  return labels[type];
-}
+const ADD_BUTTON_LABELS: Record<'text' | 'alert-image' | 'shape', string> = {
+  text: 'Text',
+  'alert-image': 'Image',
+  shape: 'Shape',
+};
 
 function typeGlyph(type: CanvasElementType) {
   const glyphs: Record<CanvasElementType, string> = {

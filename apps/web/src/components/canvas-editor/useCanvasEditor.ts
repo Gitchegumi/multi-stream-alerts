@@ -145,7 +145,11 @@ export type UseCanvasEditorReturn = {
   previewAlert: AlertEvent | null;
   /** Active snap guides for the stage. */
   snapGuides: { horizontal: boolean; vertical: boolean };
-  /** Ref that must be attached to the stage root for pointer/drag scaling. */
+  /**
+   * Ref that must be attached to the rendered canvas element (the inner
+   * `.canvas-editor-stage-canvas`) so pointer/drag scaling converts screen
+   * pixels to canvas units against the actual canvas rect, not the stage area.
+   */
   stageRef: React.RefObject<HTMLDivElement | null>;
   /** Raw alert configs passed into the workspace. */
   alertConfigs: AlertConfig[];
@@ -424,11 +428,7 @@ export function useCanvasEditor({
     if (!selectedCanvas) return;
     const count =
       selectedCanvas.settings.elements.filter((element) => element.type === type).length + 1;
-    const element = createCanvasElement(
-      type,
-      count,
-      selectedCanvas.settings.elements.length + 1,
-    );
+    const element = createCanvasElement(type, count, selectedCanvas.settings.elements.length + 1);
     patchCanvas(selectedCanvas.id, {
       settings: { elements: [...selectedCanvas.settings.elements, element] },
     });
@@ -502,13 +502,15 @@ export function useCanvasEditor({
     event.preventDefault();
     event.stopPropagation();
     setSelectedElement(elementId);
-    const stage = stageRef.current;
-    if (!stage) return;
+    const canvasEl = stageRef.current;
+    if (!canvasEl) return;
 
     const activeCanvas = selectedCanvas;
-    const stageRect = stage.getBoundingClientRect();
-    const scaleX = activeCanvas.settings.width / stageRect.width;
-    const scaleY = activeCanvas.settings.height / stageRect.height;
+    // Measure the rendered canvas rect (reflects zoom transform) so pointer
+    // movement maps to canvas units regardless of stage size or zoom level.
+    const canvasRect = canvasEl.getBoundingClientRect();
+    const scaleX = activeCanvas.settings.width / canvasRect.width;
+    const scaleY = activeCanvas.settings.height / canvasRect.height;
     const start = {
       clientX: event.clientX,
       clientY: event.clientY,

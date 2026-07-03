@@ -1,6 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FocusEvent,
+  type KeyboardEvent,
+} from 'react';
 import type { UseCanvasEditorReturn } from './useCanvasEditor';
 import { NumericField } from './NumericField';
 import { EVENT_VARIABLES, type CanvasElement, type CanvasSettings } from '@/lib/canvas-schema';
@@ -8,12 +16,18 @@ import { EVENT_VARIABLES, type CanvasElement, type CanvasSettings } from '@/lib/
 const IN_ANIMATIONS: Array<CanvasElement['animation']['in']> = ['fade', 'pop', 'slide-up'];
 const OUT_ANIMATIONS: Array<CanvasElement['animation']['out']> = ['fade'];
 
-function assetLabel(asset: { originalFilename: string | null; externalUrl: string | null; id: string }) {
+function assetLabel(asset: {
+  originalFilename: string | null;
+  externalUrl: string | null;
+  id: string;
+}) {
   return asset.originalFilename ?? asset.externalUrl ?? asset.id;
 }
 
 function assetForElement(element: CanvasElement, assets: UseCanvasEditorReturn['assets']) {
-  return element.bindings.assetId ? assets.find((asset) => asset.id === element.bindings.assetId) : null;
+  return element.bindings.assetId
+    ? assets.find((asset) => asset.id === element.bindings.assetId)
+    : null;
 }
 
 function PreviewAsset({
@@ -48,7 +62,8 @@ function PreviewAsset({
 export function EditorInspector({ editor }: { editor: UseCanvasEditorReturn }) {
   const selected = editor.selectedCanvas;
   const selectedElement = useMemo(
-    () => selected?.settings.elements.find((element) => element.id === editor.selectedElement) ?? null,
+    () =>
+      selected?.settings.elements.find((element) => element.id === editor.selectedElement) ?? null,
     [selected, editor.selectedElement],
   );
 
@@ -115,7 +130,9 @@ function CanvasInspector({ editor }: { editor: UseCanvasEditorReturn }) {
               min={320}
               max={7680}
               value={editor.canvasSizeDraft.width}
-              onChange={(event) => editor.setCanvasSizeDraftAxis('width', event.currentTarget.value)}
+              onChange={(event) =>
+                editor.setCanvasSizeDraftAxis('width', event.currentTarget.value)
+              }
               onBlur={() => editor.commitCanvasDimension('width')}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') event.currentTarget.blur();
@@ -130,7 +147,9 @@ function CanvasInspector({ editor }: { editor: UseCanvasEditorReturn }) {
               min={240}
               max={4320}
               value={editor.canvasSizeDraft.height}
-              onChange={(event) => editor.setCanvasSizeDraftAxis('height', event.currentTarget.value)}
+              onChange={(event) =>
+                editor.setCanvasSizeDraftAxis('height', event.currentTarget.value)
+              }
               onBlur={() => editor.commitCanvasDimension('height')}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') event.currentTarget.blur();
@@ -161,7 +180,11 @@ function CanvasInspector({ editor }: { editor: UseCanvasEditorReturn }) {
       <div className="canvas-editor-inspector-section">
         <label className="canvas-editor-field">
           <span>Stored sound</span>
-          <select className="select" value={selected.settings.audioAssetId ?? ''} onChange={handleAudioChange}>
+          <select
+            className="select"
+            value={selected.settings.audioAssetId ?? ''}
+            onChange={handleAudioChange}
+          >
             <option value="">Default / event audio</option>
             {editor.audioAssets.map((asset) => (
               <option key={asset.id} value={asset.id}>
@@ -199,7 +222,13 @@ function CanvasInspector({ editor }: { editor: UseCanvasEditorReturn }) {
   );
 }
 
-function ElementInspector({ editor, element }: { editor: UseCanvasEditorReturn; element: CanvasElement }) {
+function ElementInspector({
+  editor,
+  element,
+}: {
+  editor: UseCanvasEditorReturn;
+  element: CanvasElement;
+}) {
   const selected = editor.selectedCanvas!;
   const [renaming, setRenaming] = useState(false);
   const renameRef = useRef<HTMLInputElement>(null);
@@ -239,7 +268,8 @@ function ElementInspector({ editor, element }: { editor: UseCanvasEditorReturn; 
     const asset = editor.assets.find((item) => item.id === assetId);
     patchBindings({
       assetRole: 'eventVisual',
-      assetType: asset?.assetType === 'image' || asset?.assetType === 'video' ? asset.assetType : undefined,
+      assetType:
+        asset?.assetType === 'image' || asset?.assetType === 'video' ? asset.assetType : undefined,
       assetId: assetId || undefined,
       assetUrl: asset?.externalUrl ?? undefined,
     });
@@ -302,24 +332,81 @@ function ElementInspector({ editor, element }: { editor: UseCanvasEditorReturn; 
       <div className="canvas-editor-inspector-section">
         <h4 className="canvas-editor-section-heading">Position & size</h4>
         <div className="canvas-editor-inspector-grid">
-          <NumericField label="X" value={element.x} onChange={(value) => patch({ x: value })} min={0} max={selected.settings.width} />
-          <NumericField label="Y" value={element.y} onChange={(value) => patch({ y: value })} min={0} max={selected.settings.height} />
-          <NumericField label="W" value={element.width} onChange={(value) => patch({ width: value })} min={1} max={selected.settings.width} />
-          <NumericField label="H" value={element.height} onChange={(value) => patch({ height: value })} min={1} max={selected.settings.height} />
-          <NumericField label="°" value={element.rotation} onChange={(value) => patch({ rotation: value })} min={-360} max={360} />
-          <NumericField label="Opacity" value={element.opacity} onChange={(value) => patch({ opacity: value })} min={0} max={1} step={0.1} />
+          <NumericField
+            label="X"
+            value={element.x}
+            onChange={(value) => patch({ x: value })}
+            min={0}
+            max={selected.settings.width}
+          />
+          <NumericField
+            label="Y"
+            value={element.y}
+            onChange={(value) => patch({ y: value })}
+            min={0}
+            max={selected.settings.height}
+          />
+          <NumericField
+            label="W"
+            value={element.width}
+            onChange={(value) => patch({ width: value })}
+            min={1}
+            max={selected.settings.width}
+          />
+          <NumericField
+            label="H"
+            value={element.height}
+            onChange={(value) => patch({ height: value })}
+            min={1}
+            max={selected.settings.height}
+          />
+          <NumericField
+            label="°"
+            value={element.rotation}
+            onChange={(value) => patch({ rotation: value })}
+            min={-360}
+            max={360}
+          />
+          <NumericField
+            label="Opacity"
+            value={element.opacity}
+            onChange={(value) => patch({ opacity: value })}
+            min={0}
+            max={1}
+            step={0.1}
+          />
         </div>
         <div className="canvas-editor-align-row">
-          <button className="button-secondary" type="button" onClick={() => editor.centerElement(element.id, 'horizontal')}>
+          <button
+            className="button-secondary"
+            type="button"
+            title="Align left"
+            onClick={() => patch({ x: 0 })}
+          >
             Left
           </button>
-          <button className="button-secondary" type="button" onClick={() => editor.centerElement(element.id, 'both')}>
+          <button
+            className="button-secondary"
+            type="button"
+            title="Center horizontally"
+            onClick={() => editor.centerElement(element.id, 'horizontal')}
+          >
             Center
           </button>
-          <button className="button-secondary" type="button" onClick={() => editor.centerElement(element.id, 'horizontal')}>
+          <button
+            className="button-secondary"
+            type="button"
+            title="Align right"
+            onClick={() => patch({ x: Math.max(0, selected.settings.width - element.width) })}
+          >
             Right
           </button>
-          <button className="button-secondary" type="button" onClick={() => editor.centerElement(element.id, 'vertical')}>
+          <button
+            className="button-secondary"
+            type="button"
+            title="Center vertically"
+            onClick={() => editor.centerElement(element.id, 'vertical')}
+          >
             Middle
           </button>
         </div>
@@ -328,15 +415,25 @@ function ElementInspector({ editor, element }: { editor: UseCanvasEditorReturn; 
       {isText || isImage ? (
         <div className="canvas-editor-inspector-section">
           {isText ? (
-            <TemplateField element={element} onChange={(textTemplate) => patchBindings({ textTemplate })} />
+            <TemplateField
+              element={element}
+              onChange={(textTemplate) => patchBindings({ textTemplate })}
+            />
           ) : (
             <>
               <div className="canvas-editor-media-preview">
-                <PreviewAsset asset={assetForElement(element, editor.assets)} fallback="Event image" />
+                <PreviewAsset
+                  asset={assetForElement(element, editor.assets)}
+                  fallback="Event image"
+                />
               </div>
               <label className="canvas-editor-field">
                 <span>Stored asset</span>
-                <select className="select" value={element.bindings.assetId ?? ''} onChange={handleImageAssetChange}>
+                <select
+                  className="select"
+                  value={element.bindings.assetId ?? ''}
+                  onChange={handleImageAssetChange}
+                >
                   <option value="">Use event image/video</option>
                   {editor.imageAssets.map((asset) => (
                     <option key={asset.id} value={asset.id}>
@@ -385,7 +482,10 @@ function ElementInspector({ editor, element }: { editor: UseCanvasEditorReturn; 
                 type="color"
                 value={element.styles.textStrokeColor ?? '#000000'}
                 onChange={(event) =>
-                  patchStyles({ textStrokeColor: event.currentTarget.value, textStrokeWidth: element.styles.textStrokeWidth ?? 2 })
+                  patchStyles({
+                    textStrokeColor: event.currentTarget.value,
+                    textStrokeWidth: element.styles.textStrokeWidth ?? 2,
+                  })
                 }
               />
             </label>
@@ -393,7 +493,10 @@ function ElementInspector({ editor, element }: { editor: UseCanvasEditorReturn; 
               label="Px"
               value={element.styles.textStrokeWidth ?? 0}
               onChange={(value) =>
-                patchStyles({ textStrokeWidth: value, textStrokeColor: element.styles.textStrokeColor ?? '#000000' })
+                patchStyles({
+                  textStrokeWidth: value,
+                  textStrokeColor: element.styles.textStrokeColor ?? '#000000',
+                })
               }
               min={0}
               max={24}
@@ -402,7 +505,9 @@ function ElementInspector({ editor, element }: { editor: UseCanvasEditorReturn; 
           <button
             className={`canvas-editor-action-button${element.styles.fontWeight === '700' ? ' canvas-editor-action-active' : ''}`}
             type="button"
-            onClick={() => patchStyles({ fontWeight: element.styles.fontWeight === '700' ? '400' : '700' })}
+            onClick={() =>
+              patchStyles({ fontWeight: element.styles.fontWeight === '700' ? '400' : '700' })
+            }
           >
             Bold
           </button>
@@ -417,7 +522,11 @@ function ElementInspector({ editor, element }: { editor: UseCanvasEditorReturn; 
             <select
               className="select"
               value={element.animation.in ?? 'fade'}
-              onChange={(event) => handleAnimationInChange(event.currentTarget.value as CanvasElement['animation']['in'])}
+              onChange={(event) =>
+                handleAnimationInChange(
+                  event.currentTarget.value as CanvasElement['animation']['in'],
+                )
+              }
             >
               {IN_ANIMATIONS.map((value) => (
                 <option key={value} value={value}>
@@ -431,7 +540,11 @@ function ElementInspector({ editor, element }: { editor: UseCanvasEditorReturn; 
             <select
               className="select"
               value={element.animation.out ?? 'fade'}
-              onChange={(event) => handleAnimationOutChange(event.currentTarget.value as CanvasElement['animation']['out'])}
+              onChange={(event) =>
+                handleAnimationOutChange(
+                  event.currentTarget.value as CanvasElement['animation']['out'],
+                )
+              }
             >
               {OUT_ANIMATIONS.map((value) => (
                 <option key={value} value={value}>
@@ -454,7 +567,13 @@ function ElementInspector({ editor, element }: { editor: UseCanvasEditorReturn; 
   );
 }
 
-function TemplateField({ element, onChange }: { element: CanvasElement; onChange: (value: string) => void }) {
+function TemplateField({
+  element,
+  onChange,
+}: {
+  element: CanvasElement;
+  onChange: (value: string) => void;
+}) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showTokens, setShowTokens] = useState(false);
   const [tokenIndex, setTokenIndex] = useState(0);

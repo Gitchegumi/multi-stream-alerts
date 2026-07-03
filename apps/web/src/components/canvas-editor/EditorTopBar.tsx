@@ -22,16 +22,28 @@ export function EditorTopBar({ editor }: { editor: UseCanvasEditorReturn }) {
   if (!selected) {
     return (
       <header className="canvas-editor-top-bar">
-        <span className="canvas-editor-logo">GitchAlerts</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          className="canvas-editor-logo"
+          src="/gitchalerts-logo.svg"
+          alt="GitchAlerts"
+          width={30}
+          height={30}
+        />
       </header>
     );
   }
 
   return (
     <header className="canvas-editor-top-bar">
-      <span className="canvas-editor-logo" aria-label="GitchAlerts">
-        GitchAlerts
-      </span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        className="canvas-editor-logo"
+        src="/gitchalerts-logo.svg"
+        alt="GitchAlerts"
+        width={30}
+        height={30}
+      />
 
       <div className="canvas-editor-switcher" ref={dropdownRef}>
         <button
@@ -45,7 +57,9 @@ export function EditorTopBar({ editor }: { editor: UseCanvasEditorReturn }) {
           <span className="canvas-editor-switcher-dims muted">
             {selected.settings.width} × {selected.settings.height}
           </span>
-          <span className="canvas-editor-switcher-chevron" aria-hidden>▾</span>
+          <span className="canvas-editor-switcher-chevron" aria-hidden>
+            ▾
+          </span>
         </button>
 
         {open ? (
@@ -66,7 +80,9 @@ export function EditorTopBar({ editor }: { editor: UseCanvasEditorReturn }) {
                   }}
                 >
                   <span className="canvas-editor-switcher-item-name">{canvas.name}</span>
-                  <span className="muted">{canvas.settings.width} × {canvas.settings.height}</span>
+                  <span className="muted">
+                    {canvas.settings.width} × {canvas.settings.height}
+                  </span>
                 </button>
               ))}
             </div>
