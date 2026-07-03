@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.10.2](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.10.1...v0.10.2) (2026-07-03)
+
+
+### Features
+
+* **auth:** OAuth account linking for Twitch and YouTube integrations ([#69](https://github.com/Gitchegumi/multi-stream-alerts/issues/69)) ([9c9d921](https://github.com/Gitchegumi/multi-stream-alerts/commit/9c9d92174f8b6805b3a8030d8049f3220b6b7bbb))
+* consolidate integrations into workspace Settings page ([463c4e6](https://github.com/Gitchegumi/multi-stream-alerts/commit/463c4e62ce0c11bf271e4fa23ff1d9e1510d0c96)), closes [#95](https://github.com/Gitchegumi/multi-stream-alerts/issues/95)
+* expose Twitch/YouTube OAuth linking from Alerts page ([#90](https://github.com/Gitchegumi/multi-stream-alerts/issues/90)) ([aa9241d](https://github.com/Gitchegumi/multi-stream-alerts/commit/aa9241d709ccf54922bf398dc1687d1954d129d2))
+* move Integrations into Settings nav, remove redundant button ([#91](https://github.com/Gitchegumi/multi-stream-alerts/issues/91)) ([ad74a4c](https://github.com/Gitchegumi/multi-stream-alerts/commit/ad74a4cee326db407ca330b0068ff48900751732))
+* support multiple authenticated accounts per alert ([96debd7](https://github.com/Gitchegumi/multi-stream-alerts/commit/96debd7b10a132d01d7064a381c673bd57face3b)), closes [#97](https://github.com/Gitchegumi/multi-stream-alerts/issues/97)
+
+
+### Bug Fixes
+
+* add pull-request-title-pattern to release-please config ([142cd7d](https://github.com/Gitchegumi/multi-stream-alerts/commit/142cd7d1c72d7e66cb303e86f885d71302eb5f35))
+* add pull-request-title-pattern to release-please config ([6eed859](https://github.com/Gitchegumi/multi-stream-alerts/commit/6eed8598c755ef2eb641a95a56db289de7c46e2a))
+* address PR [#98](https://github.com/Gitchegumi/multi-stream-alerts/issues/98) review — account targeting correctness ([8e4e5a5](https://github.com/Gitchegumi/multi-stream-alerts/commit/8e4e5a500a31364d0215c19c70f375eee3209bf3))
+* **auth:** address PR [#70](https://github.com/Gitchegumi/multi-stream-alerts/issues/70) review — cookie handling, shared crypto, seamless signIn ([a958e33](https://github.com/Gitchegumi/multi-stream-alerts/commit/a958e333a38f3898d498ce3adeeb01e0ba935e78))
+* gate account targeting to Twitch/YouTube, fix DB tests ([3f42da8](https://github.com/Gitchegumi/multi-stream-alerts/commit/3f42da8bb149d0c4133b227032afce3f9e288552))
+* make Integrations nav link channel-scoped, add buildNavLinks tests ([#91](https://github.com/Gitchegumi/multi-stream-alerts/issues/91)) ([3d95fbe](https://github.com/Gitchegumi/multi-stream-alerts/commit/3d95fbed01d2582b493004d6f5d0cc4eb63dcee0))
+* **release:** independent per-service tags + single root release ([04d9b0a](https://github.com/Gitchegumi/multi-stream-alerts/commit/04d9b0a9e0b8c361901173f1d55740e3d88d4d33))
+* remove .ts extension from test imports, fix noUncheckedIndexedAccess on buffer tamper ([01a315c](https://github.com/Gitchegumi/multi-stream-alerts/commit/01a315cfcbd125cba1fd369233edbcd9d1c8e2ff))
+* remove dead routes and scope linked accounts to workspace ([138a644](https://github.com/Gitchegumi/multi-stream-alerts/commit/138a644f210585a0bb632c62bb2406a2ba1ff2e1))
+* remove unused PROVIDERS import from IntegrationsSection ([254115e](https://github.com/Gitchegumi/multi-stream-alerts/commit/254115e00ad1ad1feafd1577910e47d39a2d03e7))
+
 ## [0.1.10](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.1.9...v0.1.10) (2026-06-08)
 
 

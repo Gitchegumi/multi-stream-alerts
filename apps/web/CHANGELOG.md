@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.1.11](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-web-v0.1.10...alerts-web-v0.1.11) (2026-07-03)
+
+
+### Features
+
+* **auth:** OAuth account linking for Twitch and YouTube integrations ([#69](https://github.com/Gitchegumi/multi-stream-alerts/issues/69)) ([9c9d921](https://github.com/Gitchegumi/multi-stream-alerts/commit/9c9d92174f8b6805b3a8030d8049f3220b6b7bbb))
+* consolidate integrations into workspace Settings page ([463c4e6](https://github.com/Gitchegumi/multi-stream-alerts/commit/463c4e62ce0c11bf271e4fa23ff1d9e1510d0c96)), closes [#95](https://github.com/Gitchegumi/multi-stream-alerts/issues/95)
+* expose Twitch/YouTube OAuth linking from Alerts page ([#90](https://github.com/Gitchegumi/multi-stream-alerts/issues/90)) ([aa9241d](https://github.com/Gitchegumi/multi-stream-alerts/commit/aa9241d709ccf54922bf398dc1687d1954d129d2))
+* move Integrations into Settings nav, remove redundant button ([#91](https://github.com/Gitchegumi/multi-stream-alerts/issues/91)) ([ad74a4c](https://github.com/Gitchegumi/multi-stream-alerts/commit/ad74a4cee326db407ca330b0068ff48900751732))
+* support multiple authenticated accounts per alert ([96debd7](https://github.com/Gitchegumi/multi-stream-alerts/commit/96debd7b10a132d01d7064a381c673bd57face3b)), closes [#97](https://github.com/Gitchegumi/multi-stream-alerts/issues/97)
+
+
+### Bug Fixes
+
+* address PR [#98](https://github.com/Gitchegumi/multi-stream-alerts/issues/98) review — account targeting correctness ([8e4e5a5](https://github.com/Gitchegumi/multi-stream-alerts/commit/8e4e5a500a31364d0215c19c70f375eee3209bf3))
+* **auth:** address PR [#70](https://github.com/Gitchegumi/multi-stream-alerts/issues/70) review — cookie handling, shared crypto, seamless signIn ([a958e33](https://github.com/Gitchegumi/multi-stream-alerts/commit/a958e333a38f3898d498ce3adeeb01e0ba935e78))
+* make Integrations nav link channel-scoped, add buildNavLinks tests ([#91](https://github.com/Gitchegumi/multi-stream-alerts/issues/91)) ([3d95fbe](https://github.com/Gitchegumi/multi-stream-alerts/commit/3d95fbed01d2582b493004d6f5d0cc4eb63dcee0))
+* remove dead routes and scope linked accounts to workspace ([138a644](https://github.com/Gitchegumi/multi-stream-alerts/commit/138a644f210585a0bb632c62bb2406a2ba1ff2e1))
+* remove unused PROVIDERS import from IntegrationsSection ([254115e](https://github.com/Gitchegumi/multi-stream-alerts/commit/254115e00ad1ad1feafd1577910e47d39a2d03e7))
+
 ## [0.1.9](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.1.8...alerts-web-v0.1.9) (2026-06-08)
 
 
