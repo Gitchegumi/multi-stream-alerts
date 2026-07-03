@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.12](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-web-v0.1.11...alerts-web-v0.1.12) (2026-07-03)
+
+
+### Features
+
+* redesign alerts editor into Studio layout ([144193d](https://github.com/Gitchegumi/multi-stream-alerts/commit/144193d62f8589920fe2d01c14a0949337f3f33b))
+
+
+### Bug Fixes
+
+* address Studio editor review (drag scaling, audio button, alignment, logo) ([778bd7f](https://github.com/Gitchegumi/multi-stream-alerts/commit/778bd7f5ce02e3d5409b89ddd95cde071df9c82b))
+
 ## [0.1.11](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-web-v0.1.10...alerts-web-v0.1.11) (2026-07-03)
 
 
