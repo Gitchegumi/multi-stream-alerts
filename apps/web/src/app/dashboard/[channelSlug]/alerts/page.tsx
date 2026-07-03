@@ -6,7 +6,7 @@ import {
   toAlertEvent,
 } from '@multi-stream-alerts/database';
 import { requireDashboardSession } from '@/lib/session';
-import { CanvasWorkspace } from '@/components/CanvasWorkspace';
+import { CanvasEditor } from '@/components/canvas-editor/CanvasEditor';
 import { RecentAlertFeed } from '@/components/RecentAlertFeed';
 import { LinkedAccountBanner } from '@/components/LinkedAccountBanner';
 import { normalizeCanvasSettings } from '@/lib/canvas-schema';
@@ -100,7 +100,7 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
         />
       </section>
 
-      <CanvasWorkspace
+      <CanvasEditor
         channelId={channel.id}
         channelSlug={channel.slug}
         initialCanvases={canvases}
