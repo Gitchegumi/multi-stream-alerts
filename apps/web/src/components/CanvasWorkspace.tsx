@@ -410,17 +410,21 @@ export function CanvasWorkspace({
     });
   }
 
-  function saveAccountTargeting(configId: string, selectedAccountIds: string[]) {
+  function saveAccountTargeting(config: AlertConfig, selectedAccountIds: string[]) {
     startTransition(async () => {
+      const configJson = (config.configJson ?? {}) as Record<string, unknown>;
       const response = await fetch(
         `/api/channels/${encodeURIComponent(channelSlug)}/alert-configs/${encodeURIComponent(
-          configId,
+          config.id,
         )}`,
         {
           method: 'PATCH',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
-            configJson: { selectedLinkedAccountIds: selectedAccountIds },
+            configJson: {
+              ...configJson,
+              selectedLinkedAccountIds: selectedAccountIds,
+            },
           }),
         },
       );
@@ -429,7 +433,7 @@ export function CanvasWorkspace({
         return;
       }
       const body = (await response.json()) as { config: AlertConfig };
-      setConfigs((current) => current.map((item) => (item.id === configId ? body.config : item)));
+      setConfigs((current) => current.map((item) => (item.id === config.id ? body.config : item)));
     });
   }
 
@@ -441,7 +445,7 @@ export function CanvasWorkspace({
     const nextIds = checked
       ? [...new Set([...currentIds, accountId])]
       : currentIds.filter((id) => id !== accountId);
-    saveAccountTargeting(config.id, nextIds);
+    saveAccountTargeting(config, nextIds);
   }
 
   function testAlert(eventKey = 'manual.test') {
@@ -1388,16 +1392,13 @@ function AccountTargetingControl({
   channelSlug: string;
   onToggle: (config: AlertConfig, accountId: string, checked: boolean) => void;
 }) {
-  const platformAccounts = linkedAccounts.filter(
-    (a) => a.platform === platform && a.isActive,
-  );
+  const platformAccounts = linkedAccounts.filter((a) => a.platform === platform && a.isActive);
 
   if (platformAccounts.length === 0) {
     return (
       <div className="canvas-alert-account-targeting">
         <p className="muted small">
-          No {platform === 'twitch' ? 'Twitch' : 'YouTube'} accounts linked.
-          Connect one in{' '}
+          No {platform === 'twitch' ? 'Twitch' : 'YouTube'} accounts linked. Connect one in{' '}
           <a href={`/dashboard/${encodeURIComponent(channelSlug)}/settings#integrations`}>
             Settings → Integrations
           </a>
@@ -1418,19 +1419,13 @@ function AccountTargetingControl({
       <div className="canvas-alert-account-list">
         {platformAccounts.map((account) => {
           const checked = selectedIds.includes(account.id);
-          const label =
-            account.platformAccountName ?? account.platformAccountId;
+          const label = account.platformAccountName ?? account.platformAccountId;
           return (
-            <label
-              className="canvas-alert-account-chip"
-              key={account.id}
-            >
+            <label className="canvas-alert-account-chip" key={account.id}>
               <input
                 type="checkbox"
                 checked={checked}
-                onChange={(event) =>
-                  onToggle(config, account.id, event.currentTarget.checked)
-                }
+                onChange={(event) => onToggle(config, account.id, event.currentTarget.checked)}
               />
               <span>
                 {label}
@@ -1441,10 +1436,9 @@ function AccountTargetingControl({
         })}
       </div>
       {selectedIds.length === 0 && (
-        <p className="muted small">
-          No accounts selected — this alert will fire for{' '}
-          <strong>any</strong> linked {platform === 'twitch' ? 'Twitch' : 'YouTube'}{' '}
-          account. Select specific accounts to restrict it.
+        <p className="muted small warning">
+          No accounts selected — this alert will not fire until one or more{' '}
+          {platform === 'twitch' ? 'Twitch' : 'YouTube'} accounts are selected.
         </p>
       )}
     </div>

@@ -69,7 +69,10 @@ export async function PATCH(
   if (body.durationMs !== undefined) updateData.durationMs = body.durationMs;
   if (body.volume !== undefined) updateData.volume = body.volume;
   if (body.configJson !== undefined)
-    updateData.configJson = JSON.parse(JSON.stringify(body.configJson));
+    updateData.configJson = {
+      ...((existing.configJson as Record<string, unknown>) ?? {}),
+      ...body.configJson,
+    };
 
   const config = await prisma.workspaceAlertConfig.update({
     where: { id: configId },
