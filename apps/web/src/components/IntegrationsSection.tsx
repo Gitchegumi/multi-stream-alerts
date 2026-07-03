@@ -21,7 +21,6 @@ import { signIn } from 'next-auth/react';
 import {
   type CredentialStatus,
   type IntegrationProvider,
-  PROVIDERS,
 } from '@multi-stream-alerts/database';
 import { IntegrationSettingsForm } from '@/components/IntegrationSettingsForm';
 import { IntegrationCard, type LinkedAccount } from '@/components/IntegrationCard';
