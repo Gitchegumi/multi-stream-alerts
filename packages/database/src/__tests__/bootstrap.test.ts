@@ -118,6 +118,7 @@ test('createStoredAlertEvent with layoutIdOverride uses layout defaults over con
     durationMs: 3000,
     volume: 40,
     templateText: 'Config template text',
+    configJson: { selectedLinkedAccountIds: ['acc-1'] },
     createdAt: new Date(),
     updatedAt: new Date(),
   }));
@@ -138,6 +139,7 @@ test('createStoredAlertEvent with layoutIdOverride uses layout defaults over con
   };
 
   const findFirstMock = mock.fn(async () => overrideLayout);
+  const findManyMock = mock.fn(async () => [{ platformAccountId: 'platform-acc-1' }]);
   const createMock = mock.fn(async (args: { data: Record<string, unknown> }) => ({
     id: 'event-1',
     ...args.data,
@@ -147,6 +149,7 @@ test('createStoredAlertEvent with layoutIdOverride uses layout defaults over con
   }));
 
   const prismaMock = {
+    linkedAccount: { findMany: findManyMock },
     workspaceAlertLayout: { findFirst: findFirstMock },
     alertEvent: { create: createMock },
   };
@@ -162,6 +165,7 @@ test('createStoredAlertEvent with layoutIdOverride uses layout defaults over con
       eventKey: 'twitch.followed',
       displayName: 'TestUser',
       rawEventId: 'raw-1',
+      platformAccountId: 'platform-acc-1',
       layoutIdOverride: 'layout-override',
     });
 
@@ -230,6 +234,7 @@ test('createStoredAlertEvent without layoutIdOverride uses config values with la
     durationMs: 3000,
     volume: 40,
     templateText: 'Config template text',
+    configJson: { selectedLinkedAccountIds: ['acc-1'] },
     createdAt: new Date(),
     updatedAt: new Date(),
   }));
@@ -241,8 +246,10 @@ test('createStoredAlertEvent without layoutIdOverride uses config values with la
     createdAt: new Date(),
     updatedAt: new Date(),
   }));
+  const findManyMock = mock.fn(async () => [{ platformAccountId: 'platform-acc-1' }]);
 
   const prismaMock = {
+    linkedAccount: { findMany: findManyMock },
     alertEvent: { create: createMock },
   };
 
@@ -257,6 +264,7 @@ test('createStoredAlertEvent without layoutIdOverride uses config values with la
       eventKey: 'twitch.followed',
       displayName: 'TestUser',
       rawEventId: 'raw-2',
+      platformAccountId: 'platform-acc-1',
     });
 
     assert.ok(result);

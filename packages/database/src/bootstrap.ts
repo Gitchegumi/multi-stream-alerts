@@ -132,6 +132,7 @@ export async function createStoredAlertEvent(input: {
   type: AlertType;
   eventKey?: string;
   displayName: string;
+  platformAccountId?: string;
   amount?: number;
   currency?: string;
   message?: string;
@@ -157,6 +158,62 @@ export async function createStoredAlertEvent(input: {
       reason: 'no_config_or_disabled',
     });
     return null;
+  }
+
+  // Account targeting: when the config has selectedLinkedAccountIds in
+  // configJson, the incoming event's platformAccountId must match one of
+  // the selected linked accounts' platformAccountId. An empty or missing
+  // selection means the alert will NOT fire — users must explicitly choose
+  // which accounts the alert listens to.
+  if (input.platform === 'twitch' || input.platform === 'youtube') {
+    const configJson = (config.configJson ?? {}) as Record<string, unknown>;
+    const selectedLinkedAccountIds = Array.isArray(configJson.selectedLinkedAccountIds)
+      ? (configJson.selectedLinkedAccountIds as string[])
+      : [];
+
+    if (selectedLinkedAccountIds.length === 0) {
+      console.info('alert suppressed by account targeting', {
+        channelId: input.channelId,
+        platform: input.platform,
+        type: input.type,
+        eventKey: input.eventKey,
+        reason: 'no_accounts_selected',
+      });
+      return null;
+    }
+
+    if (!input.platformAccountId) {
+      console.info('alert suppressed by account targeting', {
+        channelId: input.channelId,
+        platform: input.platform,
+        type: input.type,
+        eventKey: input.eventKey,
+        reason: 'missing_platform_account_id',
+      });
+      return null;
+    }
+
+    const selectedAccounts = await _prisma.linkedAccount.findMany({
+      where: {
+        id: { in: selectedLinkedAccountIds },
+        channelId: input.channelId,
+        platform: input.platform,
+        isActive: true,
+      },
+      select: { platformAccountId: true },
+    });
+
+    if (!selectedAccounts.some((account) => account.platformAccountId === input.platformAccountId)) {
+      console.info('alert suppressed by account targeting', {
+        channelId: input.channelId,
+        platform: input.platform,
+        type: input.type,
+        eventKey: input.eventKey,
+        reason: 'account_not_selected',
+        platformAccountId: input.platformAccountId,
+      });
+      return null;
+    }
   }
 
   const layout =

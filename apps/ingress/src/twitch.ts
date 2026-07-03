@@ -26,6 +26,7 @@ export interface NormalizedTwitchEvent {
   type: AlertType;
   eventKey: string;
   displayName: string;
+  platformAccountId?: string;
   amount?: number;
   currency?: string;
   message?: string;
@@ -125,6 +126,20 @@ function extractRawEventId(payload: unknown): string {
 }
 
 /**
+ * Extract the broadcaster's platform account ID from the EventSub
+ * event payload. For most event types this is `broadcaster_user_id`;
+ * for raids it's `to_broadcaster_user_id` (the channel being raided,
+ * which is the one receiving the event). For follows it's `broadcaster_user_id`.
+ */
+function extractPlatformAccountId(payload: unknown): string | undefined {
+  if (typeof payload !== 'object' || payload === null) return undefined;
+  const p = payload as Record<string, unknown>;
+  if (typeof p.broadcaster_user_id === 'string') return p.broadcaster_user_id;
+  if (typeof p.to_broadcaster_user_id === 'string') return p.to_broadcaster_user_id;
+  return undefined;
+}
+
+/**
  * Normalize a Twitch EventSub payload into the internal alert-event
  * shape. Returns `null` for unmapped or unsupported subscription types.
  *
@@ -156,6 +171,7 @@ export function normalizeTwitchEventSub(payload: unknown): NormalizedTwitchEvent
     type,
     eventKey,
     displayName,
+    platformAccountId: extractPlatformAccountId(event),
     amount: extractAmount(event),
     currency: extractCurrency(event),
     message: extractMessage(event),

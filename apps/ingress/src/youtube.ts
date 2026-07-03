@@ -25,6 +25,7 @@ export interface NormalizedYoutubeEvent {
   type: AlertType;
   eventKey: string;
   displayName: string;
+  platformAccountId?: string;
   rawEventId: string;
   rawPayload: unknown;
 }
@@ -52,6 +53,7 @@ export function normalizeYoutubePubSub(payload: unknown): NormalizedYoutubeEvent
     type: 'stream_online',
     eventKey: 'youtube.stream_online',
     displayName: entry.author?.trim() || 'YouTube channel',
+    platformAccountId: entry.channelId,
     rawEventId: entry.id,
     rawPayload: entry,
   };

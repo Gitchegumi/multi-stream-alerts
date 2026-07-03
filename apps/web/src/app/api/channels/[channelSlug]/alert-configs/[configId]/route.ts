@@ -13,6 +13,12 @@ const configSchema = z.object({
   templateText: z.string().max(500).nullable().optional(),
   durationMs: z.number().int().min(500).max(60000).nullable().optional(),
   volume: z.number().int().min(0).max(100).nullable().optional(),
+  configJson: z
+    .object({
+      selectedLinkedAccountIds: z.array(z.string()).optional(),
+    })
+    .passthrough()
+    .optional(),
 });
 
 export async function PATCH(
@@ -53,9 +59,24 @@ export async function PATCH(
     return NextResponse.json({ error: 'Alert config not found' }, { status: 404 });
   }
 
+  // Build the update payload — only include fields that were provided
+  // so we don't accidentally null out fields the caller didn't send.
+  const updateData: Record<string, unknown> = {};
+  if (body.enabled !== undefined) updateData.enabled = body.enabled;
+  if (body.layoutId !== undefined) updateData.layoutId = body.layoutId;
+  if (body.displayName !== undefined) updateData.displayName = body.displayName;
+  if (body.templateText !== undefined) updateData.templateText = body.templateText;
+  if (body.durationMs !== undefined) updateData.durationMs = body.durationMs;
+  if (body.volume !== undefined) updateData.volume = body.volume;
+  if (body.configJson !== undefined)
+    updateData.configJson = {
+      ...((existing.configJson as Record<string, unknown>) ?? {}),
+      ...body.configJson,
+    };
+
   const config = await prisma.workspaceAlertConfig.update({
     where: { id: configId },
-    data: body,
+    data: updateData as never,
     include: { alertEventType: true, layout: true },
   });
 

@@ -35,11 +35,21 @@ type AlertConfig = {
   id: string;
   enabled: boolean;
   layoutId: string | null;
+  configJson: Record<string, unknown> | null;
   alertEventType: {
     platform: string;
     eventKey: string;
     displayName: string;
   };
+};
+
+type LinkedAccountInfo = {
+  id: string;
+  platform: 'twitch' | 'youtube';
+  platformAccountId: string;
+  platformAccountName: string | null;
+  isActive: boolean;
+  isPrimary: boolean;
 };
 
 type WorkspaceAsset = {
@@ -63,12 +73,14 @@ export function CanvasWorkspace({
   initialCanvases,
   alertConfigs,
   assets,
+  linkedAccounts,
 }: {
   channelId: string;
   channelSlug: string;
   initialCanvases: CanvasProfile[];
   alertConfigs: AlertConfig[];
   assets: WorkspaceAsset[];
+  linkedAccounts: LinkedAccountInfo[];
 }) {
   const [canvases, setCanvases] = useState(initialCanvases);
   const [configs, setConfigs] = useState(alertConfigs);
@@ -396,6 +408,44 @@ export function CanvasWorkspace({
       const body = (await response.json()) as { config: AlertConfig };
       setConfigs((current) => current.map((item) => (item.id === config.id ? body.config : item)));
     });
+  }
+
+  function saveAccountTargeting(config: AlertConfig, selectedAccountIds: string[]) {
+    startTransition(async () => {
+      const configJson = (config.configJson ?? {}) as Record<string, unknown>;
+      const response = await fetch(
+        `/api/channels/${encodeURIComponent(channelSlug)}/alert-configs/${encodeURIComponent(
+          config.id,
+        )}`,
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            configJson: {
+              ...configJson,
+              selectedLinkedAccountIds: selectedAccountIds,
+            },
+          }),
+        },
+      );
+      if (!response.ok) {
+        setResult('Could not save account targeting.');
+        return;
+      }
+      const body = (await response.json()) as { config: AlertConfig };
+      setConfigs((current) => current.map((item) => (item.id === config.id ? body.config : item)));
+    });
+  }
+
+  function toggleAccountSelection(config: AlertConfig, accountId: string, checked: boolean) {
+    const configJson = (config.configJson ?? {}) as Record<string, unknown>;
+    const currentIds = Array.isArray(configJson.selectedLinkedAccountIds)
+      ? (configJson.selectedLinkedAccountIds as string[])
+      : [];
+    const nextIds = checked
+      ? [...new Set([...currentIds, accountId])]
+      : currentIds.filter((id) => id !== accountId);
+    saveAccountTargeting(config, nextIds);
   }
 
   function testAlert(eventKey = 'manual.test') {
@@ -1095,31 +1145,42 @@ export function CanvasWorkspace({
             <div className="canvas-alert-group" key={platform}>
               <h3>{platformLabel(platform)}</h3>
               {configs.map((config) => (
-                <label className="canvas-alert-row" key={config.id}>
-                  <input
-                    type="checkbox"
-                    checked={assignedKeys.has(config.alertEventType.eventKey)}
-                    onChange={(event) => toggleAlert(config, event.currentTarget.checked)}
-                  />
-                  <span>
-                    <strong>{config.alertEventType.displayName}</strong>
-                    <span className="muted small">
-                      {config.alertEventType.eventKey}
-                      {config.enabled ? '' : ' / disabled'}
+                <div className="canvas-alert-row-wrapper" key={config.id}>
+                  <label className="canvas-alert-row">
+                    <input
+                      type="checkbox"
+                      checked={assignedKeys.has(config.alertEventType.eventKey)}
+                      onChange={(event) => toggleAlert(config, event.currentTarget.checked)}
+                    />
+                    <span>
+                      <strong>{config.alertEventType.displayName}</strong>
+                      <span className="muted small">
+                        {config.alertEventType.eventKey}
+                        {config.enabled ? '' : ' / disabled'}
+                      </span>
                     </span>
-                  </span>
-                  <button
-                    className="link-button"
-                    type="button"
-                    disabled={isPending}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      testAlert(config.alertEventType.eventKey);
-                    }}
-                  >
-                    Test
-                  </button>
-                </label>
+                    <button
+                      className="link-button"
+                      type="button"
+                      disabled={isPending}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        testAlert(config.alertEventType.eventKey);
+                      }}
+                    >
+                      Test
+                    </button>
+                  </label>
+                  {(platform === 'twitch' || platform === 'youtube') && (
+                    <AccountTargetingControl
+                      config={config}
+                      platform={platform as 'twitch' | 'youtube'}
+                      linkedAccounts={linkedAccounts}
+                      channelSlug={channelSlug}
+                      onToggle={toggleAccountSelection}
+                    />
+                  )}
+                </div>
               ))}
             </div>
           ))}
@@ -1316,4 +1377,70 @@ function snapToCanvasCenter(
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
+}
+
+function AccountTargetingControl({
+  config,
+  platform,
+  linkedAccounts,
+  channelSlug,
+  onToggle,
+}: {
+  config: AlertConfig;
+  platform: 'twitch' | 'youtube';
+  linkedAccounts: LinkedAccountInfo[];
+  channelSlug: string;
+  onToggle: (config: AlertConfig, accountId: string, checked: boolean) => void;
+}) {
+  const platformAccounts = linkedAccounts.filter((a) => a.platform === platform && a.isActive);
+
+  if (platformAccounts.length === 0) {
+    return (
+      <div className="canvas-alert-account-targeting">
+        <p className="muted small">
+          No {platform === 'twitch' ? 'Twitch' : 'YouTube'} accounts linked. Connect one in{' '}
+          <a href={`/dashboard/${encodeURIComponent(channelSlug)}/settings#integrations`}>
+            Settings → Integrations
+          </a>
+          .
+        </p>
+      </div>
+    );
+  }
+
+  const configJson = (config.configJson ?? {}) as Record<string, unknown>;
+  const selectedIds = Array.isArray(configJson.selectedLinkedAccountIds)
+    ? (configJson.selectedLinkedAccountIds as string[])
+    : [];
+
+  return (
+    <div className="canvas-alert-account-targeting">
+      <span className="muted small">Listen to accounts:</span>
+      <div className="canvas-alert-account-list">
+        {platformAccounts.map((account) => {
+          const checked = selectedIds.includes(account.id);
+          const label = account.platformAccountName ?? account.platformAccountId;
+          return (
+            <label className="canvas-alert-account-chip" key={account.id}>
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={(event) => onToggle(config, account.id, event.currentTarget.checked)}
+              />
+              <span>
+                {label}
+                {account.isPrimary ? ' ⭐' : ''}
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      {selectedIds.length === 0 && (
+        <p className="muted small warning">
+          No accounts selected — this alert will not fire until one or more{' '}
+          {platform === 'twitch' ? 'Twitch' : 'YouTube'} accounts are selected.
+        </p>
+      )}
+    </div>
+  );
 }
