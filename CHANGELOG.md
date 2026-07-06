@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.4](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.10.3...v0.10.4) (2026-07-06)
+
+
+### Bug Fixes
+
+* address Alerts editor layout and test-alert issues ([90a3f80](https://github.com/Gitchegumi/multi-stream-alerts/commit/90a3f80dcb928b46dd519cbcf73d4e6121f7ad2c))
+* Alerts editor layout, collapsible linked accounts, and test alert ([173fdb6](https://github.com/Gitchegumi/multi-stream-alerts/commit/173fdb6a83f0d68e9e7b73028b648768aa687280))
+
 ## [0.10.3](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.10.2...v0.10.3) (2026-07-03)
 
 
