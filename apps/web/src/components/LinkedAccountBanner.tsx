@@ -22,6 +22,8 @@ interface LinkedAccountBannerProps {
   callbackUrl?: string;
   compact?: boolean;
   channelSlug?: string;
+  /** Render collapsed by default with a header toggle to expand. */
+  collapsible?: boolean;
 }
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -40,11 +42,17 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export function LinkedAccountBanner({ callbackUrl, compact = true, channelSlug }: LinkedAccountBannerProps) {
+export function LinkedAccountBanner({
+  callbackUrl,
+  compact = true,
+  channelSlug,
+  collapsible = false,
+}: LinkedAccountBannerProps) {
   const searchParams = useSearchParams();
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [expanded, setExpanded] = useState(!collapsible);
 
   const currentUrl = typeof window !== 'undefined' ? window.location.href : undefined;
   const effectiveCallbackUrl = callbackUrl ?? currentUrl ?? '/dashboard/settings/integrations';
@@ -57,8 +65,10 @@ export function LinkedAccountBanner({ callbackUrl, compact = true, channelSlug }
         message: `${capitalize(connected)} account connected successfully 🛶`,
         type: 'success',
       });
+      setExpanded(true);
     } else if (error) {
       setToast({ message: 'Failed to connect account. Please try again.', type: 'error' });
+      setExpanded(true);
     }
     const timer = setTimeout(() => setToast(null), 4000);
     return () => clearTimeout(timer);
@@ -143,15 +153,40 @@ export function LinkedAccountBanner({ callbackUrl, compact = true, channelSlug }
   const youtubeAccounts = accounts.filter((a) => a.platform === 'youtube' && a.isActive);
   const status = getLinkStatus(accounts);
   const allLinked = status.twitch && status.youtube;
+  const connectedCount = (status.twitch ? 1 : 0) + youtubeAccounts.length;
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between">
+      <div className={`flex items-center justify-between ${expanded ? 'mb-3' : ''}`}>
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Linked accounts</h2>
-          <p className="text-sm text-gray-500">
-            Connect Twitch and YouTube to receive alerts for those platforms.
-          </p>
+          {collapsible ? (
+            <button
+              type="button"
+              className="flex items-center gap-2 text-lg font-semibold text-gray-900"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((v) => !v)}
+            >
+              <span
+                aria-hidden
+                className={`text-xs text-gray-500 transition-transform ${expanded ? 'rotate-90' : ''}`}
+              >
+                ▶
+              </span>
+              Linked accounts
+              {!expanded && !isLoading && (
+                <span className="text-sm font-normal text-gray-500">
+                  {connectedCount === 0 ? '· none connected' : `· ${connectedCount} connected`}
+                </span>
+              )}
+            </button>
+          ) : (
+            <h2 className="text-lg font-semibold text-gray-900">Linked accounts</h2>
+          )}
+          {expanded && (
+            <p className="text-sm text-gray-500">
+              Connect Twitch and YouTube to receive alerts for those platforms.
+            </p>
+          )}
         </div>
         {allLinked && !isLoading && (
           <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
@@ -170,7 +205,7 @@ export function LinkedAccountBanner({ callbackUrl, compact = true, channelSlug }
         </div>
       )}
 
-      {isLoading ? (
+      {!expanded ? null : isLoading ? (
         <div className={compact ? 'flex gap-4' : 'grid gap-4 md:grid-cols-2'}>
           <div className="h-24 flex-1 animate-pulse rounded-xl bg-gray-100"></div>
           <div className="h-24 flex-1 animate-pulse rounded-xl bg-gray-100"></div>

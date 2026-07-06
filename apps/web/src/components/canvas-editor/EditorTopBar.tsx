@@ -183,15 +183,6 @@ export function EditorTopBar({ editor }: { editor: UseCanvasEditorReturn }) {
         ) : null}
       </div>
 
-      <span
-        className={`canvas-editor-live-badge${
-          selected.isActive ? ' canvas-editor-live-badge-active' : ''
-        }`}
-      >
-        <span className="canvas-editor-live-dot" aria-hidden />
-        Live in OBS
-      </span>
-
       <span className="canvas-editor-spacer" />
 
       <span className="canvas-editor-save-state muted">
