@@ -1678,37 +1678,6 @@ textarea.input {
   gap: 10px;
 }
 
-.canvas-editor-live-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.canvas-editor-live-badge-active {
-  border-color: #2a9d3c;
-  color: #6ee787;
-  background: rgba(110, 231, 135, 0.08);
-}
-
-.canvas-editor-live-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--line-strong);
-}
-
-.canvas-editor-live-badge-active .canvas-editor-live-dot {
-  background: #6ee787;
-  box-shadow: 0 0 8px #6ee787;
-}
-
 .canvas-editor-spacer {
   flex: 1;
 }
@@ -1749,6 +1718,9 @@ textarea.input {
   display: grid;
   grid-template-rows: auto 1fr auto;
   min-width: 0;
+  /* Without a height cap the shell's 1fr row grows to fit tall tab content
+     (e.g. the Alerts list), pushing the stage down and clipping it. */
+  min-height: 0;
   border-right: 1px solid var(--line);
   background: var(--bg);
 }

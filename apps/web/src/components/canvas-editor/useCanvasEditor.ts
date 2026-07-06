@@ -627,8 +627,12 @@ export function useCanvasEditor({
     saveAccountTargeting(config, nextIds);
   }
 
-  function testAlert(eventKey = 'manual.test') {
+  function testAlert(requestedEventKey?: string) {
     if (!selectedCanvas) return;
+    // Default to a key the canvas is actually bound to so the test renders on
+    // the live overlay too (bound canvases ignore unassigned event keys).
+    const eventKey =
+      requestedEventKey ?? selectedCanvas.settings.alertEventKeys[0] ?? 'manual.test';
     const preview: AlertEvent = {
       id: `preview-${Date.now()}`,
       channelId,
@@ -645,6 +649,16 @@ export function useCanvasEditor({
     };
     setPreviewAlert(preview);
     window.setTimeout(() => setPreviewAlert(null), selectedCanvas.settings.defaultDurationMs);
+    const audioUrl = selectedCanvas.settings.audioAssetId
+      ? `/api/assets/${encodeURIComponent(selectedCanvas.settings.audioAssetId)}/content`
+      : selectedCanvas.settings.audioAssetUrl;
+    if (audioUrl && selectedCanvas.settings.volume > 0) {
+      const audio = new Audio(audioUrl);
+      audio.volume = Math.max(0, Math.min(1, selectedCanvas.settings.volume / 100));
+      void audio.play().catch(() => {
+        // Autoplay restrictions or a missing asset shouldn't break the preview.
+      });
+    }
     startTransition(async () => {
       const response = await fetch('/api/test-alert', {
         method: 'POST',

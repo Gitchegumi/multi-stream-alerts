@@ -97,6 +97,7 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
           callbackUrl={`/dashboard/${encodeURIComponent(channel.slug)}/alerts?connected=PLATFORM`}
           channelSlug={channel.slug}
           compact
+          collapsible
         />
       </section>
 

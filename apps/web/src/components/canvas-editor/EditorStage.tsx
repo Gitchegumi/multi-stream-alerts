@@ -102,7 +102,8 @@ export function EditorStage({ editor }: { editor: UseCanvasEditorReturn }) {
               .sort((a, b) => a.zIndex - b.zIndex)
               .map((element) => (
                 <ElementView
-                  key={element.id}
+                  // Remount per preview so the entrance animation replays.
+                  key={`${element.id}-${editor.previewAlert?.id ?? 'static'}`}
                   element={element}
                   editor={editor}
                   selected={editor.selectedElement === element.id}
@@ -221,6 +222,8 @@ function ElementView({
           element.styles.textStrokeWidth && element.styles.textStrokeColor
             ? `${Math.max(0, element.styles.textStrokeWidth / 2.8)}px ${element.styles.textStrokeColor}`
             : undefined,
+        animationName: editor.previewAlert ? animationName(element.animation.in) : undefined,
+        animationDuration: editor.previewAlert ? '520ms' : undefined,
       }}
       onPointerDown={handlePointerDown}
       onClick={(event) => {
@@ -270,6 +273,12 @@ function ElementView({
       ) : null}
     </div>
   );
+}
+
+function animationName(value: CanvasElement['animation']['in']) {
+  if (value === 'pop') return 'alert-pop';
+  if (value === 'slide-up') return 'alert-slide-up';
+  return 'alert-fade';
 }
 
 type ReactPointerEvent = React.PointerEvent<HTMLElement>;
