@@ -19,6 +19,22 @@ const testAlertSchema = z.object({
   isPublic: z.boolean().optional(),
 });
 
+function buildSampleAlertData(
+  platform: string,
+  type: string,
+): { message?: string; amount?: number; currency?: string } {
+  if (type === 'tip' || type === 'superchat' || type === 'hypechat') {
+    return { message: 'Thanks for the stream!', amount: 5, currency: 'USD' };
+  }
+  if (type === 'subscription' || type === 'membership' || type === 'gift') {
+    return { message: 'Welcome to the channel!' };
+  }
+  if (type === 'raid') {
+    return { message: 'Raid incoming!' };
+  }
+  return { message: 'This is a test alert from the dashboard.' };
+}
+
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
 
@@ -38,17 +54,25 @@ export async function POST(request: Request) {
     ? await prisma.alertEventType.findUnique({ where: { eventKey: body.eventKey } })
     : null;
 
+  const sampleData = buildSampleAlertData(
+    eventType?.platform ?? 'manual',
+    eventType?.legacyType ?? 'test',
+  );
+
   const event = await storeAndPublishAlertEvent({
     channelId: body.channelId,
     platform: eventType?.platform ?? 'manual',
     type: eventType?.legacyType ?? 'test',
     eventKey: eventType?.eventKey ?? 'manual.test',
     layoutIdOverride: body.layoutId,
-    displayName: session.user.name ?? 'Dashboard user',
-    message: body.message,
+    displayName: 'Test Viewer',
+    message: body.message ?? sampleData.message,
+    amount: sampleData.amount,
+    currency: sampleData.currency,
     isPublic: body.isPublic ?? true,
+    skipAccountTargeting: true,
     rawEventId: crypto.randomUUID(),
-    rawPayload: { source: 'dashboard' },
+    rawPayload: { source: 'dashboard', test: true },
   });
 
   if (!event) {
