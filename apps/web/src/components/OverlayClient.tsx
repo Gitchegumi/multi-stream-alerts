@@ -8,6 +8,7 @@ import {
   type CanvasElement,
   type CanvasSettings,
 } from '@/lib/canvas-schema';
+import { buildAnimationStyle } from '@/lib/canvas-animation';
 
 export function OverlayClient({
   displayKey,
@@ -131,6 +132,7 @@ function CanvasRuntimeElement({
   element: CanvasElement;
   alert: AlertEvent;
 }) {
+  const animStyle = buildAnimationStyle(element, 'in');
   const style = {
     left: element.x,
     top: element.y,
@@ -150,8 +152,10 @@ function CanvasRuntimeElement({
       element.styles.textStrokeWidth && element.styles.textStrokeColor
         ? `${element.styles.textStrokeWidth}px ${element.styles.textStrokeColor}`
         : undefined,
-    animationName: animationName(element.animation.in),
-    animationDuration: '520ms',
+    animationName: animStyle?.animationName,
+    animationDuration: animStyle?.animationDuration,
+    animationDelay: animStyle?.animationDelay,
+    animationFillMode: animStyle?.animationFillMode,
   };
 
   if (element.type === 'alert-image') {
@@ -210,10 +214,4 @@ function resolveCanvasAssetUrl(
     return `/api/assets/${encodeURIComponent(assetId)}/content?displayKey=${encodeURIComponent(displayKey)}`;
   }
   return resolveOverlayAssetUrl(assetUrl ?? undefined, displayKey);
-}
-
-function animationName(value: CanvasElement['animation']['in']) {
-  if (value === 'pop') return 'alert-pop';
-  if (value === 'slide-up') return 'alert-slide-up';
-  return 'alert-fade';
 }
