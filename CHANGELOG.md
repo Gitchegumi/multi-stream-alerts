@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.10.5](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.10.4...v0.10.5) (2026-07-07)
+
+
+### Bug Fixes
+
+* address PR [#114](https://github.com/Gitchegumi/multi-stream-alerts/issues/114) review feedback ([d2ba427](https://github.com/Gitchegumi/multi-stream-alerts/commit/d2ba42775d703f7167c5d3424c0fc6235b2a06f3))
+* bypass account targeting for test alerts and add sample data ([dcfbe72](https://github.com/Gitchegumi/multi-stream-alerts/commit/dcfbe729a3ff0a6df14a7f14180e7c69cfbf3bab))
+* bypass account targeting for test alerts so overlay receives them ([8621b06](https://github.com/Gitchegumi/multi-stream-alerts/commit/8621b062366449e1d4c243b1da2453a9913fd674))
+* make Test alert play configured animations in the editor canvas ([a84e340](https://github.com/Gitchegumi/multi-stream-alerts/commit/a84e340033badee408c3627f20c34c01aef40e2f))
+* make Test alert play configured animations in the editor canvas ([ebcdef5](https://github.com/Gitchegumi/multi-stream-alerts/commit/ebcdef59bbec2d56a546a5c7200e5c1b2aa9dc78)), closes [#110](https://github.com/Gitchegumi/multi-stream-alerts/issues/110)
+* move visual styling to animated wrapper so shape/text layers animate ([d9ae937](https://github.com/Gitchegumi/multi-stream-alerts/commit/d9ae93750c5f89e601ddac47ed2fdf92bfa7dc74))
+* remove token overlay causing placeholder/text overlap in inspector Content field ([80dbbe3](https://github.com/Gitchegumi/multi-stream-alerts/commit/80dbbe3c18fc577936dc01c205985a82d5587fdc))
+* remove token overlay causing placeholder/text overlap in inspector Content field ([991d7df](https://github.com/Gitchegumi/multi-stream-alerts/commit/991d7df6fce3be55ddf6c7605b9b1219c1c0ce3b)), closes [#109](https://github.com/Gitchegumi/multi-stream-alerts/issues/109)
+
 ## [0.10.4](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.10.3...v0.10.4) (2026-07-06)
 
 
