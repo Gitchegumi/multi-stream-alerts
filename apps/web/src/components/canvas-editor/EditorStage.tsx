@@ -220,19 +220,7 @@ function ElementView({
         width: `${width}%`,
         height: `${height}%`,
         zIndex: element.zIndex,
-        opacity: element.opacity,
         transform: `rotate(${element.rotation}deg)`,
-        color: element.styles.color,
-        background: element.styles.backgroundColor,
-        borderRadius: element.styles.borderRadius,
-        fontFamily: element.styles.fontFamily,
-        fontSize: Math.max(10, (element.styles.fontSize ?? 32) / 2.8),
-        fontWeight: element.styles.fontWeight,
-        textShadow: element.styles.textShadow,
-        WebkitTextStroke:
-          element.styles.textStrokeWidth && element.styles.textStrokeColor
-            ? `${Math.max(0, element.styles.textStrokeWidth / 2.8)}px ${element.styles.textStrokeColor}`
-            : undefined,
       }}
       onPointerDown={handlePointerDown}
       onClick={(event) => {
@@ -242,16 +230,28 @@ function ElementView({
     >
       <div
         className="canvas-editor-element-anim"
-        style={
-          animStyle
+        style={{
+          opacity: element.opacity,
+          background: element.styles.backgroundColor,
+          borderRadius: element.styles.borderRadius,
+          color: element.styles.color,
+          fontFamily: element.styles.fontFamily,
+          fontSize: Math.max(10, (element.styles.fontSize ?? 32) / 2.8),
+          fontWeight: element.styles.fontWeight,
+          textShadow: element.styles.textShadow,
+          WebkitTextStroke:
+            element.styles.textStrokeWidth && element.styles.textStrokeColor
+              ? `${Math.max(0, element.styles.textStrokeWidth / 2.8)}px ${element.styles.textStrokeColor}`
+              : undefined,
+          ...(animStyle
             ? {
                 animationName: animStyle.animationName,
                 animationDuration: animStyle.animationDuration,
                 animationDelay: animStyle.animationDelay,
                 animationFillMode: animStyle.animationFillMode,
               }
-            : undefined
-        }
+            : {}),
+        }}
       >
         {selected ? (
           <span className="canvas-editor-element-badge canvas-editor-element-name">
