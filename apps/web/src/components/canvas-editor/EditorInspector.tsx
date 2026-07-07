@@ -582,12 +582,12 @@ function TemplateField({
   function insertToken(token: string) {
     const textarea = textareaRef.current;
     if (!textarea) {
-      onChange(`${value}${token}`);
+      onChange(insertTokenAt(value, token, value.length, value.length));
       return;
     }
     const start = textarea.selectionStart ?? value.length;
-    const next = value.slice(0, start) + token + value.slice(textarea.selectionEnd ?? start);
-    onChange(next);
+    const end = textarea.selectionEnd ?? start;
+    onChange(insertTokenAt(value, token, start, end));
     setShowTokens(false);
     window.setTimeout(() => {
       const position = start + token.length;
@@ -636,11 +636,9 @@ function TemplateField({
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           rows={4}
+          placeholder={CONTENT_PLACEHOLDER}
         />
       </label>
-      <div className="canvas-editor-token-overlay" aria-hidden>
-        {renderTokenOverlay(value)}
-      </div>
       {showTokens ? (
         <div className="canvas-editor-token-popover" role="listbox">
           {EVENT_VARIABLES.map((token, index) => (
@@ -662,19 +660,20 @@ function TemplateField({
   );
 }
 
-function renderTokenOverlay(template: string) {
-  const parts = template.split(/(\{\{[a-zA-Z0-9]+\}\})/g);
-  return parts.map((part, index) => {
-    if (/\{\{[a-zA-Z0-9]+\}\}/.test(part)) {
-      return (
-        <span key={index} className="canvas-editor-token-chip">
-          {part}
-        </span>
-      );
-    }
-    return <span key={index}>{part}</span>;
-  });
+/**
+ * Insert a token into a template string at the given selection range.
+ * Exported for unit testing (issue #109 regression coverage).
+ */
+export function insertTokenAt(template: string, token: string, start: number, end: number): string {
+  return template.slice(0, start) + token + template.slice(end);
 }
+
+/**
+ * Placeholder text for the Content textarea. The browser only shows this
+ * when the value is empty — no manual overlay needed (issue #109).
+ */
+export const CONTENT_PLACEHOLDER =
+  'Enter alert text. Type / to insert event data like {{viewerName}}.';
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));

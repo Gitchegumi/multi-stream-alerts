@@ -2389,29 +2389,6 @@ textarea.input {
   resize: vertical;
 }
 
-.canvas-editor-token-overlay {
-  pointer-events: none;
-  position: absolute;
-  top: 26px;
-  left: 8px;
-  right: 8px;
-  bottom: 26px;
-  color: transparent;
-  font: inherit;
-  line-height: inherit;
-  white-space: pre-wrap;
-  word-break: break-word;
-  overflow: hidden;
-}
-
-.canvas-editor-token-chip {
-  display: inline;
-  color: var(--accent);
-  background: var(--primary-soft);
-  border-radius: 4px;
-  padding: 1px 3px;
-}
-
 .canvas-editor-token-popover {
   position: absolute;
   left: 8px;
