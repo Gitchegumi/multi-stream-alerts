@@ -142,6 +142,7 @@ export async function createStoredAlertEvent(input: {
   rawEventId: string;
   rawPayload?: unknown;
   layoutIdOverride?: string;
+  skipAccountTargeting?: boolean;
 }): Promise<AlertEvent | null> {
   const config = await _resolveAlertConfig({
     channelId: input.channelId,
@@ -165,7 +166,12 @@ export async function createStoredAlertEvent(input: {
   // the selected linked accounts' platformAccountId. An empty or missing
   // selection means the alert will NOT fire — users must explicitly choose
   // which accounts the alert listens to.
-  if (input.platform === 'twitch' || input.platform === 'youtube') {
+  // skipAccountTargeting: test alerts bypass this check since there is no
+  // real external account involved.
+  if (
+    input.skipAccountTargeting !== true &&
+    (input.platform === 'twitch' || input.platform === 'youtube')
+  ) {
     const configJson = (config.configJson ?? {}) as Record<string, unknown>;
     const selectedLinkedAccountIds = Array.isArray(configJson.selectedLinkedAccountIds)
       ? (configJson.selectedLinkedAccountIds as string[])
@@ -203,7 +209,9 @@ export async function createStoredAlertEvent(input: {
       select: { platformAccountId: true },
     });
 
-    if (!selectedAccounts.some((account) => account.platformAccountId === input.platformAccountId)) {
+    if (
+      !selectedAccounts.some((account) => account.platformAccountId === input.platformAccountId)
+    ) {
       console.info('alert suppressed by account targeting', {
         channelId: input.channelId,
         platform: input.platform,

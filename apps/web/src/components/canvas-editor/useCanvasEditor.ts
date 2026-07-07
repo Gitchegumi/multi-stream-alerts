@@ -720,7 +720,9 @@ export function useCanvasEditor({
       setResult(
         response.ok
           ? 'Test alert sent and previewed.'
-          : 'Local preview shown, but the alert was not sent.',
+          : response.status === 409
+            ? 'Test alert suppressed — alert type may be disabled. Local preview shown.'
+            : 'Local preview shown, but the alert was not sent.',
       );
     });
   }
