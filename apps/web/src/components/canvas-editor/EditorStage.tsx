@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react';
 import { renderCanvasText } from '@/lib/canvas-schema';
+import { buildAnimationStyle } from '@/lib/canvas-animation';
 import type { UseCanvasEditorReturn } from './useCanvasEditor';
 import type { CanvasElement } from '@/lib/canvas-schema';
 
@@ -102,8 +103,9 @@ export function EditorStage({ editor }: { editor: UseCanvasEditorReturn }) {
               .sort((a, b) => a.zIndex - b.zIndex)
               .map((element) => (
                 <ElementView
-                  // Remount per preview so the entrance animation replays.
-                  key={`${element.id}-${editor.previewAlert?.id ?? 'static'}`}
+                  // Remount per preview + phase so entrance and exit
+                  // animations replay on each test click.
+                  key={`${element.id}-${editor.previewAlert?.id ?? 'static'}-${editor.previewExiting ? 'out' : 'in'}`}
                   element={element}
                   editor={editor}
                   selected={editor.selectedElement === element.id}
@@ -200,6 +202,15 @@ function ElementView({
   const width = (element.width / settings.width) * 100;
   const height = (element.height / settings.height) * 100;
 
+  // Build animation style only during preview playback. The key remount
+  // (above) ensures the animation replays on each test click.
+  const animStyle =
+    editor.previewAlert && !editor.previewExiting
+      ? buildAnimationStyle(element, 'in')
+      : editor.previewAlert && editor.previewExiting
+        ? buildAnimationStyle(element, 'out')
+        : null;
+
   return (
     <div
       className={`canvas-editor-element${selected ? ' canvas-editor-element-selected' : ''}${element.locked ? ' canvas-editor-element-locked' : ''} canvas-editor-element-type-${element.type}`}
@@ -209,21 +220,7 @@ function ElementView({
         width: `${width}%`,
         height: `${height}%`,
         zIndex: element.zIndex,
-        opacity: element.opacity,
         transform: `rotate(${element.rotation}deg)`,
-        color: element.styles.color,
-        background: element.styles.backgroundColor,
-        borderRadius: element.styles.borderRadius,
-        fontFamily: element.styles.fontFamily,
-        fontSize: Math.max(10, (element.styles.fontSize ?? 32) / 2.8),
-        fontWeight: element.styles.fontWeight,
-        textShadow: element.styles.textShadow,
-        WebkitTextStroke:
-          element.styles.textStrokeWidth && element.styles.textStrokeColor
-            ? `${Math.max(0, element.styles.textStrokeWidth / 2.8)}px ${element.styles.textStrokeColor}`
-            : undefined,
-        animationName: editor.previewAlert ? animationName(element.animation.in) : undefined,
-        animationDuration: editor.previewAlert ? '520ms' : undefined,
       }}
       onPointerDown={handlePointerDown}
       onClick={(event) => {
@@ -231,30 +228,55 @@ function ElementView({
         editor.selectElement(element.id);
       }}
     >
-      {selected ? (
-        <span className="canvas-editor-element-badge canvas-editor-element-name">
-          {element.name}
-        </span>
-      ) : null}
-
-      <div className="canvas-editor-element-content">
-        {element.type === 'alert-image' ? (
-          element.bindings.assetUrl ? (
-            <img
-              className="canvas-editor-element-image"
-              src={element.bindings.assetUrl}
-              alt={element.name}
-            />
-          ) : (
-            <span className="canvas-editor-element-placeholder">Event image</span>
-          )
-        ) : element.type === 'shape' ? null : (
-          <span className="canvas-editor-element-text">
-            {renderCanvasText(element.bindings.textTemplate ?? element.name, editor.previewAlert)}
+      <div
+        className="canvas-editor-element-anim"
+        style={{
+          opacity: element.opacity,
+          background: element.styles.backgroundColor,
+          borderRadius: element.styles.borderRadius,
+          color: element.styles.color,
+          fontFamily: element.styles.fontFamily,
+          fontSize: Math.max(10, (element.styles.fontSize ?? 32) / 2.8),
+          fontWeight: element.styles.fontWeight,
+          textShadow: element.styles.textShadow,
+          WebkitTextStroke:
+            element.styles.textStrokeWidth && element.styles.textStrokeColor
+              ? `${Math.max(0, element.styles.textStrokeWidth / 2.8)}px ${element.styles.textStrokeColor}`
+              : undefined,
+          ...(animStyle
+            ? {
+                animationName: animStyle.animationName,
+                animationDuration: animStyle.animationDuration,
+                animationDelay: animStyle.animationDelay,
+                animationFillMode: animStyle.animationFillMode,
+              }
+            : {}),
+        }}
+      >
+        {selected ? (
+          <span className="canvas-editor-element-badge canvas-editor-element-name">
+            {element.name}
           </span>
-        )}
-      </div>
+        ) : null}
 
+        <div className="canvas-editor-element-content">
+          {element.type === 'alert-image' ? (
+            element.bindings.assetUrl ? (
+              <img
+                className="canvas-editor-element-image"
+                src={element.bindings.assetUrl}
+                alt={element.name}
+              />
+            ) : (
+              <span className="canvas-editor-element-placeholder">Event image</span>
+            )
+          ) : element.type === 'shape' ? null : (
+            <span className="canvas-editor-element-text">
+              {renderCanvasText(element.bindings.textTemplate ?? element.name, editor.previewAlert)}
+            </span>
+          )}
+        </div>
+      </div>
       {selected ? (
         <>
           <span className="canvas-editor-element-badge canvas-editor-element-dims">
@@ -273,12 +295,6 @@ function ElementView({
       ) : null}
     </div>
   );
-}
-
-function animationName(value: CanvasElement['animation']['in']) {
-  if (value === 'pop') return 'alert-pop';
-  if (value === 'slide-up') return 'alert-slide-up';
-  return 'alert-fade';
 }
 
 type ReactPointerEvent = React.PointerEvent<HTMLElement>;

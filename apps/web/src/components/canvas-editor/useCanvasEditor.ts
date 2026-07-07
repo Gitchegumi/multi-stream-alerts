@@ -143,6 +143,8 @@ export type UseCanvasEditorReturn = {
   result: string | null;
   /** Currently playing preview alert, if any. */
   previewAlert: AlertEvent | null;
+  /** True when the preview is in the exit-animation phase. */
+  previewExiting: boolean;
   /** Active snap guides for the stage. */
   snapGuides: { horizontal: boolean; vertical: boolean };
   /**
@@ -210,11 +212,16 @@ export function useCanvasEditor({
   );
   const [result, setResult] = useState<string | null>(null);
   const [previewAlert, setPreviewAlert] = useState<AlertEvent | null>(null);
+  const [previewExiting, setPreviewExiting] = useState(false);
   const [snapGuides, setSnapGuides] = useState({ horizontal: false, vertical: false });
   const [zoom, setZoom] = useState(100);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [isPending, startTransition] = useTransition();
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const previewTimers = useRef<{ exit: number | null; clear: number | null }>({
+    exit: null,
+    clear: null,
+  });
 
   const selectedCanvas = useMemo(
     () => canvases.find((canvas) => canvas.id === selected) ?? null,
@@ -255,6 +262,15 @@ export function useCanvasEditor({
       height: String(selectedCanvas.settings.height),
     });
   }, [selectedCanvas?.id, selectedCanvas?.settings.width, selectedCanvas?.settings.height]);
+
+  // Clean up preview timers on unmount so they don't fire after the editor
+  // is gone (issue #110).
+  useEffect(() => {
+    return () => {
+      if (previewTimers.current.exit) window.clearTimeout(previewTimers.current.exit);
+      if (previewTimers.current.clear) window.clearTimeout(previewTimers.current.clear);
+    };
+  }, []);
 
   function selectCanvas(id: string) {
     const next = canvases.find((canvas) => canvas.id === id);
@@ -647,8 +663,39 @@ export function useCanvasEditor({
       rawEventId: `preview-${Date.now()}`,
       createdAt: new Date().toISOString(),
     };
+
+    // Reset any previous preview state (repeated test clicks replay cleanly).
+    setPreviewExiting(false);
     setPreviewAlert(preview);
-    window.setTimeout(() => setPreviewAlert(null), selectedCanvas.settings.defaultDurationMs);
+
+    // Schedule the exit animation phase before clearing the preview entirely.
+    // The exit animation duration is 520ms (matching the entrance), so we
+    // trigger it 520ms before the full duration elapses.
+    const exitDuration = 520;
+    const totalDuration = selectedCanvas.settings.defaultDurationMs;
+    if (totalDuration >= exitDuration * 2) {
+      // Enough time for both entrance and exit animations.
+      const exitTimer = window.setTimeout(() => {
+        setPreviewExiting(true);
+      }, totalDuration - exitDuration);
+      const clearTimer = window.setTimeout(() => {
+        setPreviewAlert(null);
+        setPreviewExiting(false);
+      }, totalDuration);
+      if (previewTimers.current.clear) window.clearTimeout(previewTimers.current.clear);
+      if (previewTimers.current.exit) window.clearTimeout(previewTimers.current.exit);
+      previewTimers.current = { exit: exitTimer, clear: clearTimer };
+    } else {
+      // Duration too short for exit animation — just clear after totalDuration.
+      const clearTimer = window.setTimeout(() => {
+        setPreviewAlert(null);
+        setPreviewExiting(false);
+      }, totalDuration);
+      if (previewTimers.current.clear) window.clearTimeout(previewTimers.current.clear);
+      if (previewTimers.current.exit) window.clearTimeout(previewTimers.current.exit);
+      previewTimers.current = { exit: null, clear: clearTimer };
+    }
+
     const audioUrl = selectedCanvas.settings.audioAssetId
       ? `/api/assets/${encodeURIComponent(selectedCanvas.settings.audioAssetId)}/content`
       : selectedCanvas.settings.audioAssetUrl;
@@ -712,6 +759,7 @@ export function useCanvasEditor({
     saveState,
     result,
     previewAlert,
+    previewExiting,
     snapGuides,
     stageRef,
     alertConfigs: configs,
