@@ -276,24 +276,23 @@ function ElementView({
             </span>
           )}
         </div>
-
-        {selected ? (
-          <>
-            <span className="canvas-editor-element-badge canvas-editor-element-dims">
-              {element.width} × {element.height}
-            </span>
-            {(['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'] as const).map((handle) => (
-              <span
-                key={handle}
-                className={`canvas-editor-handle canvas-editor-handle-${handle}`}
-                aria-label={`Resize ${handle}`}
-                role="presentation"
-                onPointerDown={(event) => handleResizePointerDown(event, handle)}
-              />
-            ))}
-          </>
-        ) : null}
       </div>
+      {selected ? (
+        <>
+          <span className="canvas-editor-element-badge canvas-editor-element-dims">
+            {element.width} × {element.height}
+          </span>
+          {(['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'] as const).map((handle) => (
+            <span
+              key={handle}
+              className={`canvas-editor-handle canvas-editor-handle-${handle}`}
+              aria-label={`Resize ${handle}`}
+              role="presentation"
+              onPointerDown={(event) => handleResizePointerDown(event, handle)}
+            />
+          ))}
+        </>
+      ) : null}
     </div>
   );
 }

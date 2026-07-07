@@ -673,18 +673,28 @@ export function useCanvasEditor({
     // trigger it 520ms before the full duration elapses.
     const exitDuration = 520;
     const totalDuration = selectedCanvas.settings.defaultDurationMs;
-    const exitTimer = window.setTimeout(() => {
-      setPreviewExiting(true);
-    }, Math.max(0, totalDuration - exitDuration));
-    const clearTimer = window.setTimeout(() => {
-      setPreviewAlert(null);
-      setPreviewExiting(false);
-    }, totalDuration);
-
-    // Store timers so a repeated test click can cancel stale ones.
-    if (previewTimers.current.clear) window.clearTimeout(previewTimers.current.clear);
-    if (previewTimers.current.exit) window.clearTimeout(previewTimers.current.exit);
-    previewTimers.current = { exit: exitTimer, clear: clearTimer };
+    if (totalDuration >= exitDuration * 2) {
+      // Enough time for both entrance and exit animations.
+      const exitTimer = window.setTimeout(() => {
+        setPreviewExiting(true);
+      }, totalDuration - exitDuration);
+      const clearTimer = window.setTimeout(() => {
+        setPreviewAlert(null);
+        setPreviewExiting(false);
+      }, totalDuration);
+      if (previewTimers.current.clear) window.clearTimeout(previewTimers.current.clear);
+      if (previewTimers.current.exit) window.clearTimeout(previewTimers.current.exit);
+      previewTimers.current = { exit: exitTimer, clear: clearTimer };
+    } else {
+      // Duration too short for exit animation — just clear after totalDuration.
+      const clearTimer = window.setTimeout(() => {
+        setPreviewAlert(null);
+        setPreviewExiting(false);
+      }, totalDuration);
+      if (previewTimers.current.clear) window.clearTimeout(previewTimers.current.clear);
+      if (previewTimers.current.exit) window.clearTimeout(previewTimers.current.exit);
+      previewTimers.current = { exit: null, clear: clearTimer };
+    }
 
     const audioUrl = selectedCanvas.settings.audioAssetId
       ? `/api/assets/${encodeURIComponent(selectedCanvas.settings.audioAssetId)}/content`

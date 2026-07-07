@@ -42,12 +42,12 @@ export function buildAnimationStyle(
   animationFillMode: string;
 } | null {
   const config = element.animation;
-  const animValue = phase === 'in' ? config.in : config.out;
+  const animValue = phase === 'in' ? (config.in ?? 'fade') : config.out;
   if (!animValue) return null;
 
   return {
     animationName: canvasAnimationName(animValue, phase),
-    animationDuration: `${config.durationMs ?? 520}ms`,
+    animationDuration: phase === 'out' ? '520ms' : `${config.durationMs ?? 520}ms`,
     animationDelay: `${config.delayMs ?? 0}ms`,
     animationFillMode: 'both',
   };

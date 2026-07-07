@@ -57,9 +57,11 @@ test('canvasAnimationName maps fade to alert-fade-out for exit phase', () => {
 
 // --- buildAnimationStyle ---
 
-test('buildAnimationStyle returns null when in animation is undefined', () => {
+test('buildAnimationStyle returns fade for undefined in animation', () => {
   const el = makeElement({ in: undefined });
-  assert.equal(buildAnimationStyle(el, 'in'), null);
+  const result = buildAnimationStyle(el, 'in');
+  assert.equal(result?.animationName, 'alert-fade');
+  assert.equal(result?.animationDuration, '520ms');
 });
 
 test('buildAnimationStyle returns null when out animation is undefined', () => {
@@ -83,7 +85,7 @@ test('buildAnimationStyle returns exit animation properties', () => {
   const result = buildAnimationStyle(el, 'out');
   assert.deepEqual(result, {
     animationName: 'alert-fade-out',
-    animationDuration: '300ms',
+    animationDuration: '520ms',
     animationDelay: '0ms',
     animationFillMode: 'both',
   });
@@ -111,4 +113,10 @@ test('buildAnimationStyle for exit with pop uses alert-pop-out', () => {
   const el = makeElement({ out: 'pop', durationMs: 500 });
   const result = buildAnimationStyle(el, 'out');
   assert.equal(result?.animationName, 'alert-pop-out');
+});
+
+test('buildAnimationStyle uses 520ms for exit regardless of durationMs', () => {
+  const el = makeElement({ out: 'fade', durationMs: 9999 });
+  const result = buildAnimationStyle(el, 'out');
+  assert.equal(result?.animationDuration, '520ms');
 });
