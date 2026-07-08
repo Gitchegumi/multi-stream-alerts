@@ -29,6 +29,14 @@ interface IntegrationCardProps {
   onConnect: () => void;
   onDisconnect: (id: string) => Promise<void>;
   onSetPrimary?: (id: string) => Promise<void>;
+  /**
+   * Whether the platform's OAuth flow is configured on this instance.
+   * When false and the account is not yet linked, the card shows a
+   * disabled/explanatory state instead of a Connect button that would
+   * otherwise dead-end on the sign-in page. Defaults to true so existing
+   * callers that only render cards for enabled providers are unaffected.
+   */
+  oauthAvailable?: boolean;
 }
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -57,6 +65,7 @@ export function IntegrationCard({
   onConnect,
   onDisconnect,
   onSetPrimary,
+  oauthAvailable = true,
 }: IntegrationCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -84,6 +93,27 @@ export function IntegrationCard({
   };
 
   if (!account) {
+    if (!oauthAvailable) {
+      return (
+        <div className="rounded-xl border-2 border-dashed border-gray-300 p-6 text-center">
+          <PlatformIcon platform={platform} size={48} className="mx-auto mb-4 opacity-50" />
+          <h3 className="mb-2 text-lg font-semibold text-gray-900">{PLATFORM_LABELS[platform]}</h3>
+          <p className="mb-4 text-sm text-gray-500">
+            {PLATFORM_LABELS[platform]} account linking is not available on this instance. An
+            administrator must configure the {PLATFORM_LABELS[platform]} OAuth credentials to enable
+            it.
+          </p>
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            className="inline-flex min-h-[44px] cursor-not-allowed items-center justify-center rounded-lg border-2 border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-400"
+          >
+            Connect {PLATFORM_LABELS[platform]}
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="rounded-xl border-2 border-dashed border-gray-300 p-6 text-center transition-colors hover:border-gray-400">
         <PlatformIcon platform={platform} size={48} className="mx-auto mb-4" />
@@ -105,7 +135,9 @@ export function IntegrationCard({
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <div className={`flex h-12 w-12 items-center justify-center rounded-full ${platform === 'twitch' ? 'bg-purple-100' : 'bg-red-100'}`}>
+          <div
+            className={`flex h-12 w-12 items-center justify-center rounded-full ${platform === 'twitch' ? 'bg-purple-100' : 'bg-red-100'}`}
+          >
             <PlatformIcon platform={platform} size={28} />
           </div>
           <div>
@@ -151,8 +183,8 @@ export function IntegrationCard({
         <div className="mt-4 rounded-lg bg-gray-50 p-4">
           <p className="mb-3 text-sm text-gray-700">
             Disconnect {PLATFORM_LABELS[platform]} account{' '}
-            <strong>{account.platformAccountName ?? account.platformAccountId}</strong>?
-            This will stop all alerts for this account.
+            <strong>{account.platformAccountName ?? account.platformAccountId}</strong>? This will
+            stop all alerts for this account.
           </p>
           <div className="flex gap-2">
             <button

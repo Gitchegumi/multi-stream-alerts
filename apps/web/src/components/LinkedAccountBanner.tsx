@@ -12,6 +12,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { IntegrationCard, type LinkedAccount } from '@/components/IntegrationCard';
+import { resolveConnectAction, type OAuthAvailability } from '@/lib/linked-account-connect';
 
 export interface LinkStatus {
   twitch: boolean;
@@ -24,6 +25,14 @@ interface LinkedAccountBannerProps {
   channelSlug?: string;
   /** Render collapsed by default with a header toggle to expand. */
   collapsible?: boolean;
+  /**
+   * Whether the Twitch OAuth provider is configured at the instance level.
+   * When false, the Twitch card shows a disabled/explanatory state rather
+   * than a Connect button that would dead-end on the sign-in page.
+   */
+  twitchOAuthEnabled?: boolean;
+  /** Whether the YouTube/Google OAuth provider is configured at the instance level. */
+  youtubeOAuthEnabled?: boolean;
 }
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -47,7 +56,13 @@ export function LinkedAccountBanner({
   compact = true,
   channelSlug,
   collapsible = false,
+  twitchOAuthEnabled = true,
+  youtubeOAuthEnabled = true,
 }: LinkedAccountBannerProps) {
+  const oauthAvailability: OAuthAvailability = {
+    twitch: twitchOAuthEnabled,
+    youtube: youtubeOAuthEnabled,
+  };
   const searchParams = useSearchParams();
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -97,7 +112,15 @@ export function LinkedAccountBanner({
   }, [fetchAccounts]);
 
   const handleConnect = async (platform: 'twitch' | 'youtube') => {
-    const provider = platform === 'youtube' ? 'google' : 'twitch';
+    const action = resolveConnectAction(platform, oauthAvailability);
+    if (action.kind === 'unavailable') {
+      setToast({
+        message: `${PLATFORM_LABELS[platform]} account linking is not available on this instance.`,
+        type: 'error',
+      });
+      return;
+    }
+    const { provider } = action;
     const callback = effectiveCallbackUrl.replace('PLATFORM', platform);
     try {
       const linkUrl = channelSlug
@@ -217,6 +240,7 @@ export function LinkedAccountBanner({
             account={twitchAccount}
             onConnect={() => handleConnect('twitch')}
             onDisconnect={handleDisconnect}
+            oauthAvailable={twitchOAuthEnabled}
           />
 
           {youtubeAccounts.length === 0 ? (
@@ -224,6 +248,7 @@ export function LinkedAccountBanner({
               platform="youtube"
               onConnect={() => handleConnect('youtube')}
               onDisconnect={handleDisconnect}
+              oauthAvailable={youtubeOAuthEnabled}
             />
           ) : (
             <div className={compact ? 'contents' : 'space-y-4'}>
@@ -237,7 +262,7 @@ export function LinkedAccountBanner({
                   onSetPrimary={handleSetPrimary}
                 />
               ))}
-              {youtubeAccounts.length < 5 && (
+              {youtubeAccounts.length < 5 && youtubeOAuthEnabled && (
                 <button
                   onClick={() => handleConnect('youtube')}
                   className="w-full rounded-lg border-2 border-dashed border-gray-300 py-3 text-sm font-medium text-gray-500 transition-colors hover:border-gray-400 hover:text-gray-700"

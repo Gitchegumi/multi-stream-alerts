@@ -10,6 +10,7 @@ import { CanvasEditor } from '@/components/canvas-editor/CanvasEditor';
 import { RecentAlertFeed } from '@/components/RecentAlertFeed';
 import { LinkedAccountBanner } from '@/components/LinkedAccountBanner';
 import { normalizeCanvasSettings } from '@/lib/canvas-schema';
+import { twitchEnabled, googleEnabled } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -98,6 +99,8 @@ export default async function AlertsPage({ params }: { params: Promise<{ channel
           channelSlug={channel.slug}
           compact
           collapsible
+          twitchOAuthEnabled={twitchEnabled}
+          youtubeOAuthEnabled={googleEnabled}
         />
       </section>
 
