@@ -11,7 +11,19 @@ import {
 } from 'react';
 import type { UseCanvasEditorReturn } from './useCanvasEditor';
 import { NumericField } from './NumericField';
-import { EVENT_VARIABLES, type CanvasElement, type CanvasSettings } from '@/lib/canvas-schema';
+import {
+  EVENT_VARIABLES,
+  resolveAssetKind,
+  type CanvasElement,
+  type CanvasSettings,
+} from '@/lib/canvas-schema';
+
+/**
+ * Human-readable list of visual asset formats accepted for alert image
+ * elements. Animated GIF/WebP and video (MP4/WebM) play automatically in the
+ * preview and browser source (issue #117).
+ */
+const SUPPORTED_VISUAL_FORMATS = 'PNG, JPG, GIF, WebP, SVG, MP4, WebM';
 
 const IN_ANIMATIONS: Array<CanvasElement['animation']['in']> = ['fade', 'pop', 'slide-up'];
 const OUT_ANIMATIONS: Array<CanvasElement['animation']['out']> = ['fade'];
@@ -43,7 +55,7 @@ function PreviewAsset({
 }) {
   const url = asset?.previewUrl ?? eventUrl;
   if (!url) return <span className="canvas-image-placeholder">{fallback}</span>;
-  if (asset?.assetType === 'video' || /\.(mp4|webm)(\?|$)/i.test(url)) {
+  if (resolveAssetKind(asset?.assetType, url) === 'video') {
     return (
       <video
         className="canvas-preview-asset"
@@ -442,6 +454,10 @@ function ElementInspector({
                   ))}
                 </select>
               </label>
+              <p className="canvas-editor-hint">
+                Supported: {SUPPORTED_VISUAL_FORMATS}. Animated GIF/WebP and video play
+                automatically.
+              </p>
             </>
           )}
         </div>
