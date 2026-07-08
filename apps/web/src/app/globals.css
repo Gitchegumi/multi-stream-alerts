@@ -613,6 +613,9 @@ audio.asset-preview {
 
 .overlay-canvas-runtime-text {
   padding: 18px;
+  /* Let long wrapped text render past the element box instead of slicing
+     glyphs mid-letter when a viewer name pushes the text to an extra line. */
+  overflow: visible;
 }
 
 .overlay-runtime-asset {
@@ -2153,14 +2156,20 @@ textarea.input {
     50% 50% / 26px 26px;
 }
 
-.canvas-editor-stage-canvas {
+/* Layout placeholder sized to the scaled canvas footprint (transforms do not
+   affect layout), so flex centering and the toolbar keep working while the
+   canvas itself renders at true pixel size. */
+.canvas-editor-stage-frame {
   position: relative;
   flex-shrink: 0;
-  width: min(100%, 960px);
-  border: 1px solid var(--line-strong);
-  background: rgba(19, 20, 24, 0.72);
+  outline: 1px solid var(--line-strong);
   box-shadow: var(--shadow-brand);
-  transform-origin: center center;
+}
+
+.canvas-editor-stage-canvas {
+  position: relative;
+  background: rgba(19, 20, 24, 0.72);
+  transform-origin: top left;
 }
 
 .canvas-editor-stage-canvas-dark {
@@ -2238,7 +2247,8 @@ textarea.input {
   min-width: 16px;
   min-height: 16px;
   overflow: hidden;
-  border: 1px solid transparent;
+  /* Selection chrome uses outline (not border) so the element's content box
+     stays identical to the browser-source runtime and text wraps the same. */
   background: transparent;
   color: var(--text);
   cursor: pointer;
@@ -2249,18 +2259,23 @@ textarea.input {
 }
 
 .canvas-editor-element-selected {
-  border: 1.5px solid var(--primary);
+  outline: calc(1.5px / var(--stage-scale, 1)) solid var(--primary);
 }
 
 .canvas-editor-element-locked {
   cursor: default;
 }
 
+/* Text keeps rendering past its box instead of slicing glyphs mid-letter,
+   matching the browser-source runtime (issue: bottom of text cut off). */
 .canvas-editor-element-type-text,
-.canvas-editor-element-type-alert-message,
-.canvas-editor-element-type-shape,
-.canvas-editor-element-type-alert-image {
-  /* hook for per-type overrides */
+.canvas-editor-element-type-alert-message {
+  overflow: visible;
+}
+
+.canvas-editor-element-type-text .canvas-editor-element-content,
+.canvas-editor-element-type-alert-message .canvas-editor-element-content {
+  overflow: visible;
 }
 
 .canvas-editor-element-content {
@@ -2283,7 +2298,8 @@ textarea.input {
 .canvas-editor-element-text {
   display: block;
   width: 100%;
-  padding: 4px;
+  /* Must match .overlay-canvas-runtime-text so line wrapping is identical. */
+  padding: 18px;
 }
 
 .canvas-editor-element-image {
@@ -2304,26 +2320,28 @@ textarea.input {
   padding: 8px;
 }
 
+/* Editor chrome (badges, handles, guides) divides by the stage scale so it
+   keeps a constant on-screen size inside the true-pixel, scaled-down canvas. */
 .canvas-editor-element-badge {
   position: absolute;
   z-index: 3;
   pointer-events: none;
   background: var(--primary);
   color: #fff;
-  font-size: 10px;
+  font-size: calc(10px / var(--stage-scale, 1));
   font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: calc(2px / var(--stage-scale, 1)) calc(6px / var(--stage-scale, 1));
+  border-radius: calc(4px / var(--stage-scale, 1));
   white-space: nowrap;
 }
 
 .canvas-editor-element-name {
-  bottom: calc(100% + 5px);
+  bottom: calc(100% + 5px / var(--stage-scale, 1));
   left: 0;
 }
 
 .canvas-editor-element-dims {
-  top: calc(100% + 5px);
+  top: calc(100% + 5px / var(--stage-scale, 1));
   left: 50%;
   transform: translateX(-50%);
   font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
@@ -2333,9 +2351,9 @@ textarea.input {
 .canvas-editor-handle {
   position: absolute;
   z-index: 4;
-  width: 9px;
-  height: 9px;
-  border: 1px solid var(--primary);
+  width: calc(9px / var(--stage-scale, 1));
+  height: calc(9px / var(--stage-scale, 1));
+  border: calc(1px / var(--stage-scale, 1)) solid var(--primary);
   background: var(--panel);
 }
 
@@ -2354,19 +2372,19 @@ textarea.input {
 }
 
 .canvas-editor-handle-n {
-  top: -5px;
+  top: calc(-5px / var(--stage-scale, 1));
 }
 
 .canvas-editor-handle-e {
-  right: -5px;
+  right: calc(-5px / var(--stage-scale, 1));
 }
 
 .canvas-editor-handle-s {
-  bottom: -5px;
+  bottom: calc(-5px / var(--stage-scale, 1));
 }
 
 .canvas-editor-handle-w {
-  left: -5px;
+  left: calc(-5px / var(--stage-scale, 1));
 }
 
 .canvas-editor-handle-ne,
@@ -2380,23 +2398,23 @@ textarea.input {
 }
 
 .canvas-editor-handle-ne {
-  top: -5px;
-  right: -5px;
+  top: calc(-5px / var(--stage-scale, 1));
+  right: calc(-5px / var(--stage-scale, 1));
 }
 
 .canvas-editor-handle-nw {
-  top: -5px;
-  left: -5px;
+  top: calc(-5px / var(--stage-scale, 1));
+  left: calc(-5px / var(--stage-scale, 1));
 }
 
 .canvas-editor-handle-se {
-  right: -5px;
-  bottom: -5px;
+  right: calc(-5px / var(--stage-scale, 1));
+  bottom: calc(-5px / var(--stage-scale, 1));
 }
 
 .canvas-editor-handle-sw {
-  left: -5px;
-  bottom: -5px;
+  left: calc(-5px / var(--stage-scale, 1));
+  bottom: calc(-5px / var(--stage-scale, 1));
 }
 
 .canvas-editor-snap-guide {
@@ -2409,14 +2427,14 @@ textarea.input {
 
 .canvas-editor-snap-guide-v {
   inset: 0 auto 0 50%;
-  width: 2px;
-  transform: translateX(-1px);
+  width: calc(2px / var(--stage-scale, 1));
+  transform: translateX(-50%);
 }
 
 .canvas-editor-snap-guide-h {
   inset: 50% 0 auto;
-  height: 2px;
-  transform: translateY(-1px);
+  height: calc(2px / var(--stage-scale, 1));
+  transform: translateY(-50%);
 }
 
 /* ---------- status bar ---------- */

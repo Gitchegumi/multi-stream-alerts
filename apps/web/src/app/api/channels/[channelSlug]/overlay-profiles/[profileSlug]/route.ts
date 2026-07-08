@@ -4,8 +4,11 @@ import {
   canManageChannel,
   ensureDefaultChannel,
   prisma,
+  publishOverlaySettingsUpdate,
   type Prisma,
 } from '@multi-stream-alerts/database';
+import { resolveCanvasSettingsAssetTypes } from '@/lib/canvas-asset-types';
+import { normalizeCanvasSettings } from '@/lib/canvas-schema';
 import { requireDashboardSession } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
@@ -45,11 +48,13 @@ export type HandlerSession = {
 export type HandlerDeps = {
   prisma: typeof prisma;
   canManageChannel: typeof canManageChannel;
+  publishOverlaySettingsUpdate?: typeof publishOverlaySettingsUpdate;
 };
 
 const defaultDeps: HandlerDeps = {
   prisma,
   canManageChannel,
+  publishOverlaySettingsUpdate,
 };
 
 export type HandlePatchArgs = {
@@ -122,6 +127,26 @@ export async function handlePatch(args: HandlePatchArgs): Promise<HandlerResult>
       settingsJson,
     },
   });
+
+  // Push the saved settings to any open browser sources so they re-render
+  // without a reload. A publish failure must not fail the save itself.
+  if (data.settings) {
+    try {
+      const resolved = await resolveCanvasSettingsAssetTypes(
+        normalizeCanvasSettings(settingsJson).settings,
+        auth.channel.id,
+        deps.prisma,
+      );
+      await deps.publishOverlaySettingsUpdate?.({
+        profileId: auth.profile.id,
+        channelId: auth.channel.id,
+        settings: resolved,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.warn('overlay settings publish failed', { profileId: auth.profile.id, error });
+    }
+  }
 
   return {
     status: 200,

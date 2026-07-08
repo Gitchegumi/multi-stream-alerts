@@ -2,11 +2,8 @@ import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { prisma } from '@multi-stream-alerts/database';
 import { OverlayClient } from '@/components/OverlayClient';
-import {
-  normalizeCanvasSettings,
-  type CanvasElement,
-  type CanvasSettings,
-} from '@/lib/canvas-schema';
+import { resolveCanvasSettingsAssetTypes } from '@/lib/canvas-asset-types';
+import { normalizeCanvasSettings } from '@/lib/canvas-schema';
 import {
   getClientIp,
   isOverlayRouteRateLimited,
@@ -53,37 +50,11 @@ export default async function ScopedOverlayPage({
     );
   }
 
-  const settings = await readCanvasSettings(overlayProfile.settingsJson, overlayProfile.channelId);
+  const settings = await resolveCanvasSettingsAssetTypes(
+    normalizeCanvasSettings(overlayProfile.settingsJson).settings,
+    overlayProfile.channelId,
+    prisma,
+  );
 
   return <OverlayClient displayKey={displayKey} profile={profile} settings={settings} />;
-}
-
-async function readCanvasSettings(value: unknown, channelId: string) {
-  const settings = normalizeCanvasSettings(value).settings;
-  const assetIds = settings.elements.flatMap((element) =>
-    element.type === 'alert-image' && element.bindings.assetId ? [element.bindings.assetId] : [],
-  );
-  if (!assetIds.length) return settings;
-
-  const assets = await prisma.workspaceAsset.findMany({
-    where: { channelId, id: { in: [...new Set(assetIds)] } },
-    select: { id: true, assetType: true },
-  });
-  const assetTypes = new Map(assets.map((asset) => [asset.id, asset.assetType]));
-
-  return {
-    ...settings,
-    elements: settings.elements.map((element): CanvasElement => {
-      if (element.type !== 'alert-image' || !element.bindings.assetId) return element;
-      const assetType = assetTypes.get(element.bindings.assetId);
-      if (assetType !== 'image' && assetType !== 'video') return element;
-      return {
-        ...element,
-        bindings: {
-          ...element.bindings,
-          assetType,
-        },
-      };
-    }),
-  } satisfies CanvasSettings;
 }

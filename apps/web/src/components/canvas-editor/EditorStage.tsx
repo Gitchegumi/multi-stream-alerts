@@ -1,13 +1,46 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { renderCanvasText, resolveCanvasElementAsset } from '@/lib/canvas-schema';
 import { buildAnimationStyle } from '@/lib/canvas-animation';
 import type { UseCanvasEditorReturn } from './useCanvasEditor';
 import type { CanvasElement } from '@/lib/canvas-schema';
 
+/** Breathing room between the fitted canvas and the stage edges, in px. */
+const STAGE_FIT_MARGIN = 48;
+
 export function EditorStage({ editor }: { editor: UseCanvasEditorReturn }) {
   const selected = editor.selectedCanvas;
+  const canvasWidth = selected?.settings.width ?? 1920;
+  const canvasHeight = selected?.settings.height ?? 1080;
+
+  // The stage renders the canvas at its true pixel size and scales it down
+  // with a transform — the same technique the browser source uses — so text
+  // wraps and clips identically in both places instead of approximating font
+  // sizes with a fixed divisor.
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const [fitScale, setFitScale] = useState(0.35);
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    function updateFitScale() {
+      if (!section) return;
+      const rect = section.getBoundingClientRect();
+      const availableWidth = rect.width - STAGE_FIT_MARGIN;
+      const availableHeight = rect.height - STAGE_FIT_MARGIN;
+      if (availableWidth <= 0 || availableHeight <= 0) return;
+      setFitScale(Math.min(availableWidth / canvasWidth, availableHeight / canvasHeight));
+    }
+
+    updateFitScale();
+    const observer = new ResizeObserver(updateFitScale);
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, [canvasWidth, canvasHeight]);
+
+  const displayScale = Math.max(0.01, fitScale * (editor.zoom / 100));
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -77,42 +110,57 @@ export function EditorStage({ editor }: { editor: UseCanvasEditorReturn }) {
   );
 
   return (
-    <section className="canvas-editor-stage" tabIndex={0} onKeyDown={handleKeyDown}>
+    <section
+      ref={sectionRef}
+      className="canvas-editor-stage"
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+    >
+      {/* The frame occupies the scaled footprint in layout (transforms don't
+          affect layout), keeping the canvas centered and the toolbar in view. */}
       <div
-        ref={editor.stageRef}
-        className={`canvas-editor-stage-canvas canvas-editor-stage-canvas-${selected?.settings.background ?? 'transparent'}`}
+        className="canvas-editor-stage-frame"
         style={{
-          aspectRatio: selected
-            ? `${selected.settings.width} / ${selected.settings.height}`
-            : '16 / 9',
-          transform: `scale(${editor.zoom / 100})`,
+          width: canvasWidth * displayScale,
+          height: canvasHeight * displayScale,
         }}
-        onClick={handleStageClick}
       >
-        {selected ? (
-          <>
-            {editor.snapGuides.vertical ? (
-              <span className="canvas-editor-snap-guide canvas-editor-snap-guide-v" />
-            ) : null}
-            {editor.snapGuides.horizontal ? (
-              <span className="canvas-editor-snap-guide canvas-editor-snap-guide-h" />
-            ) : null}
+        <div
+          ref={editor.stageRef}
+          className={`canvas-editor-stage-canvas canvas-editor-stage-canvas-${selected?.settings.background ?? 'transparent'}`}
+          style={{
+            width: canvasWidth,
+            height: canvasHeight,
+            transform: `scale(${displayScale})`,
+            ['--stage-scale' as string]: String(displayScale),
+          }}
+          onClick={handleStageClick}
+        >
+          {selected ? (
+            <>
+              {editor.snapGuides.vertical ? (
+                <span className="canvas-editor-snap-guide canvas-editor-snap-guide-v" />
+              ) : null}
+              {editor.snapGuides.horizontal ? (
+                <span className="canvas-editor-snap-guide canvas-editor-snap-guide-h" />
+              ) : null}
 
-            {[...selected.settings.elements]
-              .filter((element) => !element.hidden)
-              .sort((a, b) => a.zIndex - b.zIndex)
-              .map((element) => (
-                <ElementView
-                  // Remount per preview + phase so entrance and exit
-                  // animations replay on each test click.
-                  key={`${element.id}-${editor.previewAlert?.id ?? 'static'}-${editor.previewExiting ? 'out' : 'in'}`}
-                  element={element}
-                  editor={editor}
-                  selected={editor.selectedElement === element.id}
-                />
-              ))}
-          </>
-        ) : null}
+              {[...selected.settings.elements]
+                .filter((element) => !element.hidden)
+                .sort((a, b) => a.zIndex - b.zIndex)
+                .map((element) => (
+                  <ElementView
+                    // Remount per preview + phase so entrance and exit
+                    // animations replay on each test click.
+                    key={`${element.id}-${editor.previewAlert?.id ?? 'static'}-${editor.previewExiting ? 'out' : 'in'}`}
+                    element={element}
+                    editor={editor}
+                    selected={editor.selectedElement === element.id}
+                  />
+                ))}
+            </>
+          ) : null}
+        </div>
       </div>
 
       {selected ? (
@@ -178,8 +226,6 @@ function ElementView({
   editor: UseCanvasEditorReturn;
   selected: boolean;
 }) {
-  const settings = editor.selectedCanvas!.settings;
-
   function handlePointerDown(event: ReactPointerEvent) {
     if (element.locked) {
       event.stopPropagation();
@@ -197,11 +243,6 @@ function ElementView({
     editor.startElementPointer(event, element.id, mode);
   }
 
-  const left = (element.x / settings.width) * 100;
-  const top = (element.y / settings.height) * 100;
-  const width = (element.width / settings.width) * 100;
-  const height = (element.height / settings.height) * 100;
-
   // Build animation style only during preview playback. The key remount
   // (above) ensures the animation replays on each test click.
   const animStyle =
@@ -215,10 +256,10 @@ function ElementView({
     <div
       className={`canvas-editor-element${selected ? ' canvas-editor-element-selected' : ''}${element.locked ? ' canvas-editor-element-locked' : ''} canvas-editor-element-type-${element.type}`}
       style={{
-        left: `${left}%`,
-        top: `${top}%`,
-        width: `${width}%`,
-        height: `${height}%`,
+        left: element.x,
+        top: element.y,
+        width: element.width,
+        height: element.height,
         zIndex: element.zIndex,
         transform: `rotate(${element.rotation}deg)`,
       }}
@@ -236,12 +277,12 @@ function ElementView({
           borderRadius: element.styles.borderRadius,
           color: element.styles.color,
           fontFamily: element.styles.fontFamily,
-          fontSize: Math.max(10, (element.styles.fontSize ?? 32) / 2.8),
+          fontSize: element.styles.fontSize,
           fontWeight: element.styles.fontWeight,
           textShadow: element.styles.textShadow,
           WebkitTextStroke:
             element.styles.textStrokeWidth && element.styles.textStrokeColor
-              ? `${Math.max(0, element.styles.textStrokeWidth / 2.8)}px ${element.styles.textStrokeColor}`
+              ? `${element.styles.textStrokeWidth}px ${element.styles.textStrokeColor}`
               : undefined,
           ...(animStyle
             ? {
