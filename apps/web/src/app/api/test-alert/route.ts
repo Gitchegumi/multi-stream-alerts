@@ -19,12 +19,46 @@ const testAlertSchema = z.object({
   isPublic: z.boolean().optional(),
 });
 
+/**
+ * Sample viewer names used for randomized test alerts so variable substitution
+ * (e.g. `{{viewerName}}`) can be visually validated with realistic variation
+ * on each run (issue #124).
+ */
+const SAMPLE_VIEWER_NAMES = [
+  'PixelWrangler',
+  'NightOwlGaming',
+  'CaffeineQueen',
+  'RetroRaider',
+  'GlitchGremlin',
+  'MidnightMage',
+  'TurboTaco',
+  'FrostbyteFox',
+  'NeonNomad',
+  'CosmicCactus',
+  'ByteSizedBandit',
+  'LunarLlama',
+];
+
+function pickRandom<T>(items: readonly T[]): T {
+  return items[Math.floor(Math.random() * items.length)] as T;
+}
+
+/** Randomized viewer name for a test alert. */
+function randomViewerName(): string {
+  return pickRandom(SAMPLE_VIEWER_NAMES);
+}
+
+/** Randomized tip amount between $1.00 and $100.00 with cents. */
+function randomTipAmount(): number {
+  return Number((Math.random() * 99 + 1).toFixed(2));
+}
+
 function buildSampleAlertData(
   platform: string,
   type: string,
 ): { message?: string; amount?: number; currency?: string } {
   if (type === 'tip' || type === 'superchat' || type === 'hypechat') {
-    return { message: 'Thanks for the stream!', amount: 5, currency: 'USD' };
+    return { message: 'Thanks for the stream!', amount: randomTipAmount(), currency: 'USD' };
   }
   if (type === 'subscription' || type === 'membership' || type === 'gift') {
     return { message: 'Welcome to the channel!' };
@@ -65,7 +99,7 @@ export async function POST(request: Request) {
     type: eventType?.legacyType ?? 'test',
     eventKey: eventType?.eventKey ?? 'manual.test',
     layoutIdOverride: body.layoutId,
-    displayName: 'Test Viewer',
+    displayName: randomViewerName(),
     message: body.message ?? sampleData.message,
     amount: sampleData.amount,
     currency: sampleData.currency,

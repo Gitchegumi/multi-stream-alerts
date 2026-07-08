@@ -43,6 +43,7 @@ export async function GET(request: Request) {
   const encoder = new TextEncoder();
   const redis = createRedisClient();
   let closed = false;
+  let heartbeat: ReturnType<typeof setInterval> | null = null;
 
   const cleanup = () => {
     if (closed) {
@@ -50,6 +51,10 @@ export async function GET(request: Request) {
     }
 
     closed = true;
+    if (heartbeat) {
+      clearInterval(heartbeat);
+      heartbeat = null;
+    }
     request.signal.removeEventListener('abort', cleanup);
     redis.disconnect();
     console.info('overlay disconnected', { channelId: profile.channelId });
@@ -92,6 +97,23 @@ export async function GET(request: Request) {
       try {
         controller.enqueue(encoder.encode(': connected\n\n'));
         await redis.subscribe(redisAlertChannel);
+
+        // Emit a periodic comment so idle connections are not dropped by
+        // proxies or the browser. A silently dropped stream stops delivering
+        // alerts to that client and, before this, forced constant reconnects
+        // that could trip the per-IP rate limit when several overlays were
+        // open at once (issue #124).
+        heartbeat = setInterval(() => {
+          if (closed) {
+            return;
+          }
+          try {
+            controller.enqueue(encoder.encode(': ping\n\n'));
+          } catch (error) {
+            console.error('SSE heartbeat error', error);
+            cleanup();
+          }
+        }, 15_000);
       } catch (error) {
         fail(error);
       }
