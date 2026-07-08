@@ -151,6 +151,55 @@ export function renderCanvasText(template: string, alert: AlertEvent | null) {
   });
 }
 
+/** Visual asset kinds an `alert-image` element can render. */
+export type CanvasAssetKind = 'image' | 'video';
+
+/** A resolved visual asset ready to render, or `null` when none is available. */
+export type ResolvedCanvasAsset = { url: string; kind: CanvasAssetKind } | null;
+
+/** File extensions rendered with a `<video>` element rather than `<img>`. */
+const VIDEO_URL_PATTERN = /\.(mp4|webm)(\?|$)/i;
+
+/**
+ * Decide whether a resolved asset URL should render as a video or an image.
+ * Prefers the explicit asset type when known, otherwise falls back to the file
+ * extension. Animated GIF/WebP are `image` and animate natively in `<img>`.
+ */
+export function resolveAssetKind(
+  assetType: string | null | undefined,
+  url: string,
+): CanvasAssetKind {
+  if (assetType === 'video') return 'video';
+  if (assetType === 'image') return 'image';
+  return VIDEO_URL_PATTERN.test(url) ? 'video' : 'image';
+}
+
+/**
+ * Resolve the visual asset for an `alert-image` element across the editor
+ * preview, test alert, and browser-source rendering paths. Chooses the first
+ * available URL — the element's stored asset, then a bound external URL, then
+ * the visual asset carried by the alert/event — and picks the render kind.
+ *
+ * Callers supply the already-resolved stored asset URL because the editor uses
+ * an in-memory preview URL while the browser source builds a keyed content URL.
+ */
+export function resolveCanvasElementAsset(
+  element: Pick<CanvasElement, 'bindings'>,
+  options: {
+    /** Resolved URL for the element's stored asset, if one is bound. */
+    storedAssetUrl?: string | null;
+    /** Asset type of the stored asset, when known (authoritative). */
+    storedAssetType?: string | null;
+    /** Fallback visual URL carried by the alert/event. */
+    eventVisualUrl?: string | null;
+  } = {},
+): ResolvedCanvasAsset {
+  const url = options.storedAssetUrl ?? element.bindings.assetUrl ?? options.eventVisualUrl ?? null;
+  if (!url) return null;
+  const assetType = options.storedAssetType ?? element.bindings.assetType;
+  return { url, kind: resolveAssetKind(assetType, url) };
+}
+
 export function createCanvasElement(
   type: CanvasElementType,
   count: number,

@@ -4,9 +4,11 @@ import type { AlertEvent } from '@multi-stream-alerts/shared';
 import { useEffect, useRef, useState } from 'react';
 import {
   renderCanvasText,
+  resolveCanvasElementAsset,
   shouldRenderAlertOnCanvas,
   type CanvasElement,
   type CanvasSettings,
+  type ResolvedCanvasAsset,
 } from '@/lib/canvas-schema';
 import { buildAnimationStyle } from '@/lib/canvas-animation';
 
@@ -159,12 +161,17 @@ function CanvasRuntimeElement({
   };
 
   if (element.type === 'alert-image') {
-    const assetUrl =
-      resolveCanvasAssetUrl(element.bindings.assetId, element.bindings.assetUrl, displayKey) ??
-      resolveOverlayAssetUrl(alert.visualAssetUrl, displayKey);
+    const resolved = resolveCanvasElementAsset(element, {
+      storedAssetUrl: resolveCanvasAssetUrl(
+        element.bindings.assetId,
+        element.bindings.assetUrl,
+        displayKey,
+      ),
+      eventVisualUrl: resolveOverlayAssetUrl(alert.visualAssetUrl, displayKey),
+    });
     return (
       <div className="overlay-canvas-runtime-element" style={style}>
-        <VisualAsset kind={element.bindings.assetType} url={assetUrl} />
+        <VisualAsset asset={resolved} />
       </div>
     );
   }
@@ -180,21 +187,15 @@ function CanvasRuntimeElement({
   );
 }
 
-function VisualAsset({
-  kind,
-  url,
-}: {
-  kind?: CanvasElement['bindings']['assetType'];
-  url?: string;
-}) {
-  if (!url) return null;
+function VisualAsset({ asset }: { asset: ResolvedCanvasAsset }) {
+  if (!asset) return null;
 
-  if (kind === 'video' || /\.(mp4|webm)(\?|$)/i.test(url)) {
-    return <video className="overlay-runtime-asset" src={url} autoPlay loop playsInline />;
+  if (asset.kind === 'video') {
+    return <video className="overlay-runtime-asset" src={asset.url} autoPlay loop playsInline />;
   }
 
   // eslint-disable-next-line @next/next/no-img-element
-  return <img className="overlay-runtime-asset" alt="" src={url} />;
+  return <img className="overlay-runtime-asset" alt="" src={asset.url} />;
 }
 
 function resolveOverlayAssetUrl(url: string | undefined, displayKey: string) {

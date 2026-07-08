@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { renderCanvasText } from '@/lib/canvas-schema';
+import { renderCanvasText, resolveCanvasElementAsset } from '@/lib/canvas-schema';
 import { buildAnimationStyle } from '@/lib/canvas-animation';
 import type { UseCanvasEditorReturn } from './useCanvasEditor';
 import type { CanvasElement } from '@/lib/canvas-schema';
@@ -261,15 +261,7 @@ function ElementView({
 
         <div className="canvas-editor-element-content">
           {element.type === 'alert-image' ? (
-            element.bindings.assetUrl ? (
-              <img
-                className="canvas-editor-element-image"
-                src={element.bindings.assetUrl}
-                alt={element.name}
-              />
-            ) : (
-              <span className="canvas-editor-element-placeholder">Event image</span>
-            )
+            <AlertImageContent element={element} editor={editor} />
           ) : element.type === 'shape' ? null : (
             <span className="canvas-editor-element-text">
               {renderCanvasText(element.bindings.textTemplate ?? element.name, editor.previewAlert)}
@@ -295,6 +287,49 @@ function ElementView({
       ) : null}
     </div>
   );
+}
+
+/**
+ * Renders the visual for an `alert-image` element on the editor stage. Resolves
+ * a bound stored asset (image or video), a bound external URL, or the visual
+ * asset carried by the previewed test alert — matching the browser-source
+ * runtime — and falls back to the placeholder only when nothing is available
+ * (issue #117).
+ */
+function AlertImageContent({
+  element,
+  editor,
+}: {
+  element: CanvasElement;
+  editor: UseCanvasEditorReturn;
+}) {
+  const storedAsset = element.bindings.assetId
+    ? editor.assets.find((asset) => asset.id === element.bindings.assetId)
+    : undefined;
+  const resolved = resolveCanvasElementAsset(element, {
+    storedAssetUrl: storedAsset?.previewUrl,
+    storedAssetType: storedAsset?.assetType,
+    eventVisualUrl: editor.previewAlert?.visualAssetUrl,
+  });
+
+  if (!resolved) {
+    return <span className="canvas-editor-element-placeholder">Event image</span>;
+  }
+
+  if (resolved.kind === 'video') {
+    return (
+      <video
+        className="canvas-editor-element-image"
+        src={resolved.url}
+        autoPlay
+        loop
+        muted
+        playsInline
+      />
+    );
+  }
+
+  return <img className="canvas-editor-element-image" src={resolved.url} alt={element.name} />;
 }
 
 type ReactPointerEvent = React.PointerEvent<HTMLElement>;
