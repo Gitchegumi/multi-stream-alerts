@@ -2483,8 +2483,7 @@ textarea.input {
 }
 
 .canvas-editor-stage-toolbar {
-  position: absolute;
-  bottom: 18px;
+  position: sticky;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -2493,8 +2492,8 @@ textarea.input {
   border: 1px solid var(--line);
   border-radius: 999px;
   background: rgba(28, 30, 35, 0.92);
-  backdrop-filter: blur(8px);
   padding: 6px 10px;
+  margin-top: 8px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
   z-index: 20;
 }
