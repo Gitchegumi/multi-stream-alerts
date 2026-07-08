@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.16](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-web-v0.1.15...alerts-web-v0.1.16) (2026-07-08)
+
+
+### Features
+
+* **overlay:** add "none" image animation option ([#122](https://github.com/Gitchegumi/multi-stream-alerts/issues/122)) ([f60a42d](https://github.com/Gitchegumi/multi-stream-alerts/commit/f60a42d2c6bac2436f77f945d78228695fbff25b))
+
+
+### Bug Fixes
+
+* changed css for the canvas editor toolbar so that it is placed o… ([4f40dce](https://github.com/Gitchegumi/multi-stream-alerts/commit/4f40dce5bb081a6cec662d147f47b0e70062f096))
+* changed css for the canvas editor toolbar so that it is placed outside the canvas area. ([a08551b](https://github.com/Gitchegumi/multi-stream-alerts/commit/a08551bbe4cfe43d470d6ef649c4dcf6ef1a0e27))
+* **overlay:** scale browser source to viewport and harden alert delivery ([#124](https://github.com/Gitchegumi/multi-stream-alerts/issues/124)) ([7e3ab37](https://github.com/Gitchegumi/multi-stream-alerts/commit/7e3ab3712a6d0383f1f051ad19a4cf518c13f115))
+
 ## [0.1.15](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-web-v0.1.14...alerts-web-v0.1.15) (2026-07-08)
 
 
