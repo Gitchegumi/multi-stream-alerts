@@ -66,6 +66,12 @@ type MockDeps = {
     };
   };
   canManageChannel: (userId: string, role: string, channelId: string) => Promise<boolean>;
+  publishOverlaySettingsUpdate?: (update: {
+    profileId: string;
+    channelId: string;
+    settings: Record<string, unknown>;
+    updatedAt: string;
+  }) => Promise<void>;
 };
 
 function makeDeps(overrides: Partial<MockDeps> = {}): HandlerDeps {
@@ -145,6 +151,54 @@ test('handlePatch updates canvas fields and merges settingsJson', async () => {
       alertEventKeys: ['kofi.tipped'],
     },
   });
+});
+
+test('handlePatch publishes updated settings for open browser sources', async () => {
+  const published: Array<{
+    profileId: string;
+    channelId: string;
+    settings: Record<string, unknown>;
+    updatedAt: string;
+  }> = [];
+  const deps = makeDeps({
+    publishOverlaySettingsUpdate: async (update) => {
+      published.push(update);
+    },
+  });
+
+  const result = await handlePatch({
+    session: makeSession(),
+    channelSlug: 'main',
+    profileSlug: 'main',
+    body: { settings: { width: 1280 } },
+    deps,
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(published.length, 1);
+  assert.equal(published[0]?.profileId, 'profile-1');
+  assert.equal(published[0]?.channelId, 'channel-1');
+  assert.equal(published[0]?.settings.width, 1280);
+});
+
+test('handlePatch does not publish settings when only metadata changes', async () => {
+  const published: unknown[] = [];
+  const deps = makeDeps({
+    publishOverlaySettingsUpdate: async (update) => {
+      published.push(update);
+    },
+  });
+
+  const result = await handlePatch({
+    session: makeSession(),
+    channelSlug: 'main',
+    profileSlug: 'main',
+    body: { name: 'Renamed only' },
+    deps,
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(published.length, 0);
 });
 
 test('handlePatch rejects a slug already used by another canvas', async () => {

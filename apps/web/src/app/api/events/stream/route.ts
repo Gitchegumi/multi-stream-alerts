@@ -2,7 +2,9 @@ import { prisma } from '@multi-stream-alerts/database';
 import { createRedisClient } from '@multi-stream-alerts/database';
 import {
   parseAlertEvent,
+  parseOverlaySettingsUpdate,
   redisAlertChannel,
+  redisOverlaySettingsChannel,
   serializeAlertEvent,
 } from '@multi-stream-alerts/shared';
 
@@ -70,12 +72,29 @@ export async function GET(request: Request) {
       request.signal.addEventListener('abort', cleanup, { once: true });
       redis.on('error', fail);
 
-      redis.on('message', (_channel, payload) => {
-        try {
-          if (closed) {
-            return;
-          }
+      redis.on('message', (channel, payload) => {
+        if (closed) {
+          return;
+        }
 
+        if (channel === redisOverlaySettingsChannel) {
+          // A malformed settings payload should not kill the alert stream —
+          // skip it and keep the connection alive.
+          try {
+            const update = parseOverlaySettingsUpdate(payload);
+            if (update.profileId !== profile.id) {
+              return;
+            }
+            controller.enqueue(
+              encoder.encode(`event: settings\ndata: ${JSON.stringify(update.settings)}\n\n`),
+            );
+          } catch (error) {
+            console.error('SSE settings parse error', error);
+          }
+          return;
+        }
+
+        try {
           const event = parseAlertEvent(payload);
 
           if (event.channelId !== profile.channelId) {
@@ -96,7 +115,7 @@ export async function GET(request: Request) {
 
       try {
         controller.enqueue(encoder.encode(': connected\n\n'));
-        await redis.subscribe(redisAlertChannel);
+        await redis.subscribe(redisAlertChannel, redisOverlaySettingsChannel);
 
         // Emit a periodic comment so idle connections are not dropped by
         // proxies or the browser. A silently dropped stream stops delivering

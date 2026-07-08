@@ -3,6 +3,7 @@
 import type { AlertEvent } from '@multi-stream-alerts/shared';
 import { useEffect, useRef, useState } from 'react';
 import {
+  normalizeCanvasSettings,
   renderCanvasText,
   resolveCanvasElementAsset,
   shouldRenderAlertOnCanvas,
@@ -15,13 +16,14 @@ import { buildAnimationStyle } from '@/lib/canvas-animation';
 export function OverlayClient({
   displayKey,
   profile,
-  settings,
+  settings: initialSettings,
 }: {
   displayKey: string;
   profile: string;
   settings: CanvasSettings;
 }) {
   const [activeAlert, setActiveAlert] = useState<AlertEvent | null>(null);
+  const [settings, setSettings] = useState(initialSettings);
   const [scale, setScale] = useState(1);
   const queueRef = useRef<AlertEvent[]>([]);
   const activeRef = useRef(false);
@@ -61,6 +63,18 @@ export function OverlayClient({
 
       queueRef.current.push(alert);
       drainQueue();
+    });
+
+    // Hot-swap the canvas layout when the editor saves, so the browser source
+    // reflects edits without reloading the page (which would blank the source
+    // and re-run entrance animations mid-stream).
+    source.addEventListener('settings', (event) => {
+      try {
+        const payload: unknown = JSON.parse((event as MessageEvent).data);
+        setSettings(normalizeCanvasSettings(payload).settings);
+      } catch (error) {
+        console.warn('overlay settings update ignored', { displayKey, error });
+      }
     });
 
     // Let EventSource auto-reconnect on transient errors instead of permanently

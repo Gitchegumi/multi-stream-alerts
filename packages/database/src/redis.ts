@@ -1,8 +1,11 @@
 import Redis from 'ioredis';
 import {
   redisAlertChannel,
+  redisOverlaySettingsChannel,
   serializeAlertEvent,
+  serializeOverlaySettingsUpdate,
   type AlertEvent,
+  type OverlaySettingsUpdate,
 } from '@multi-stream-alerts/shared';
 
 export function createRedisClient() {
@@ -16,6 +19,16 @@ export async function publishAlertEvent(event: AlertEvent) {
 
   try {
     await redis.publish(redisAlertChannel, serializeAlertEvent(event));
+  } finally {
+    redis.disconnect();
+  }
+}
+
+export async function publishOverlaySettingsUpdate(update: OverlaySettingsUpdate) {
+  const redis = createRedisClient();
+
+  try {
+    await redis.publish(redisOverlaySettingsChannel, serializeOverlaySettingsUpdate(update));
   } finally {
     redis.disconnect();
   }
