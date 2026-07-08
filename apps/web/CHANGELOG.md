@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.15](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-web-v0.1.14...alerts-web-v0.1.15) (2026-07-08)
+
+
+### Bug Fixes
+
+* gate linked-account connect buttons on OAuth availability ([#115](https://github.com/Gitchegumi/multi-stream-alerts/issues/115)) ([01e9514](https://github.com/Gitchegumi/multi-stream-alerts/commit/01e9514c9327c8eef78e08658b681fe145394816))
+* gate linked-account connect buttons on OAuth availability ([#115](https://github.com/Gitchegumi/multi-stream-alerts/issues/115)) ([da27728](https://github.com/Gitchegumi/multi-stream-alerts/commit/da2772891d7db655e4c81fb75256f85c3c414998))
+* render configured/animated assets in test alert preview ([#117](https://github.com/Gitchegumi/multi-stream-alerts/issues/117)) ([35ea066](https://github.com/Gitchegumi/multi-stream-alerts/commit/35ea0666ac4daf0ec3ffa8bc47e6bd6dd335ca1c))
+* render configured/animated assets in test alert preview ([#117](https://github.com/Gitchegumi/multi-stream-alerts/issues/117)) ([b1b731e](https://github.com/Gitchegumi/multi-stream-alerts/commit/b1b731eb255d85a527998eae0458c7ea1853b2ca))
+
 ## [0.1.14](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-web-v0.1.13...alerts-web-v0.1.14) (2026-07-07)
 
 
