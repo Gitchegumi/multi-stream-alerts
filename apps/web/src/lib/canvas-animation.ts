@@ -43,7 +43,10 @@ export function buildAnimationStyle(
 } | null {
   const config = element.animation;
   const animValue = phase === 'in' ? (config.in ?? 'fade') : config.out;
-  if (!animValue) return null;
+  // `none` (issue #122) means the user disabled editor-applied animation for
+  // this element — render it statically and let the source file animate on its
+  // own if the format supports it.
+  if (!animValue || animValue === 'none') return null;
 
   return {
     animationName: canvasAnimationName(animValue, phase),

@@ -25,7 +25,9 @@ import {
  */
 const SUPPORTED_VISUAL_FORMATS = 'PNG, JPG, GIF, WebP, SVG, MP4, WebM';
 
-const IN_ANIMATIONS: Array<CanvasElement['animation']['in']> = ['fade', 'pop', 'slide-up'];
+// `none` lets an asset render without any editor-applied entrance animation so
+// already-animated assets (GIF/APNG/animated WebP) play untouched (issue #122).
+const IN_ANIMATIONS: Array<CanvasElement['animation']['in']> = ['none', 'fade', 'pop', 'slide-up'];
 const OUT_ANIMATIONS: Array<CanvasElement['animation']['out']> = ['fade'];
 
 function assetLabel(asset: {
