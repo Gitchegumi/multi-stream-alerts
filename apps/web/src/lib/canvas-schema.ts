@@ -35,7 +35,10 @@ export type CanvasElement = {
     assetUrl?: string;
   };
   animation: {
-    in?: 'fade' | 'pop' | 'slide-up';
+    // `none` intentionally disables any editor-applied entrance animation so the
+    // asset renders exactly as provided (issue #122). It is a valid, saved value
+    // — distinct from an unset animation, which still defaults to `fade`.
+    in?: 'none' | 'fade' | 'pop' | 'slide-up';
     out?: 'fade';
     durationMs?: number;
     delayMs?: number;

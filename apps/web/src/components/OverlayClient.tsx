@@ -22,6 +22,7 @@ export function OverlayClient({
   settings: CanvasSettings;
 }) {
   const [activeAlert, setActiveAlert] = useState<AlertEvent | null>(null);
+  const [scale, setScale] = useState(1);
   const queueRef = useRef<AlertEvent[]>([]);
   const activeRef = useRef(false);
   const timeoutRef = useRef<number | null>(null);
@@ -30,6 +31,22 @@ export function OverlayClient({
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
+
+  // Scale the fixed-size stage to fit the viewport while preserving aspect
+  // ratio, so the browser source matches the editor composition instead of
+  // clipping in windows that are not exactly the canvas size (issue #124).
+  useEffect(() => {
+    function updateScale() {
+      if (typeof window === 'undefined') return;
+      const scaleX = window.innerWidth / settings.width;
+      const scaleY = window.innerHeight / settings.height;
+      setScale(Math.min(scaleX, scaleY));
+    }
+
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    return () => window.removeEventListener('resize', updateScale);
+  }, [settings.width, settings.height]);
 
   useEffect(() => {
     const source = new EventSource(
@@ -46,8 +63,15 @@ export function OverlayClient({
       drainQueue();
     });
 
+    // Let EventSource auto-reconnect on transient errors instead of permanently
+    // closing the stream. Force-closing here previously left a client silently
+    // disconnected — more likely with several overlays open at once — so test
+    // alerts stopped arriving on that client (issue #124). The server also emits
+    // periodic heartbeats to keep the connection from going idle.
     source.onerror = () => {
-      source.close();
+      if (source.readyState === EventSource.CLOSED) {
+        console.warn('overlay stream closed by server; awaiting reconnect', { displayKey });
+      }
     };
 
     return () => {
@@ -103,25 +127,31 @@ export function OverlayClient({
   }
 
   return (
-    <main
-      className={`overlay-stage overlay-stage-${settings.background}`}
-      aria-live="polite"
-      style={{ width: settings.width, height: settings.height }}
-    >
-      {activeAlert
-        ? settings.elements
-            .filter((element) => !element.hidden)
-            .sort((a, b) => a.zIndex - b.zIndex)
-            .map((element) => (
-              <CanvasRuntimeElement
-                displayKey={displayKey}
-                element={element}
-                alert={activeAlert}
-                key={element.id}
-              />
-            ))
-        : null}
-    </main>
+    <div className="overlay-viewport">
+      <main
+        className={`overlay-stage overlay-stage-${settings.background}`}
+        aria-live="polite"
+        style={{
+          width: settings.width,
+          height: settings.height,
+          transform: `scale(${scale})`,
+        }}
+      >
+        {activeAlert
+          ? settings.elements
+              .filter((element) => !element.hidden)
+              .sort((a, b) => a.zIndex - b.zIndex)
+              .map((element) => (
+                <CanvasRuntimeElement
+                  displayKey={displayKey}
+                  element={element}
+                  alert={activeAlert}
+                  key={element.id}
+                />
+              ))
+          : null}
+      </main>
+    </div>
   );
 }
 

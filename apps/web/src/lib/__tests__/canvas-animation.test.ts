@@ -69,6 +69,11 @@ test('buildAnimationStyle returns null when out animation is undefined', () => {
   assert.equal(buildAnimationStyle(el, 'out'), null);
 });
 
+test('buildAnimationStyle returns null when in animation is none (issue #122)', () => {
+  const el = makeElement({ in: 'none' });
+  assert.equal(buildAnimationStyle(el, 'in'), null);
+});
+
 test('buildAnimationStyle returns entrance animation properties', () => {
   const el = makeElement({ in: 'pop', durationMs: 1000, delayMs: 200 });
   const result = buildAnimationStyle(el, 'in');
