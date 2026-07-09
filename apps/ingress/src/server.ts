@@ -2,7 +2,10 @@ import express from 'express';
 import { parseIngressEnv } from '@multi-stream-alerts/shared';
 import { kofiWebhookExpressHandler } from './kofi-webhook';
 import { twitchWebhookExpressHandler } from './twitch-webhook';
-import { youtubeWebhookExpressHandler } from './youtube-webhook';
+import {
+  youtubeWebhookExpressHandler,
+  youtubeWebSubVerificationExpressHandler,
+} from './youtube-webhook';
 
 const env = parseIngressEnv(process.env);
 const app = express();
@@ -20,6 +23,10 @@ app.post(
 );
 
 app.post('/api/webhooks/twitch', express.raw({ type: '*/*' }), twitchWebhookExpressHandler);
+
+// WebSub intent verification: the hub confirms (un)subscriptions via GET
+// with the hub.challenge to echo. Registered before the POST route.
+app.get('/api/webhooks/youtube/:channelSlug', youtubeWebSubVerificationExpressHandler);
 
 app.post(
   '/api/webhooks/youtube/:channelSlug',

@@ -6,37 +6,37 @@ import {
 } from '@multi-stream-alerts/database';
 import { prisma } from '@multi-stream-alerts/database';
 import type { AlertEvent } from '@multi-stream-alerts/shared';
-import { normalizeYoutubePubSub } from './youtube';
+import { normalizeYoutubePubSub, verifyYoutubeWebSubSignature } from './youtube';
 
 /**
- * Structural shape for the Express `Response` that the handler uses.
- * The handler only ever calls `response.status(code).json(body)`, so
- * declaring a narrow interface here keeps the handler decoupled from
- * the full Express `Response` type and makes it trivial to stub in
- * unit tests.
+ * Structural shape for the Express `Response` that the handlers use. The
+ * notification handler only ever calls `response.status(code).json(body)`;
+ * the WebSub verification (GET) handler additionally needs `.send(text)` to
+ * echo the `hub.challenge`.
  */
 interface YoutubeWebhookResponse {
-  status: (code: number) => { json: (body: unknown) => void };
+  status: (code: number) => { json: (body: unknown) => void; send?: (body: string) => void };
 }
 
-export type YoutubeRejectionReason = 'channel_not_found' | 'not_configured';
+interface YoutubeVerificationResponse {
+  status: (code: number) => { send: (body: string) => void; json: (body: unknown) => void };
+}
+
+export type YoutubeRejectionReason = 'channel_not_found' | 'not_configured' | 'invalid_signature';
 
 /**
- * Dependency-injection seam for tests. Each field is optional; defaults
- * pull from the live database / normalizer. Tests pass in a stub `deps`
- * object to avoid touching a real Prisma client or Redis.
+ * Dependency-injection seam for the notification handler.
  *
- * - `findChannelBySlug` resolves the channel from the URL slug.
- * - `getDecryptedClientId` / `getDecryptedClientSecret` load the
- *   channel's stored YouTube OAuth credentials.
- * - `normalizeEvent` parses the Atom XML body into an internal alert event.
- * - `claimDedup` deduplicates by raw event id.
- * - `storeAndPublish` persists the event and pushes it to Redis.
+ * Since issue #128 the ingest gate is "has this channel been OAuth-provisioned
+ * for YouTube?" — i.e. does it have a stored `youtube.websub_secret` — rather
+ * than the old manual client_id/client_secret pair. When the secret is
+ * present we also verify the WebSub HMAC on the raw body.
  */
 export interface YoutubeWebhookDeps {
   findChannelBySlug?: (slug: string) => Promise<{ id: string; slug: string } | null>;
-  getDecryptedClientId?: (channelId: string) => Promise<string | null>;
-  getDecryptedClientSecret?: (channelId: string) => Promise<string | null>;
+  /** Load the channel's WebSub secret (null = not provisioned). */
+  getWebSubSecret?: (channelId: string) => Promise<string | null>;
+  verifySignature?: typeof verifyYoutubeWebSubSignature;
   normalizeEvent?: typeof normalizeYoutubePubSub;
   claimDedup?: (input: {
     provider: string;
@@ -51,38 +51,32 @@ const defaultDeps: Required<YoutubeWebhookDeps> = {
     const channel = await prisma.channel.findUnique({ where: { slug } });
     return channel ? { id: channel.id, slug: channel.slug } : null;
   },
-  getDecryptedClientId: (channelId) =>
+  getWebSubSecret: (channelId) =>
     getChannelDecryptedSecret({
       channelId,
       provider: 'youtube',
-      key: 'youtube.client_id',
+      key: 'youtube.websub_secret',
     }),
-  getDecryptedClientSecret: (channelId) =>
-    getChannelDecryptedSecret({
-      channelId,
-      provider: 'youtube',
-      key: 'youtube.client_secret',
-    }),
+  verifySignature: verifyYoutubeWebSubSignature,
   normalizeEvent: normalizeYoutubePubSub,
   claimDedup: claimDeduplicationKey,
   storeAndPublish: storeAndPublishAlertEvent,
 };
 
 /**
- * Express handler for the path-based YouTube Pub/Sub hub callback:
+ * Express handler for the path-based YouTube WebSub hub callback (POST):
  *   POST /api/webhooks/youtube/:channelSlug
  *
- * Resolves the channel from the URL slug, loads its stored
- * YouTube OAuth client_id / client_secret (encrypted at rest),
- * parses the inbound Atom XML, normalizes it to an internal alert
- * event, deduplicates by `rawEventId`, and stores + publishes the event.
+ * Resolves the channel from the URL slug, loads its stored WebSub secret
+ * (present only after the user connected YouTube via OAuth), verifies the
+ * inbound `X-Hub-Signature` HMAC, parses the Atom XML, normalizes it to an
+ * internal alert event, deduplicates by `rawEventId`, and stores + publishes.
  *
- * Never logs the client_id or client_secret value. The only
- * identifiers it emits are `channelSlug`, `channelId`, `rawEventId`,
- * and the opaque rejection reason.
+ * Never logs the secret. The only identifiers it emits are `channelSlug`,
+ * `channelId`, `rawEventId`, and the opaque rejection reason.
  */
 export async function handleYoutubeWebhook(
-  request: Pick<Request, 'params' | 'body'>,
+  request: Pick<Request, 'params' | 'body' | 'headers'>,
   response: YoutubeWebhookResponse,
   deps: YoutubeWebhookDeps = {},
 ): Promise<void> {
@@ -94,8 +88,8 @@ export async function handleYoutubeWebhook(
 
   const resolved: Required<YoutubeWebhookDeps> = { ...defaultDeps, ...deps };
   const findChannel = resolved.findChannelBySlug;
-  const getClientId = resolved.getDecryptedClientId;
-  const getClientSecret = resolved.getDecryptedClientSecret;
+  const getSecret = resolved.getWebSubSecret;
+  const verifySignature = resolved.verifySignature;
   const normalizeEvent = resolved.normalizeEvent;
   const claimKey = resolved.claimDedup;
   const publish = resolved.storeAndPublish;
@@ -107,31 +101,31 @@ export async function handleYoutubeWebhook(
     return;
   }
 
-  // Load both credentials up front. Either being null means the channel
-  // is not fully configured for YouTube ingestion.
-  const [clientId, clientSecret] = await Promise.all([
-    getClientId(channel.id),
-    getClientSecret(channel.id),
-  ]);
-
-  if (!clientId || !clientSecret) {
+  const secret = await getSecret(channel.id);
+  if (!secret) {
     console.warn('youtube webhook rejected', { channelSlug, reason: 'not_configured' });
     response.status(503).json({ error: 'YouTube not configured for this channel' });
     return;
   }
 
+  // express.raw({ type: '*/*' }) delivers the body as a Buffer. Verify the
+  // WebSub HMAC over the raw bytes before doing anything with the payload.
+  const rawBody = Buffer.isBuffer(request.body)
+    ? request.body
+    : typeof request.body === 'string'
+      ? Buffer.from(request.body)
+      : Buffer.from('');
+
+  const signature = headerString(request.headers?.['x-hub-signature']);
+  if (!verifySignature({ secret, signature, rawBody })) {
+    console.warn('youtube webhook rejected', { channelSlug, reason: 'invalid_signature' });
+    response.status(401).json({ error: 'Invalid WebSub signature' });
+    return;
+  }
+
   console.info('youtube webhook accepted', { channelSlug, channelId: channel.id });
 
-  // The server.ts route uses express.raw({ type: '*/*' }) so body is a
-  // Buffer. If tests inject a string we accept that too.
-  const rawBody = Buffer.isBuffer(request.body)
-    ? request.body.toString('utf8')
-    : typeof request.body === 'string'
-      ? request.body
-      : '';
-
-  const normalized = normalizeEvent(rawBody);
-
+  const normalized = normalizeEvent(rawBody.toString('utf8'));
   if (normalized === null) {
     console.warn('youtube webhook suppressed', { channelSlug, reason: 'unmapped' });
     response.status(204).json({});
@@ -157,10 +151,83 @@ export async function handleYoutubeWebhook(
   response.status(200).json({ ok: true, event });
 }
 
+// ---------------------------------------------------------------------------
+// WebSub verification (GET) — hub intent confirmation
+// ---------------------------------------------------------------------------
+
+export interface YoutubeVerificationDeps {
+  findChannelBySlug?: (slug: string) => Promise<{ id: string } | null>;
+  /** Confirm we actually requested this topic for this channel. */
+  hasSubscription?: (channelId: string, topic: string) => Promise<boolean>;
+}
+
+const defaultVerificationDeps: Required<YoutubeVerificationDeps> = {
+  findChannelBySlug: async (slug) => {
+    const channel = await prisma.channel.findUnique({ where: { slug } });
+    return channel ? { id: channel.id } : null;
+  },
+  hasSubscription: async (channelId, topic) => {
+    const row = await prisma.providerSubscription.findFirst({
+      where: { channelId, provider: 'youtube', providerSubscriptionId: topic },
+      select: { id: true },
+    });
+    return row !== null;
+  },
+};
+
 /**
- * Express handler that delegates to `handleYoutubeWebhook` with the
- * live defaults. The dep-injection point is the unit-test entry;
- * this wrapper exists so `server.ts` can register it as a normal
+ * WebSub verification of intent (GET):
+ *   GET /api/webhooks/youtube/:channelSlug?hub.mode=subscribe&hub.topic=…&hub.challenge=…
+ *
+ * The hub calls this to confirm we requested the (un)subscription. We echo
+ * `hub.challenge` back as plain text only when the channel resolves and a
+ * matching `ProviderSubscription` row exists, so we never confirm a
+ * subscription we did not initiate.
+ */
+export async function handleYoutubeWebSubVerification(
+  request: Pick<Request, 'params' | 'query'>,
+  response: YoutubeVerificationResponse,
+  deps: YoutubeVerificationDeps = {},
+): Promise<void> {
+  const channelSlug = queryString(request.params.channelSlug as string | string[] | undefined);
+  const query = request.query as Record<string, string | string[] | undefined>;
+  const mode = queryString(query['hub.mode']);
+  const topic = queryString(query['hub.topic']);
+  const challenge = queryString(query['hub.challenge']);
+
+  if (!channelSlug || !mode || !topic || !challenge) {
+    response.status(400).send('Missing WebSub verification parameters');
+    return;
+  }
+
+  const resolved = { ...defaultVerificationDeps, ...deps };
+  const channel = await resolved.findChannelBySlug(channelSlug);
+  if (!channel) {
+    console.warn('youtube websub verification rejected', {
+      channelSlug,
+      reason: 'channel_not_found',
+    });
+    response.status(404).send('Channel not found');
+    return;
+  }
+
+  const known = await resolved.hasSubscription(channel.id, topic);
+  if (!known) {
+    console.warn('youtube websub verification rejected', {
+      channelSlug,
+      reason: 'unknown_topic',
+    });
+    response.status(404).send('Unknown subscription');
+    return;
+  }
+
+  console.info('youtube websub verification confirmed', { channelSlug, mode });
+  response.status(200).send(challenge);
+}
+
+/**
+ * Express handler that delegates to `handleYoutubeWebhook` with the live
+ * defaults. This wrapper exists so `server.ts` can register it as a normal
  * Express handler (which requires the `(req, res, next)` shape).
  */
 export async function youtubeWebhookExpressHandler(
@@ -169,4 +236,25 @@ export async function youtubeWebhookExpressHandler(
   _next: NextFunction,
 ): Promise<void> {
   await handleYoutubeWebhook(request, response);
+}
+
+/** Express handler for the WebSub verification GET. */
+export async function youtubeWebSubVerificationExpressHandler(
+  request: Request,
+  response: YoutubeVerificationResponse,
+  _next: NextFunction,
+): Promise<void> {
+  await handleYoutubeWebSubVerification(request, response);
+}
+
+function headerString(value: string | string[] | undefined): string | undefined {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'string') return value[0];
+  return undefined;
+}
+
+function queryString(value: string | string[] | undefined): string | undefined {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && typeof value[0] === 'string') return value[0];
+  return undefined;
 }
