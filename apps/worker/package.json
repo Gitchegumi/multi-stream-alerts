@@ -8,6 +8,7 @@
     "dev": "tsx watch src/worker.ts",
     "lint": "tsc --noEmit",
     "start": "tsx src/worker.ts",
+    "test": "node --import tsx --test $(find src -path '*/__tests__/*.test.ts' -type f)",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

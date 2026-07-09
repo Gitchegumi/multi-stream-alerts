@@ -9,6 +9,9 @@ import {
   assertInviteIsUsable,
   InviteCodeError,
   verifyPassword,
+  provisionTwitchEventSub,
+  resolveYoutubeChannelId,
+  provisionYoutubeWebSub,
   type Prisma,
 } from '@multi-stream-alerts/database';
 import { INVITE_CODE_COOKIE, validateInviteCodeForCookie } from './oidc-state';
@@ -186,7 +189,19 @@ if (twitchEnabled) {
       clientSecret: process.env.TWITCH_CLIENT_SECRET!,
       authorization: {
         params: {
-          scope: 'openid user:read:email',
+          // Scopes cover the EventSub subscription types the backend
+          // auto-provisions on connect (see SUPPORTED_TWITCH_SUBSCRIPTIONS).
+          // Expanding these invalidates older links, which then surface as
+          // "Needs reconnect" in the integrations UI.
+          scope: [
+            'openid',
+            'user:read:email',
+            'moderator:read:followers',
+            'channel:read:subscriptions',
+            'bits:read',
+            'channel:read:charity',
+            'channel:read:redemptions',
+          ].join(' '),
         },
       },
     }),
@@ -298,6 +313,17 @@ export const authOptions: NextAuthOptions = {
           },
         });
 
+        // Auto-provision the provider integration for the linked workspace so
+        // the user never has to configure EventSub/WebSub by hand (issue #128).
+        // Best-effort: a provisioning failure must never block the OAuth
+        // round-trip — it surfaces as a not-yet-ready connection status.
+        await provisionLinkedAccount({
+          platform,
+          providerAccountId: account.providerAccountId,
+          accessToken: account.access_token,
+          channelId: linkingChannelId ?? null,
+        });
+
         return true;
       }
 
@@ -376,6 +402,64 @@ export const authOptions: NextAuthOptions = {
 };
 
 export { oidcEnabled, credentialsEnabled, twitchEnabled, googleEnabled };
+
+/**
+ * Auto-provision the provider integration for a freshly-linked account so the
+ * user only has to click "Connect" and approve — no manual EventSub/WebSub
+ * setup (issue #128). Requires a workspace (`channelId`) to scope the
+ * integration to; user-level links (no channelId) are skipped. All failures
+ * are swallowed with a log so they can never break the OAuth sign-in flow.
+ */
+export async function provisionLinkedAccount(input: {
+  platform: 'twitch' | 'youtube';
+  providerAccountId: string;
+  accessToken?: string | null;
+  channelId: string | null;
+}): Promise<void> {
+  if (!input.channelId) {
+    console.warn('[auth] linked account has no workspace; skipping auto-provisioning', {
+      platform: input.platform,
+    });
+    return;
+  }
+
+  try {
+    if (input.platform === 'twitch') {
+      await provisionTwitchEventSub({
+        channelId: input.channelId,
+        broadcasterUserId: input.providerAccountId,
+      });
+      return;
+    }
+
+    // YouTube: resolve the channel id from the granted token, then subscribe.
+    if (!input.accessToken) {
+      console.warn('[auth] youtube link missing access token; skipping auto-provisioning');
+      return;
+    }
+    const youtubeChannelId = await resolveYoutubeChannelId(input.accessToken);
+    if (!youtubeChannelId) {
+      console.warn('[auth] could not resolve YouTube channel id; skipping auto-provisioning');
+      return;
+    }
+    const channel = await prisma.channel.findUnique({
+      where: { id: input.channelId },
+      select: { slug: true },
+    });
+    if (!channel) return;
+    await provisionYoutubeWebSub({
+      channelId: input.channelId,
+      channelSlug: channel.slug,
+      youtubeChannelId,
+    });
+  } catch (err) {
+    console.error('[auth] auto-provisioning failed', {
+      platform: input.platform,
+      channelId: input.channelId,
+      reason: err instanceof Error ? err.message : 'unknown_error',
+    });
+  }
+}
 
 export async function handleOidcSignIn(
   {

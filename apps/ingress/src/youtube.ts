@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { AlertType, AlertPlatform } from '@multi-stream-alerts/shared';
 
 /**
@@ -57,4 +58,34 @@ export function normalizeYoutubePubSub(payload: unknown): NormalizedYoutubeEvent
     rawEventId: entry.id,
     rawPayload: entry,
   };
+}
+
+/**
+ * Verify the `X-Hub-Signature` HMAC on an inbound WebSub notification.
+ * Google's PubSubHubbub hub signs the raw request body with the secret we
+ * supplied at subscribe time, formatted as `sha1=<hexdigest>`. Comparison is
+ * `timingSafeEqual` with a length pre-check so we never leak timing on a
+ * length mismatch. Returns false when the header or secret is missing.
+ */
+export function verifyYoutubeWebSubSignature(input: {
+  secret: string;
+  signature?: string;
+  rawBody: Buffer;
+}): boolean {
+  if (!input.signature || !input.secret) return false;
+
+  // The header may be `sha1=…` (Google's default) or `sha256=…`.
+  const match = input.signature.match(/^(sha1|sha256)=([0-9a-f]+)$/i);
+  if (!match) return false;
+  const algorithm = match[1]!.toLowerCase();
+
+  const expected = `${algorithm}=${createHmac(algorithm, input.secret)
+    .update(input.rawBody)
+    .digest('hex')}`;
+  const expectedBuffer = Buffer.from(expected);
+  const signatureBuffer = Buffer.from(input.signature);
+  return (
+    expectedBuffer.length === signatureBuffer.length &&
+    timingSafeEqual(expectedBuffer, signatureBuffer)
+  );
 }
