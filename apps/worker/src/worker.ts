@@ -1,5 +1,6 @@
 import { createRedisClient } from '@multi-stream-alerts/database';
 import { parseAlertEvent, redisAlertChannel } from '@multi-stream-alerts/shared';
+import { startYoutubeWebSubRenewal } from './websub-renewal';
 
 const redis = createRedisClient();
 
@@ -10,6 +11,10 @@ redis.on('error', (error) => {
 await redis.subscribe(redisAlertChannel);
 
 console.log(`alerts-worker subscribed to ${redisAlertChannel}`);
+
+// Periodically renew YouTube WebSub leases before they expire so alerts keep
+// flowing without user intervention (issue #128).
+const renewalTimer = startYoutubeWebSubRenewal();
 
 redis.on('message', (_channel, payload) => {
   try {
@@ -27,6 +32,7 @@ redis.on('message', (_channel, payload) => {
 });
 
 process.on('SIGTERM', () => {
+  clearInterval(renewalTimer);
   redis.disconnect();
   process.exit(0);
 });
