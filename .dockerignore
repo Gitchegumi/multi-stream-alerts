@@ -36,7 +36,8 @@ logs
 # Test artifacts
 .nyc_output
 
-# Documentation (not needed in the image)
-docs
-*.md
+# Documentation
+# The docs/ tree is served by the dashboard Guide route at runtime, so it must
+# ship inside the image. Only exclude root-level markdown that the app never reads.
+/*.md
 !README.md

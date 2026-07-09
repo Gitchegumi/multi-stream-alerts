@@ -8,6 +8,7 @@ GitchAlerts is a self-hosted alert and canvas system for creators who want strea
 - [Dashboard](user-guide/dashboard.md)
 - [Canvases](user-guide/canvases.md)
 - [Alerts](user-guide/alerts.md)
+- [Platform integrations](user-guide/integrations.md)
 - [Browser sources](user-guide/browser-sources.md)
 - [Assets](user-guide/assets.md)
 - [Account settings](user-guide/account-settings.md)

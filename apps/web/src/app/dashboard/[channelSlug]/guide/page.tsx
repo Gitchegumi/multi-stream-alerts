@@ -14,6 +14,7 @@ const guideOrder = [
   'user-guide/dashboard',
   'user-guide/canvases',
   'user-guide/alerts',
+  'user-guide/integrations',
   'user-guide/browser-sources',
   'user-guide/assets',
   'user-guide/account-settings',
