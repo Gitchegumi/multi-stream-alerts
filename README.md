@@ -4,6 +4,15 @@ GitchAlerts started from a simple frustration: I do not want my stream alerts, o
 
 It is built as a TypeScript monorepo with a Next.js dashboard/overlay app, a narrow public webhook ingress service, a small worker, PostgreSQL, Redis, and Docker Compose.
 
+## Documentation
+
+Full docs live in [`docs/`](docs/index.md) and are split into a
+[User Guide](docs/index.md) (getting started, canvases, alerts, integrations,
+browser sources, assets, troubleshooting) and a
+[Developer Guide](docs/index.md) (architecture, local development, environment
+variables, database, auth, webhooks, deployment, and contributing). The same docs
+are served inside the dashboard under the **Guide** tab.
+
 ## What This Is
 
 - A self-hosted alert and overlay system for creators and small teams.
