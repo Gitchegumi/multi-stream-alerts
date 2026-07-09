@@ -13,7 +13,7 @@ export function CanvasEditor(props: UseCanvasEditorProps) {
 
   if (!editor.selectedCanvas) {
     return (
-      <section className="canvas-editor-empty">
+      <section className="grid h-screen place-items-center">
         <button
           className="button"
           type="button"
@@ -27,7 +27,7 @@ export function CanvasEditor(props: UseCanvasEditorProps) {
   }
 
   return (
-    <div className="canvas-editor-shell">
+    <div className="grid h-screen grid-cols-[248px_1fr_264px] grid-rows-[52px_1fr_30px] [grid-template-areas:'topbar_topbar_topbar'_'left_stage_inspector'_'status_status_status'] overflow-hidden bg-[#1c1e23] text-text">
       <EditorTopBar editor={editor} />
       <EditorLeftPanel editor={editor} />
       <EditorStage editor={editor} />

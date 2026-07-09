@@ -3,6 +3,12 @@
 import { useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
+import {
+  authFieldClass,
+  authInputClass,
+  authToggleClass,
+  authToggleButtonClass,
+} from '@/components/auth-styles';
 
 type AuthMode = 'oidc' | 'credentials';
 
@@ -75,7 +81,7 @@ export function SignInForm({
   }
 
   return (
-    <div className="auth-form">
+    <div className="grid gap-3">
       {error && (
         <p className="error" role="alert">
           {error}
@@ -83,12 +89,12 @@ export function SignInForm({
       )}
 
       {oidcEnabled && credentialsEnabled && (
-        <div className="auth-mode-toggle" role="tablist">
+        <div className={authToggleClass} role="tablist">
           <button
             type="button"
             role="tab"
             aria-selected={mode === 'oidc'}
-            className={mode === 'oidc' ? 'active' : ''}
+            className={authToggleButtonClass(mode === 'oidc')}
             onClick={() => {
               setMode('oidc');
               setError(null);
@@ -101,7 +107,7 @@ export function SignInForm({
             type="button"
             role="tab"
             aria-selected={mode === 'credentials'}
-            className={mode === 'credentials' ? 'active' : ''}
+            className={authToggleButtonClass(mode === 'credentials')}
             onClick={() => {
               setMode('credentials');
               setError(null);
@@ -129,24 +135,26 @@ export function SignInForm({
         </>
       ) : credentialsEnabled ? (
         <form onSubmit={handleCredentialsSubmit}>
-          <label className="auth-field">
+          <label className={authFieldClass}>
             <span>Email</span>
             <input
               type="email"
               required
               autoComplete="email"
+              className={authInputClass}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={pending}
               placeholder="you@example.com"
             />
           </label>
-          <label className="auth-field">
+          <label className={authFieldClass}>
             <span>Password</span>
             <input
               type="password"
               required
               autoComplete="current-password"
+              className={authInputClass}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={pending}

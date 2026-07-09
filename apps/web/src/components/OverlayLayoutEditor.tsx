@@ -269,8 +269,8 @@ export function OverlayLayoutEditor({
   }
 
   return (
-    <div className="overlay-editor-shell">
-      <header className="overlay-editor-nav">
+    <div className="grid min-h-[calc(100vh-57px)] grid-rows-[auto_auto_1fr]">
+      <header className="sticky top-[57px] z-20 grid grid-cols-[auto_minmax(180px,1fr)_auto] items-center gap-3 border-b border-line bg-[rgba(35,37,43,0.96)] px-4 py-3 backdrop-blur-[12px] max-[900px]:grid-cols-1 max-[900px]:items-stretch max-[768px]:top-[53px]">
         <a
           className="button-secondary"
           href={`/dashboard/${encodeURIComponent(channelSlug)}/alerts`}
@@ -278,12 +278,12 @@ export function OverlayLayoutEditor({
           Back
         </a>
         <input
-          className="overlay-title-input"
+          className="w-[min(420px,100%)] border border-transparent bg-transparent px-0 py-2 text-lg font-extrabold text-text"
           value={layout.name}
           readOnly
           aria-label="Overlay layout name"
         />
-        <div className="overlay-editor-tools">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <button
             className="button-secondary"
             type="button"
@@ -301,7 +301,7 @@ export function OverlayLayoutEditor({
             Redo
           </button>
           <select
-            className="select"
+            className="select w-[100px]"
             value={zoom}
             onChange={(event) => setZoom(Number(event.target.value))}
           >
@@ -328,18 +328,18 @@ export function OverlayLayoutEditor({
         </div>
       </header>
 
-      {result ? <p className="overlay-editor-result muted">{result}</p> : null}
-      {!canManage ? <p className="overlay-editor-result muted">Read-only access.</p> : null}
+      {result ? <p className="muted mx-4 mt-2.5 mb-0">{result}</p> : null}
+      {!canManage ? <p className="muted mx-4 mt-2.5 mb-0">Read-only access.</p> : null}
       {normalized.warnings.length ? (
-        <p className="overlay-editor-result muted">
+        <p className="muted mx-4 mt-2.5 mb-0">
           Layout data was repaired while loading: {normalized.warnings.join('; ')}
         </p>
       ) : null}
 
-      <div className="overlay-editor-grid">
-        <aside className="overlay-editor-sidebar">
+      <div className="grid min-h-0 grid-cols-[250px_minmax(360px,1fr)_300px] max-[900px]:grid-cols-1 max-[900px]:items-stretch">
+        <aside className="grid min-w-0 content-start gap-[18px] bg-panel p-4 border-r border-line max-[768px]:border-r-0 max-[768px]:border-b">
           <section>
-            <h2>Elements</h2>
+            <h2 className="m-0 mb-2.5 text-[15px]">Elements</h2>
             <div className="element-palette">
               {palette.map((item) => (
                 <button
@@ -355,7 +355,7 @@ export function OverlayLayoutEditor({
             </div>
           </section>
           <section>
-            <h2>Layers</h2>
+            <h2 className="m-0 mb-2.5 text-[15px]">Layers</h2>
             <div className="layer-list">
               {[...draft.elements]
                 .sort((a, b) => b.zIndex - a.zIndex)
@@ -374,9 +374,9 @@ export function OverlayLayoutEditor({
           </section>
         </aside>
 
-        <main className="overlay-workspace">
+        <main className="grid min-w-0 place-items-center overflow-auto bg-[#202126] p-7 [background-image:linear-gradient(90deg,rgba(204,219,220,0.08)_1px,transparent_1px),linear-gradient(rgba(204,219,220,0.08)_1px,transparent_1px)] [background-size:24px_24px] max-[768px]:min-h-[420px] max-[768px]:justify-start">
           <div
-            className="overlay-canvas"
+            className="relative flex-none overflow-hidden border border-line-strong bg-[rgba(0,0,0,0.42)] shadow-brand"
             ref={canvasRef}
             style={{
               width: draft.resolution.width * zoom,
@@ -388,10 +388,10 @@ export function OverlayLayoutEditor({
               .sort((a, b) => a.zIndex - b.zIndex)
               .map((element) => (
                 <div
-                  className={`overlay-canvas-element${
+                  className={`absolute grid min-h-5 min-w-5 cursor-grab select-none place-items-center overflow-hidden border text-center [overflow-wrap:anywhere] ${
                     element.id === selectedId && !previewing
-                      ? ' overlay-canvas-element-selected'
-                      : ''
+                      ? 'border-accent shadow-[inset_0_0_0_1px_rgba(175,224,206,0.58)]'
+                      : 'border-transparent'
                   }`}
                   key={element.id}
                   role="button"
@@ -419,8 +419,8 @@ export function OverlayLayoutEditor({
           </div>
         </main>
 
-        <aside className="overlay-editor-sidebar">
-          <h2>Properties</h2>
+        <aside className="grid min-w-0 content-start gap-[18px] bg-panel p-4 border-l border-line max-[768px]:border-l-0 max-[768px]:border-b">
+          <h2 className="m-0 mb-2.5 text-[15px]">Properties</h2>
           {selected ? (
             <div className="property-stack">
               <label className="field">
@@ -449,7 +449,7 @@ export function OverlayLayoutEditor({
                   </label>
                 ))}
               </div>
-              <label className="toggle-line">
+              <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   checked={selected.visible}
@@ -458,7 +458,7 @@ export function OverlayLayoutEditor({
                 />
                 Visible
               </label>
-              <label className="toggle-line">
+              <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   checked={selected.locked}
@@ -590,21 +590,35 @@ function ElementPreview({
   const text = element.properties.textTemplate ?? element.name;
   if (element.type === 'image') {
     const asset = element.assets?.image ? assetById.get(element.assets.image) : null;
-    return asset ? <img alt="" src={asset.previewUrl} /> : <span>Missing Asset</span>;
+    return asset ? (
+      <img className="h-full w-full object-contain" alt="" src={asset.previewUrl} />
+    ) : (
+      <span>Missing Asset</span>
+    );
   }
   if (element.type === 'video') {
     const asset = element.assets?.video ? assetById.get(element.assets.video) : null;
     return asset ? (
-      <video src={asset.previewUrl} muted loop playsInline autoPlay />
+      <video
+        className="h-full w-full object-contain"
+        src={asset.previewUrl}
+        muted
+        loop
+        playsInline
+        autoPlay
+      />
     ) : (
       <span>Missing Asset</span>
     );
   }
   if (element.type === 'goal-bar') {
     return (
-      <div className="goal-preview">
-        <span style={{ width: '64%' }} />
-        <strong>{text}</strong>
+      <div className="relative grid h-full w-full place-items-center overflow-hidden">
+        <span
+          className="absolute inset-y-0 left-0 bg-[rgba(252,163,17,0.72)]"
+          style={{ width: '64%' }}
+        />
+        <strong className="relative z-[1]">{text}</strong>
       </div>
     );
   }

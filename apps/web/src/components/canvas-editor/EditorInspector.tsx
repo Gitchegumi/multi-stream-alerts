@@ -17,6 +17,14 @@ import {
   type CanvasElement,
   type CanvasSettings,
 } from '@/lib/canvas-schema';
+import {
+  editorActionButtonClass,
+  editorFieldClass,
+  editorHintClass,
+  editorInspectorGridClass,
+  editorPlaceholderClass,
+  editorSectionHeadingClass,
+} from './editor-styles';
 
 /**
  * Human-readable list of visual asset formats accepted for alert image
@@ -56,11 +64,16 @@ function PreviewAsset({
   previewKey?: string;
 }) {
   const url = asset?.previewUrl ?? eventUrl;
-  if (!url) return <span className="canvas-image-placeholder">{fallback}</span>;
+  if (!url)
+    return (
+      <span className="grid h-full w-full place-items-center border border-dashed border-line-strong text-[13px] text-muted">
+        {fallback}
+      </span>
+    );
   if (resolveAssetKind(asset?.assetType, url) === 'video') {
     return (
       <video
-        className="canvas-preview-asset"
+        className="pointer-events-none h-full w-full object-contain"
         key={previewKey ?? url}
         src={url}
         muted={!previewKey}
@@ -70,7 +83,7 @@ function PreviewAsset({
       />
     );
   }
-  return <img className="canvas-preview-asset" alt="" src={url} />;
+  return <img className="pointer-events-none h-full w-full object-contain" alt="" src={url} />;
 }
 
 export function EditorInspector({ editor }: { editor: UseCanvasEditorReturn }) {
@@ -83,14 +96,14 @@ export function EditorInspector({ editor }: { editor: UseCanvasEditorReturn }) {
 
   if (!selected) {
     return (
-      <aside className="canvas-editor-inspector">
-        <div className="canvas-editor-placeholder">No canvas selected</div>
+      <aside className="min-w-0 overflow-auto border-l border-line bg-bg [grid-area:inspector]">
+        <div className={editorPlaceholderClass}>No canvas selected</div>
       </aside>
     );
   }
 
   return (
-    <aside className="canvas-editor-inspector">
+    <aside className="min-w-0 overflow-auto border-l border-line bg-bg [grid-area:inspector]">
       {selectedElement ? (
         <ElementInspector editor={editor} element={selectedElement} />
       ) : (
@@ -120,10 +133,10 @@ function CanvasInspector({ editor }: { editor: UseCanvasEditorReturn }) {
   }
 
   return (
-    <div className="canvas-editor-inspector-content">
-      <div className="canvas-editor-inspector-section">
-        <h3 className="canvas-editor-inspector-title">Canvas settings</h3>
-        <label className="canvas-editor-field">
+    <div className="grid gap-3.5 p-3.5">
+      <div className="grid gap-2.5 border-b border-line pb-3.5 last:border-b-0 last:pb-0">
+        <h3 className="m-0 text-sm font-bold">Canvas settings</h3>
+        <label className={editorFieldClass}>
           <span>Name</span>
           <input
             className="input"
@@ -135,8 +148,8 @@ function CanvasInspector({ editor }: { editor: UseCanvasEditorReturn }) {
             }}
           />
         </label>
-        <div className="canvas-editor-inspector-grid">
-          <label className="canvas-editor-field">
+        <div className={editorInspectorGridClass}>
+          <label className={editorFieldClass}>
             <span>Width</span>
             <input
               className="input"
@@ -153,7 +166,7 @@ function CanvasInspector({ editor }: { editor: UseCanvasEditorReturn }) {
               }}
             />
           </label>
-          <label className="canvas-editor-field">
+          <label className={editorFieldClass}>
             <span>Height</span>
             <input
               className="input"
@@ -173,8 +186,8 @@ function CanvasInspector({ editor }: { editor: UseCanvasEditorReturn }) {
         </div>
       </div>
 
-      <div className="canvas-editor-inspector-section">
-        <label className="canvas-editor-field">
+      <div className="grid gap-2.5 border-b border-line pb-3.5 last:border-b-0 last:pb-0">
+        <label className={editorFieldClass}>
           <span>Background</span>
           <select
             className="select"
@@ -191,8 +204,8 @@ function CanvasInspector({ editor }: { editor: UseCanvasEditorReturn }) {
         </label>
       </div>
 
-      <div className="canvas-editor-inspector-section">
-        <label className="canvas-editor-field">
+      <div className="grid gap-2.5 border-b border-line pb-3.5 last:border-b-0 last:pb-0">
+        <label className={editorFieldClass}>
           <span>Stored sound</span>
           <select
             className="select"
@@ -207,10 +220,10 @@ function CanvasInspector({ editor }: { editor: UseCanvasEditorReturn }) {
             ))}
           </select>
         </label>
-        <label className="canvas-editor-field">
+        <label className={editorFieldClass}>
           <span>Volume {selected.settings.volume}%</span>
           <input
-            className="canvas-editor-slider"
+            className="w-full accent-accent"
             type="range"
             min={0}
             max={100}
@@ -220,8 +233,8 @@ function CanvasInspector({ editor }: { editor: UseCanvasEditorReturn }) {
         </label>
       </div>
 
-      <div className="canvas-editor-inspector-section">
-        <label className="canvas-editor-toggle-line">
+      <div className="grid gap-2.5 border-b border-line pb-3.5 last:border-b-0 last:pb-0">
+        <label className="flex cursor-pointer items-center gap-2 text-[13px]">
           <input
             type="checkbox"
             checked={selected.isActive}
@@ -231,7 +244,7 @@ function CanvasInspector({ editor }: { editor: UseCanvasEditorReturn }) {
         </label>
       </div>
 
-      <p className="canvas-editor-hint">Select an element to edit it</p>
+      <p className={editorHintClass}>Select an element to edit it</p>
     </div>
   );
 }
@@ -301,20 +314,20 @@ function ElementInspector({
   const isImage = element.type === 'alert-image';
 
   return (
-    <div className="canvas-editor-inspector-content">
-      <div className="canvas-editor-inspector-section">
-        <div className="canvas-editor-inspector-header">
+    <div className="grid gap-3.5 p-3.5">
+      <div className="grid gap-2.5 border-b border-line pb-3.5 last:border-b-0 last:pb-0">
+        <div className="flex items-center justify-between gap-2.5">
           {renaming ? (
             <input
               ref={renameRef}
-              className="input canvas-editor-rename-input"
+              className="input flex-1"
               defaultValue={element.name}
               onBlur={handleRenameBlur}
               onKeyDown={handleRenameKeyDown}
             />
           ) : (
             <button
-              className="canvas-editor-inspector-name"
+              className="min-w-0 flex-1 cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-left text-sm font-bold text-text hover:text-accent"
               type="button"
               onClick={() => setRenaming(true)}
               title="Click to rename"
@@ -322,9 +335,9 @@ function ElementInspector({
               {element.name}
             </button>
           )}
-          <div className="canvas-editor-inspector-actions">
+          <div className="flex gap-1.5">
             <button
-              className={`canvas-editor-action-button${element.hidden ? ' canvas-editor-action-active' : ''}`}
+              className={editorActionButtonClass(element.hidden)}
               type="button"
               title={element.hidden ? 'Show' : 'Hide'}
               onClick={() => patch({ hidden: !element.hidden })}
@@ -332,7 +345,7 @@ function ElementInspector({
               {element.hidden ? 'Show' : 'Hide'}
             </button>
             <button
-              className={`canvas-editor-action-button${element.locked ? ' canvas-editor-action-active' : ''}`}
+              className={editorActionButtonClass(element.locked)}
               type="button"
               title={element.locked ? 'Unlock' : 'Lock'}
               onClick={() => patch({ locked: !element.locked })}
@@ -343,9 +356,9 @@ function ElementInspector({
         </div>
       </div>
 
-      <div className="canvas-editor-inspector-section">
-        <h4 className="canvas-editor-section-heading">Position & size</h4>
-        <div className="canvas-editor-inspector-grid">
+      <div className="grid gap-2.5 border-b border-line pb-3.5 last:border-b-0 last:pb-0">
+        <h4 className={editorSectionHeadingClass}>Position &amp; size</h4>
+        <div className={editorInspectorGridClass}>
           <NumericField
             label="X"
             value={element.x}
@@ -390,9 +403,9 @@ function ElementInspector({
             step={0.1}
           />
         </div>
-        <div className="canvas-editor-align-row">
+        <div className="flex gap-1.5">
           <button
-            className="button-secondary"
+            className="button-secondary flex-1 px-1 py-1.5 text-[11px]"
             type="button"
             title="Align left"
             onClick={() => patch({ x: 0 })}
@@ -400,7 +413,7 @@ function ElementInspector({
             Left
           </button>
           <button
-            className="button-secondary"
+            className="button-secondary flex-1 px-1 py-1.5 text-[11px]"
             type="button"
             title="Center horizontally"
             onClick={() => editor.centerElement(element.id, 'horizontal')}
@@ -408,7 +421,7 @@ function ElementInspector({
             Center
           </button>
           <button
-            className="button-secondary"
+            className="button-secondary flex-1 px-1 py-1.5 text-[11px]"
             type="button"
             title="Align right"
             onClick={() => patch({ x: Math.max(0, selected.settings.width - element.width) })}
@@ -416,7 +429,7 @@ function ElementInspector({
             Right
           </button>
           <button
-            className="button-secondary"
+            className="button-secondary flex-1 px-1 py-1.5 text-[11px]"
             type="button"
             title="Center vertically"
             onClick={() => editor.centerElement(element.id, 'vertical')}
@@ -427,7 +440,7 @@ function ElementInspector({
       </div>
 
       {isText || isImage ? (
-        <div className="canvas-editor-inspector-section">
+        <div className="grid gap-2.5 border-b border-line pb-3.5 last:border-b-0 last:pb-0">
           {isText ? (
             <TemplateField
               element={element}
@@ -435,13 +448,13 @@ function ElementInspector({
             />
           ) : (
             <>
-              <div className="canvas-editor-media-preview">
+              <div className="grid min-h-[120px] place-items-center overflow-hidden rounded-md border border-line bg-panel">
                 <PreviewAsset
                   asset={assetForElement(element, editor.assets)}
                   fallback="Event image"
                 />
               </div>
-              <label className="canvas-editor-field">
+              <label className={editorFieldClass}>
                 <span>Stored asset</span>
                 <select
                   className="select"
@@ -456,7 +469,7 @@ function ElementInspector({
                   ))}
                 </select>
               </label>
-              <p className="canvas-editor-hint">
+              <p className={editorHintClass}>
                 Supported: {SUPPORTED_VISUAL_FORMATS}. Animated GIF/WebP and video play
                 automatically.
               </p>
@@ -466,9 +479,9 @@ function ElementInspector({
       ) : null}
 
       {isText ? (
-        <div className="canvas-editor-inspector-section">
-          <h4 className="canvas-editor-section-heading">Text</h4>
-          <label className="canvas-editor-field">
+        <div className="grid gap-2.5 border-b border-line pb-3.5 last:border-b-0 last:pb-0">
+          <h4 className={editorSectionHeadingClass}>Text</h4>
+          <label className={editorFieldClass}>
             <span>Font family</span>
             <input
               className="input"
@@ -476,7 +489,7 @@ function ElementInspector({
               onChange={(event) => patchStyles({ fontFamily: event.currentTarget.value })}
             />
           </label>
-          <div className="canvas-editor-inspector-grid">
+          <div className={editorInspectorGridClass}>
             <NumericField
               label="Size (px)"
               value={element.styles.fontSize ?? 32}
@@ -484,19 +497,21 @@ function ElementInspector({
               min={8}
               max={300}
             />
-            <label className="canvas-editor-field canvas-editor-color-field">
+            <label className="grid grid-cols-[1fr_28px] items-center gap-2 text-xs text-muted [&>span:first-child]:font-semibold">
               <span>Color</span>
               <input
+                className="h-7 w-7 cursor-pointer rounded-sm border border-line bg-transparent p-0"
                 type="color"
                 value={element.styles.color ?? '#f0f0f0'}
                 onChange={(event) => patchStyles({ color: event.currentTarget.value })}
               />
             </label>
           </div>
-          <div className="canvas-editor-inspector-grid">
-            <label className="canvas-editor-field canvas-editor-color-field">
+          <div className={editorInspectorGridClass}>
+            <label className="grid grid-cols-[1fr_28px] items-center gap-2 text-xs text-muted [&>span:first-child]:font-semibold">
               <span>Stroke</span>
               <input
+                className="h-7 w-7 cursor-pointer rounded-sm border border-line bg-transparent p-0"
                 type="color"
                 value={element.styles.textStrokeColor ?? '#000000'}
                 onChange={(event) =>
@@ -521,7 +536,7 @@ function ElementInspector({
             />
           </div>
           <button
-            className={`canvas-editor-action-button${element.styles.fontWeight === '700' ? ' canvas-editor-action-active' : ''}`}
+            className={editorActionButtonClass(element.styles.fontWeight === '700')}
             type="button"
             onClick={() =>
               patchStyles({ fontWeight: element.styles.fontWeight === '700' ? '400' : '700' })
@@ -532,10 +547,10 @@ function ElementInspector({
         </div>
       ) : null}
 
-      <div className="canvas-editor-inspector-section">
-        <h4 className="canvas-editor-section-heading">Animation</h4>
-        <div className="canvas-editor-inspector-grid">
-          <label className="canvas-editor-field">
+      <div className="grid gap-2.5 border-b border-line pb-3.5 last:border-b-0 last:pb-0">
+        <h4 className={editorSectionHeadingClass}>Animation</h4>
+        <div className={editorInspectorGridClass}>
+          <label className={editorFieldClass}>
             <span>In</span>
             <select
               className="select"
@@ -553,7 +568,7 @@ function ElementInspector({
               ))}
             </select>
           </label>
-          <label className="canvas-editor-field">
+          <label className={editorFieldClass}>
             <span>Out</span>
             <select
               className="select"
@@ -644,12 +659,12 @@ function TemplateField({
   }
 
   return (
-    <div className="canvas-editor-template-field">
-      <label className="canvas-editor-field">
+    <div className="relative grid gap-1.5">
+      <label className={editorFieldClass}>
         <span>Content</span>
         <textarea
           ref={textareaRef}
-          className="input canvas-editor-template-textarea"
+          className="input resize-y"
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
@@ -658,11 +673,18 @@ function TemplateField({
         />
       </label>
       {showTokens ? (
-        <div className="canvas-editor-token-popover" role="listbox">
+        <div
+          className="absolute left-2 top-[calc(26px+3.5em)] z-[60] grid min-w-[140px] overflow-hidden rounded-lg border border-line bg-panel shadow-brand"
+          role="listbox"
+        >
           {EVENT_VARIABLES.map((token, index) => (
             <button
               key={token}
-              className={`canvas-editor-token-option${index === tokenIndex ? ' canvas-editor-token-option-active' : ''}`}
+              className={`cursor-pointer border-0 bg-transparent px-2.5 py-[7px] text-left font-mono text-xs ${
+                index === tokenIndex
+                  ? 'bg-surface-hover text-accent'
+                  : 'text-text hover:bg-surface-hover hover:text-accent'
+              }`}
               type="button"
               role="option"
               aria-selected={index === tokenIndex}
@@ -673,7 +695,7 @@ function TemplateField({
           ))}
         </div>
       ) : null}
-      <p className="canvas-editor-hint">Type / to insert event data</p>
+      <p className={editorHintClass}>Type / to insert event data</p>
     </div>
   );
 }

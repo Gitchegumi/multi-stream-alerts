@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from 'react';
 import type { UseCanvasEditorReturn } from './useCanvasEditor';
+import { editorFieldClass } from './editor-styles';
 
 export function EditorTopBar({ editor }: { editor: UseCanvasEditorReturn }) {
   const selected = editor.selectedCanvas;
@@ -21,10 +22,10 @@ export function EditorTopBar({ editor }: { editor: UseCanvasEditorReturn }) {
 
   if (!selected) {
     return (
-      <header className="canvas-editor-top-bar">
+      <header className="flex items-center gap-3.5 border-b border-line bg-[#1c1e23] px-[18px] [grid-area:topbar]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          className="canvas-editor-logo"
+          className="block h-[30px] w-[30px] flex-none"
           src="/gitchalerts-logo.svg"
           alt="GitchAlerts"
           width={30}
@@ -35,41 +36,46 @@ export function EditorTopBar({ editor }: { editor: UseCanvasEditorReturn }) {
   }
 
   return (
-    <header className="canvas-editor-top-bar">
+    <header className="flex items-center gap-3.5 border-b border-line bg-[#1c1e23] px-[18px] [grid-area:topbar]">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        className="canvas-editor-logo"
+        className="block h-[30px] w-[30px] flex-none"
         src="/gitchalerts-logo.svg"
         alt="GitchAlerts"
         width={30}
         height={30}
       />
 
-      <div className="canvas-editor-switcher" ref={dropdownRef}>
+      <div className="relative" ref={dropdownRef}>
         <button
-          className="canvas-editor-switcher-trigger"
+          className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-line bg-panel px-3 py-[7px] text-[13px] text-text hover:border-accent"
           type="button"
           aria-haspopup="listbox"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
-          <span className="canvas-editor-switcher-name">{selected.name}</span>
-          <span className="canvas-editor-switcher-dims muted">
+          <span className="font-bold">{selected.name}</span>
+          <span className="muted text-xs">
             {selected.settings.width} × {selected.settings.height}
           </span>
-          <span className="canvas-editor-switcher-chevron" aria-hidden>
+          <span className="text-xs text-muted" aria-hidden>
             ▾
           </span>
         </button>
 
         {open ? (
-          <div className="canvas-editor-switcher-dropdown" role="listbox">
-            <div className="canvas-editor-switcher-list">
+          <div
+            className="absolute left-0 top-[calc(100%+6px)] z-[100] min-w-[280px] rounded-[10px] border border-line bg-panel p-2 shadow-brand"
+            role="listbox"
+          >
+            <div className="grid max-h-60 gap-1 overflow-auto">
               {editor.canvases.map((canvas) => (
                 <button
                   key={canvas.id}
-                  className={`canvas-editor-switcher-item${
-                    canvas.id === selected.id ? ' canvas-editor-switcher-item-active' : ''
+                  className={`flex w-full cursor-pointer items-center justify-between gap-2.5 rounded-md border px-2.5 py-2 text-left text-[13px] text-text ${
+                    canvas.id === selected.id
+                      ? 'border-accent bg-surface-hover'
+                      : 'border-transparent bg-transparent hover:border-accent hover:bg-surface-hover'
                   }`}
                   type="button"
                   role="option"
@@ -79,7 +85,7 @@ export function EditorTopBar({ editor }: { editor: UseCanvasEditorReturn }) {
                     setOpen(false);
                   }}
                 >
-                  <span className="canvas-editor-switcher-item-name">{canvas.name}</span>
+                  <span className="font-semibold">{canvas.name}</span>
                   <span className="muted">
                     {canvas.settings.width} × {canvas.settings.height}
                   </span>
@@ -87,9 +93,9 @@ export function EditorTopBar({ editor }: { editor: UseCanvasEditorReturn }) {
               ))}
             </div>
 
-            <div className="canvas-editor-switcher-actions">
+            <div className="mt-2 flex gap-2 border-t border-line pt-2">
               <button
-                className="canvas-editor-switcher-action"
+                className="flex-1 cursor-pointer rounded-md border border-line bg-surface-soft px-2 py-1.5 text-xs text-text hover:border-accent hover:bg-surface-hover"
                 type="button"
                 disabled={editor.isPending}
                 onClick={() => {
@@ -100,7 +106,7 @@ export function EditorTopBar({ editor }: { editor: UseCanvasEditorReturn }) {
                 New canvas
               </button>
               <button
-                className="canvas-editor-switcher-action"
+                className="flex-1 cursor-pointer rounded-md border border-line bg-surface-soft px-2 py-1.5 text-xs text-text hover:border-accent hover:bg-surface-hover"
                 type="button"
                 disabled={editor.isPending}
                 onClick={() => {
@@ -111,7 +117,7 @@ export function EditorTopBar({ editor }: { editor: UseCanvasEditorReturn }) {
                 Duplicate
               </button>
               <button
-                className="canvas-editor-switcher-action canvas-editor-switcher-action-danger"
+                className="flex-1 cursor-pointer rounded-md border border-line bg-surface-soft px-2 py-1.5 text-xs text-text hover:border-danger hover:bg-[rgba(255,107,107,0.12)] hover:text-danger"
                 type="button"
                 disabled={editor.isPending || editor.canvases.length <= 1}
                 onClick={() => {
@@ -123,8 +129,8 @@ export function EditorTopBar({ editor }: { editor: UseCanvasEditorReturn }) {
               </button>
             </div>
 
-            <div className="canvas-editor-switcher-fields">
-              <label className="canvas-editor-field">
+            <div className="mt-2 grid gap-2.5 border-t border-line pt-2">
+              <label className={editorFieldClass}>
                 <span>Name</span>
                 <input
                   className="input"
@@ -138,8 +144,8 @@ export function EditorTopBar({ editor }: { editor: UseCanvasEditorReturn }) {
                   }}
                 />
               </label>
-              <div className="canvas-editor-switcher-dim-fields">
-                <label className="canvas-editor-field">
+              <div className="grid grid-cols-2 gap-2.5">
+                <label className={editorFieldClass}>
                   <span>Width</span>
                   <input
                     className="input"
@@ -158,7 +164,7 @@ export function EditorTopBar({ editor }: { editor: UseCanvasEditorReturn }) {
                     }}
                   />
                 </label>
-                <label className="canvas-editor-field">
+                <label className={editorFieldClass}>
                   <span>Height</span>
                   <input
                     className="input"
@@ -183,14 +189,14 @@ export function EditorTopBar({ editor }: { editor: UseCanvasEditorReturn }) {
         ) : null}
       </div>
 
-      <span className="canvas-editor-spacer" />
+      <span className="flex-1" />
 
-      <span className="canvas-editor-save-state muted">
+      <span className="muted text-xs">
         {editor.saveState === 'saving' ? 'Saving…' : 'Saved just now'}
       </span>
 
       <button
-        className="button-secondary canvas-editor-url-button"
+        className="button-secondary px-3 py-1.5 text-xs"
         type="button"
         onClick={() => editor.copyUrl()}
       >
@@ -198,7 +204,7 @@ export function EditorTopBar({ editor }: { editor: UseCanvasEditorReturn }) {
       </button>
 
       <button
-        className="canvas-editor-test-button"
+        className="cursor-pointer rounded-lg border-0 bg-attention px-3.5 py-[7px] text-[13px] font-bold text-[#17120a] hover:bg-[#ffbb47]"
         type="button"
         disabled={editor.isPending}
         onClick={() => editor.testAlert()}

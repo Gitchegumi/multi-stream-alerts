@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { dashboardHeaderClass, dashboardTitleClass } from '@/components/layout-styles';
 
 type WorkspaceSummary = {
   id: string;
@@ -42,8 +43,8 @@ export function WorkspaceOverview({
 
   return (
     <section>
-      <div className="dashboard-header">
-        <h1 className="dashboard-title">Workspaces</h1>
+      <div className={dashboardHeaderClass}>
+        <h1 className={dashboardTitleClass}>Workspaces</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span className="muted">{total} total</span>
         </div>

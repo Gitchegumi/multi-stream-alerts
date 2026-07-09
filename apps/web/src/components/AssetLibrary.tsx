@@ -142,7 +142,7 @@ export function AssetLibrary({
         upload size {formatBytes(storageUsage.maxFileSizeBytes)}.
       </p>
 
-      <div className="asset-actions">
+      <div className="my-3 grid grid-cols-[minmax(180px,1fr)_auto_minmax(220px,1.4fr)_auto] items-end gap-3 max-[900px]:grid-cols-1 max-[900px]:items-stretch">
         <label className="field">
           <span>Upload asset</span>
           <input
@@ -180,7 +180,7 @@ export function AssetLibrary({
         </button>
       </div>
 
-      <div className="asset-filters" style={{ marginBottom: 12 }}>
+      <div className="mb-3 flex flex-wrap gap-2">
         {(['all', 'image', 'video', 'audio'] as const).map((f) => (
           <button
             key={f}
@@ -193,17 +193,22 @@ export function AssetLibrary({
         ))}
       </div>
 
-      <div className="asset-grid">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
         {filteredAssets.map((asset) => (
-          <article className="asset-card" key={asset.id}>
+          <article
+            className="grid min-w-0 gap-2 rounded-lg border border-line bg-surface-soft p-3"
+            key={asset.id}
+          >
             <AssetPreview asset={asset} />
-            <strong>{asset.originalFilename ?? asset.externalUrl ?? asset.id}</strong>
+            <strong className="[overflow-wrap:anywhere] text-soft-white">
+              {asset.originalFilename ?? asset.externalUrl ?? asset.id}
+            </strong>
             <span className="muted small">
               {asset.assetType} / {asset.mimeType}
               {asset.fileSizeBytes ? ` / ${formatBytes(asset.fileSizeBytes)}` : ''}
             </span>
             <span className="muted small">{asset.usageCount} layout use(s)</span>
-            <div className="asset-card-actions">
+            <div className="flex flex-wrap gap-2">
               <a
                 className="button-secondary"
                 href={asset.previewUrl}
@@ -239,15 +244,25 @@ export function AssetLibrary({
 }
 
 function AssetPreview({ asset }: { asset: WorkspaceAsset }) {
+  const previewFrameClass = 'w-full rounded-md border border-line bg-[#16171b] object-contain';
   if (asset.assetType === 'audio')
-    return <audio className="asset-preview" src={asset.previewUrl} controls />;
+    return (
+      <audio className={`${previewFrameClass} min-h-[42px]`} src={asset.previewUrl} controls />
+    );
   if (asset.assetType === 'video') {
     return (
-      <video className="asset-preview" src={asset.previewUrl} muted loop playsInline controls />
+      <video
+        className={`${previewFrameClass} aspect-video`}
+        src={asset.previewUrl}
+        muted
+        loop
+        playsInline
+        controls
+      />
     );
   }
   // eslint-disable-next-line @next/next/no-img-element
-  return <img className="asset-preview" alt="" src={asset.previewUrl} />;
+  return <img className={`${previewFrameClass} aspect-video`} alt="" src={asset.previewUrl} />;
 }
 
 async function errorMessage(response: Response, fallback: string) {

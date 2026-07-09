@@ -11,6 +11,7 @@ import { requireDashboardSession } from '@/lib/session';
 import { getVersionStatus } from '@/lib/update-check';
 import { RecentAlertFeed } from '@/components/RecentAlertFeed';
 import { UserLocalTime } from '@/components/UserLocalTime';
+import { cardGridClass, dashboardShellClass } from '@/components/layout-styles';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -70,41 +71,47 @@ export default async function ChannelDashboardPage({
   ];
 
   return (
-    <main className="dashboard-shell">
-      <section className="grid">
-        <div className="panel stat-card">
-          <strong className="stat-value">{activeAlertsCount}</strong>
+    <main className={dashboardShellClass}>
+      <section className={`${cardGridClass} mt-6`}>
+        <div className={`panel ${statCardClass}`}>
+          <strong className={statValueClass}>{activeAlertsCount}</strong>
           <span className="muted">Active alerts</span>
         </div>
-        <div className="panel stat-card">
-          <strong className="stat-value">{recentEvents.length}</strong>
+        <div className={`panel ${statCardClass}`}>
+          <strong className={statValueClass}>{recentEvents.length}</strong>
           <span className="muted">Recent events</span>
         </div>
-        <div className="panel stat-card">
-          <strong className="stat-value">{formatBytes(storageUsage.usedBytes.toString())}</strong>
+        <div className={`panel ${statCardClass}`}>
+          <strong className={statValueClass}>
+            {formatBytes(storageUsage.usedBytes.toString())}
+          </strong>
           <span className="muted">Storage used</span>
         </div>
       </section>
 
-      <section className="grid" style={{ marginTop: 16 }}>
+      <section className={`${cardGridClass} mt-4`}>
         {navCards.map((card) => (
-          <Link key={card.label} href={card.href} className="panel nav-card">
+          <Link
+            key={card.label}
+            href={card.href}
+            className="panel grid gap-2 no-underline transition-[border-color,transform,background] duration-[120ms] hover:-translate-y-px hover:border-accent hover:[background:linear-gradient(135deg,rgba(175,224,206,0.1),transparent_60%),var(--panel)]"
+          >
             <strong>{card.label}</strong>
             <span className="muted small">{card.description}</span>
           </Link>
         ))}
       </section>
 
-      <section className="panel" style={{ marginTop: 16 }}>
+      <section className="panel mt-4">
         <h2>Recent alerts</h2>
         <RecentAlertFeed events={recentEvents.map(toAlertEvent)} />
       </section>
 
-      <section className="panel version-panel" style={{ marginTop: 16 }}>
-        <div className="version-panel-header">
+      <section className="panel mt-4 grid gap-3.5">
+        <div className="flex items-start justify-between gap-3">
           <div>
             <h2>Deployment</h2>
-            <p className="muted small">Current release and container build metadata.</p>
+            <p className="muted small m-0">Current release and container build metadata.</p>
           </div>
           {versionStatus.update.status === 'update-available' ? (
             <span className="pill pill-warn">Update available</span>
@@ -117,19 +124,19 @@ export default async function ChannelDashboardPage({
           )}
         </div>
 
-        <dl className="version-grid">
-          <div>
-            <dt>Project release</dt>
-            <dd>{versionStatus.build.releaseTag}</dd>
+        <dl className="m-0 grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
+          <div className={versionCellClass}>
+            <dt className={versionTermClass}>Project release</dt>
+            <dd className={versionValueClass}>{versionStatus.build.releaseTag}</dd>
           </div>
-          <div>
-            <dt>Commit</dt>
-            <dd>{versionStatus.build.shortCommitSha ?? 'unknown'}</dd>
+          <div className={versionCellClass}>
+            <dt className={versionTermClass}>Commit</dt>
+            <dd className={versionValueClass}>{versionStatus.build.shortCommitSha ?? 'unknown'}</dd>
           </div>
           {Object.entries(versionStatus.build.serviceVersions).map(([service, version]) => (
-            <div key={service}>
-              <dt>{service} service</dt>
-              <dd>{version}</dd>
+            <div key={service} className={versionCellClass}>
+              <dt className={versionTermClass}>{service} service</dt>
+              <dd className={versionValueClass}>{version}</dd>
             </div>
           ))}
         </dl>
@@ -152,6 +159,13 @@ export default async function ChannelDashboardPage({
     </main>
   );
 }
+
+const statCardClass =
+  'gap-1.5 border-[rgba(65,102,245,0.4)] [background:linear-gradient(135deg,rgba(65,102,245,0.16),transparent_68%),var(--panel)]';
+const statValueClass = 'text-attention text-[32px] leading-none';
+const versionCellClass = 'grid gap-1 rounded-md border border-line bg-surface-soft p-2.5';
+const versionTermClass = 'text-muted text-xs uppercase';
+const versionValueClass = 'm-0 [overflow-wrap:anywhere] font-mono text-[13px]';
 
 function formatBytes(value: string | number) {
   const bytes = typeof value === 'number' ? value : Number(value);
