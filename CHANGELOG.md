@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.9](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.10.8...v0.10.9) (2026-07-09)
+
+
+### Features
+
+* OAuth-first Twitch/YouTube integrations with backend auto-provisioning ([#128](https://github.com/Gitchegumi/multi-stream-alerts/issues/128)) ([#133](https://github.com/Gitchegumi/multi-stream-alerts/issues/133)) ([ba5007b](https://github.com/Gitchegumi/multi-stream-alerts/commit/ba5007be3681b3273362bc9bef410a9a23f533c0))
+
+
+### Bug Fixes
+
+* **docs:** serve dashboard guide from image and scrub user/dev guides ([#131](https://github.com/Gitchegumi/multi-stream-alerts/issues/131)) ([dc27641](https://github.com/Gitchegumi/multi-stream-alerts/commit/dc276418d7540ed89a28341e32921079b0727493)), closes [#61](https://github.com/Gitchegumi/multi-stream-alerts/issues/61)
+
 ## [0.10.8](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.10.7...v0.10.8) (2026-07-09)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-ingress-v0.1.2...alerts-ingress-v0.1.3) (2026-07-09)
+
+
+### Features
+
+* OAuth-first Twitch/YouTube integrations with backend auto-provisioning ([#128](https://github.com/Gitchegumi/multi-stream-alerts/issues/128)) ([#133](https://github.com/Gitchegumi/multi-stream-alerts/issues/133)) ([ba5007b](https://github.com/Gitchegumi/multi-stream-alerts/commit/ba5007be3681b3273362bc9bef410a9a23f533c0))
+
 ## [0.1.2](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-ingress-v0.1.1...alerts-ingress-v0.1.2) (2026-07-03)
 
 
