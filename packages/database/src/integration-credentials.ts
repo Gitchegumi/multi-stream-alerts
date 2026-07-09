@@ -16,7 +16,8 @@ export type IntegrationCredentialKey =
   | 'twitch.client_id'
   | 'twitch.client_secret'
   | 'youtube.client_id'
-  | 'youtube.client_secret';
+  | 'youtube.client_secret'
+  | 'youtube.websub_secret';
 
 export const PROVIDERS = ['kofi', 'twitch', 'youtube'] as const;
 export type IntegrationProvider = (typeof PROVIDERS)[number];
@@ -32,6 +33,7 @@ export type CredentialStatus = {
   configured: Partial<Record<IntegrationCredentialKey, boolean>>;
   public: {
     twitchBroadcasterId: string | null;
+    youtubeChannelId: string | null;
   };
   isEnabled: boolean;
 };
@@ -42,10 +44,16 @@ export type CredentialStatus = {
  * evaluates against: a provider is "enabled" iff every required key for
  * that provider has a non-empty ciphertext.
  */
+// A provider is "enabled" (provisioned and ready to ingest) iff every key
+// listed here has a non-empty ciphertext. Since issue #128, Twitch and
+// YouTube app credentials are instance-level env vars, not per-channel
+// secrets: connecting via OAuth auto-provisions a backend-generated
+// `eventsub_secret` (Twitch) / `websub_secret` (YouTube), which is the
+// single required key that flips the provider on for that channel.
 export const REQUIRED_KEYS_BY_PROVIDER: Record<IntegrationProvider, IntegrationCredentialKey[]> = {
   kofi: ['kofi.verification_token'],
-  twitch: ['twitch.eventsub_secret', 'twitch.client_id', 'twitch.client_secret'],
-  youtube: ['youtube.client_id', 'youtube.client_secret'],
+  twitch: ['twitch.eventsub_secret'],
+  youtube: ['youtube.websub_secret'],
 };
 
 // ---------------------------------------------------------------------------
@@ -59,6 +67,7 @@ const ALL_VALID_KEYS: ReadonlySet<string> = new Set<IntegrationCredentialKey>([
   'twitch.client_secret',
   'youtube.client_id',
   'youtube.client_secret',
+  'youtube.websub_secret',
 ]);
 
 const ALL_VALID_PROVIDERS: ReadonlySet<string> = new Set<IntegrationProvider>(PROVIDERS);
@@ -90,7 +99,7 @@ function buildStatus(
   if (!row) {
     return {
       configured: {},
-      public: { twitchBroadcasterId: null },
+      public: { twitchBroadcasterId: null, youtubeChannelId: null },
       isEnabled: false,
     };
   }
@@ -110,7 +119,10 @@ function buildStatus(
 
   return {
     configured,
-    public: { twitchBroadcasterId: row.twitchBroadcasterId },
+    public: {
+      twitchBroadcasterId: row.twitchBroadcasterId,
+      youtubeChannelId: row.youtubeChannelId,
+    },
     isEnabled: row.isEnabled,
   };
 }
@@ -210,7 +222,7 @@ export async function saveChannelCredentials(input: {
   channelId: string;
   provider: IntegrationProvider;
   secrets: Partial<Record<IntegrationCredentialKey, string>>;
-  publicFields?: { twitchBroadcasterId?: string | null };
+  publicFields?: { twitchBroadcasterId?: string | null; youtubeChannelId?: string | null };
 }): Promise<CredentialStatus> {
   assertValidProvider(input.provider);
   for (const key of Object.keys(input.secrets)) {
@@ -235,13 +247,17 @@ export async function saveChannelCredentials(input: {
         provider: input.provider,
         isEnabled: false,
         twitchBroadcasterId: input.publicFields?.twitchBroadcasterId ?? null,
+        youtubeChannelId: input.publicFields?.youtubeChannelId ?? null,
       },
       update: {
         // Public-field update (only the fields the caller actually
-        // passed in). We never blank twitchBroadcasterId unless the
-        // caller explicitly passes `null`.
+        // passed in). We never blank a public field unless the caller
+        // explicitly passes `null` for it.
         ...(input.publicFields && 'twitchBroadcasterId' in input.publicFields
           ? { twitchBroadcasterId: input.publicFields.twitchBroadcasterId ?? null }
+          : {}),
+        ...(input.publicFields && 'youtubeChannelId' in input.publicFields
+          ? { youtubeChannelId: input.publicFields.youtubeChannelId ?? null }
           : {}),
         isEnabled: false,
       },

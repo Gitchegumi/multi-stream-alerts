@@ -6,6 +6,8 @@ export * from './client';
 export * from './integration-credentials';
 export * from './invites';
 export * from './password';
+export * from './providers/twitch-eventsub';
+export * from './providers/youtube-websub';
 export * from './redis';
 export * from './secrets';
 

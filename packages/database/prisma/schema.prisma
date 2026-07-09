@@ -162,6 +162,7 @@ model Channel {
   integrationCredentials IntegrationCredential[]
   linkedAccounts        LinkedAccount[]
   deduplicationKeys      DeduplicationKey[]
+  providerSubscriptions  ProviderSubscription[]
 
   @@map("channels")
 }
@@ -362,6 +363,10 @@ model IntegrationCredential {
   isEnabled           Boolean                       @default(false) @map("is_enabled")
   // Public, non-secret fields. Empty/null = not set.
   twitchBroadcasterId String?                       @map("twitch_broadcaster_id")
+  // YouTube channel ID (UC…) resolved from the linked account's OAuth
+  // token during auto-provisioning. Used to build the WebSub topic and
+  // as the ingest gate. Empty/null = not provisioned.
+  youtubeChannelId    String?                       @map("youtube_channel_id")
   createdAt           DateTime                      @default(now()) @map("created_at")
   updatedAt           DateTime                      @updatedAt @map("updated_at")
   channel             Channel                       @relation(fields: [channelId], references: [id], onDelete: Cascade)
@@ -382,6 +387,7 @@ model IntegrationCredentialSecret {
   //   twitch.client_secret
   //   youtube.client_id
   //   youtube.client_secret
+  //   youtube.websub_secret
   // Add a Zod enum (or literal-type union) at the TS layer in Task 4 to keep callers honest.
   key          String
   // Output of secrets.encryptSecret. Empty string == cleared.
@@ -429,4 +435,27 @@ model LinkedAccount {
   @@index([userId, platform])
   @@index([channelId, platform])
   @@map("linked_accounts")
+}
+
+/// Remote provider subscriptions we created on behalf of a channel during
+/// OAuth auto-provisioning. Tracked so we can tear them down on disconnect
+/// and (for YouTube WebSub, whose leases expire) renew them before they
+/// lapse. `providerSubscriptionId` is the Twitch EventSub subscription id
+/// or, for YouTube, the WebSub topic URL.
+model ProviderSubscription {
+  id                     String    @id @default(cuid())
+  channelId              String    @map("channel_id")
+  provider               String // "twitch" | "youtube"
+  providerSubscriptionId String    @map("provider_subscription_id")
+  type                   String // EventSub type (e.g. "channel.follow") or "websub"
+  status                 String    @default("enabled")
+  expiresAt              DateTime? @map("expires_at")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+  channel                Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([providerSubscriptionId])
+  @@index([channelId, provider])
+  @@index([provider, expiresAt])
+  @@map("provider_subscriptions")
 }

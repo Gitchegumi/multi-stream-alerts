@@ -36,6 +36,7 @@ function makeCredentialRow(opts: {
   id?: string;
   isEnabled?: boolean;
   twitchBroadcasterId?: string | null;
+  youtubeChannelId?: string | null;
   secrets?: SecretRow[];
 }) {
   return {
@@ -44,6 +45,7 @@ function makeCredentialRow(opts: {
     provider: 'twitch',
     isEnabled: opts.isEnabled ?? true,
     twitchBroadcasterId: opts.twitchBroadcasterId ?? null,
+    youtubeChannelId: opts.youtubeChannelId ?? null,
     secrets: opts.secrets ?? [],
   };
 }
@@ -75,7 +77,7 @@ test('getChannelCredentialStatus returns an empty default when no credential row
     const status = await getChannelCredentialStatus('random-channel-id', 'twitch');
     assert.deepEqual(status, {
       configured: {},
-      public: { twitchBroadcasterId: null },
+      public: { twitchBroadcasterId: null, youtubeChannelId: null },
       isEnabled: false,
     });
     assert.equal(prismaStub.integrationCredential.findFirst.mock.calls.length, 1);
@@ -532,13 +534,9 @@ test('PROVIDERS includes exactly kofi, twitch, and youtube', () => {
 
 test('REQUIRED_KEYS_BY_PROVIDER lists the expected keys per provider', () => {
   assert.deepEqual(REQUIRED_KEYS_BY_PROVIDER.kofi, ['kofi.verification_token']);
-  assert.deepEqual(REQUIRED_KEYS_BY_PROVIDER.twitch, [
-    'twitch.eventsub_secret',
-    'twitch.client_id',
-    'twitch.client_secret',
-  ]);
-  assert.deepEqual(REQUIRED_KEYS_BY_PROVIDER.youtube, [
-    'youtube.client_id',
-    'youtube.client_secret',
-  ]);
+  // Since issue #128, Twitch/YouTube app credentials are instance-level env
+  // vars; connecting via OAuth auto-provisions a single backend-generated
+  // secret per channel, which is the only key that flips the provider on.
+  assert.deepEqual(REQUIRED_KEYS_BY_PROVIDER.twitch, ['twitch.eventsub_secret']);
+  assert.deepEqual(REQUIRED_KEYS_BY_PROVIDER.youtube, ['youtube.websub_secret']);
 });
