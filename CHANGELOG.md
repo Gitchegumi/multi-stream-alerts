@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.8](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.10.7...v0.10.8) (2026-07-09)
+
+
+### Bug Fixes
+
+* **web:** match browser source to editor stage and hot-swap saved settings ([7f1d0ec](https://github.com/Gitchegumi/multi-stream-alerts/commit/7f1d0ec01965c0cddc457d426557e00113db9109))
+* **web:** match browser source to editor stage and hot-swap saved settings ([7d12e6b](https://github.com/Gitchegumi/multi-stream-alerts/commit/7d12e6b1af147ae5b99519f7b07c5f289b629c99))
+
 ## [0.10.7](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.10.6...v0.10.7) (2026-07-08)
 
 
