@@ -11,7 +11,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@multi-stream-alerts/database';
+import {
+  prisma,
+  teardownTwitchEventSub,
+  teardownYoutubeWebSub,
+} from '@multi-stream-alerts/database';
 
 /**
  * GET — list all linked accounts for the authenticated user.
@@ -105,5 +109,45 @@ export async function DELETE(request: NextRequest) {
     },
   });
 
+  // Tear down the provider's auto-provisioned subscriptions once the last
+  // active account of this platform for the workspace is gone (issue #128).
+  // Best-effort: a teardown failure must not fail the disconnect response.
+  await teardownProviderIfLastAccount(account.channelId, account.platform).catch((err) => {
+    console.error('[linked-accounts] provider teardown failed', {
+      platform: account.platform,
+      channelId: account.channelId,
+      reason: err instanceof Error ? err.message : 'unknown_error',
+    });
+  });
+
   return NextResponse.json({ account: updated });
+}
+
+/**
+ * Remove the provider's remote subscriptions + stored secret for a workspace,
+ * but only when no other active linked account of the same platform remains
+ * (a workspace can have several YouTube channels linked).
+ */
+async function teardownProviderIfLastAccount(
+  channelId: string | null,
+  platform: string,
+): Promise<void> {
+  if (!channelId) return;
+
+  const remaining = await prisma.linkedAccount.count({
+    where: { channelId, platform, isActive: true },
+  });
+  if (remaining > 0) return;
+
+  if (platform === 'twitch') {
+    await teardownTwitchEventSub({ channelId });
+  } else if (platform === 'youtube') {
+    const channel = await prisma.channel.findUnique({
+      where: { id: channelId },
+      select: { slug: true },
+    });
+    if (channel) {
+      await teardownYoutubeWebSub({ channelId, channelSlug: channel.slug });
+    }
+  }
 }
