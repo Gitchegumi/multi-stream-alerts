@@ -58,6 +58,12 @@ Generate `INSTANCE_ENCRYPTION_KEY` once with:
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
-## Optional OAuth account linking
+## Twitch / YouTube OAuth provider apps
 
-- `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`: instance-level provider credentials that enable the OAuth connect/disconnect cards on the Settings -> Integrations page. When unset, those cards show a disabled state and the per-workspace manual credential fields remain available.
+Twitch and YouTube are connected exclusively through OAuth — end users click **Connect** and the backend auto-provisions the EventSub / WebSub subscriptions. There are no per-workspace developer credential fields for these providers; the app-level credentials below are admin/deployment configuration.
+
+- `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET`: the instance's Twitch application. Request the scopes the alert types require — `user:read:email`, `moderator:read:followers`, `channel:read:subscriptions`, `bits:read`, `channel:read:charity`, `channel:read:redemptions`. On connect the backend mints an app (client-credentials) token and creates one webhook EventSub subscription per supported type. Expanding scopes later invalidates existing links, which surface as **Needs reconnect**.
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`: the instance's Google application with the YouTube Data API enabled and the `youtube.readonly` scope. On connect the backend resolves the channel id and subscribes to its feed on Google's WebSub hub.
+- When these are unset, the corresponding Settings -> Integrations card shows an **Unavailable** state.
+- The EventSub/WebSub callback URLs are derived from `INGRESS_PUBLIC_BASE_URL` (falling back to `PUBLIC_BASE_URL`), so that must be publicly reachable by the providers.
+- `YOUTUBE_WEBSUB_RENEWAL_INTERVAL_MS` (default `3600000`) and `YOUTUBE_WEBSUB_RENEWAL_LEAD_MS` (default `86400000`): how often the worker sweeps for expiring WebSub leases and how far ahead of expiry it renews them.

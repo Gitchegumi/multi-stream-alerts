@@ -1,6 +1,10 @@
 # Platform Integrations
 
-GitchAlerts turns events from Ko-fi, Twitch, and YouTube into alerts on your canvases. Provider credentials are configured per workspace in the dashboard under **Settings -> Integrations**. They are encrypted at rest and are never sent back to the browser after you save them.
+GitchAlerts turns events from Ko-fi, Twitch, and YouTube into alerts on your canvases. Manage them per workspace in the dashboard under **Settings -> Integrations**, where each provider appears as a compact card showing its connection status and one primary action.
+
+Twitch and YouTube connect through OAuth: you click **Connect**, sign in to the provider, approve access, and GitchAlerts links the account and sets up event delivery for you. You never paste EventSub secrets, Client IDs, Client Secrets, or stream keys. Ko-fi has no OAuth flow, so it keeps a small manual token field. Any stored secrets are encrypted at rest and are never sent back to the browser.
+
+The app-level Twitch/YouTube provider credentials are configured once by the self-hosting administrator via environment variables (see [Environment Variables](../developer-guide/environment-variables.md)). If they are not set, the Connect buttons show an **Unavailable** state.
 
 ## Ko-fi
 
@@ -15,17 +19,15 @@ Duplicate Ko-fi `message_id` values are ignored, and private Ko-fi messages are 
 
 ## Twitch
 
-Configure Twitch credentials under **Settings -> Integrations -> Twitch**. Each channel stores an EventSub secret, OAuth client ID and secret, and the numeric broadcaster ID. If instance-level Twitch app credentials are configured, you can also connect or disconnect a Twitch account from the same page instead of pasting secrets by hand.
+Open **Settings -> Integrations -> Twitch** and click **Connect Twitch**. You are redirected to Twitch to approve access; when you return, GitchAlerts links the account and automatically provisions the EventSub subscriptions (follows, subs, gifts, cheers, raids, charity, and channel-point redemptions) against a global webhook callback. There is nothing to paste.
 
-Twitch uses a single global callback URL; the receiving channel is identified by matching the inbound signature against your stored EventSub secret.
-
-Note: Twitch EventSub subscription management and event normalization are still in progress. You can store credentials today, but live Twitch alerts are not yet delivered end to end.
+The card shows the linked account and a **Disconnect** button, which also removes the remote EventSub subscriptions. If GitchAlerts later needs broader permissions, the card shows **Needs reconnect** — click Connect again to re-approve.
 
 ## YouTube
 
-Configure YouTube credentials under **Settings -> Integrations -> YouTube**. Each channel stores a Google OAuth client ID and secret, and the webhook URL is per-channel: `https://<your-alerts-domain>/api/webhooks/youtube/<your-channel-slug>`.
+Open **Settings -> Integrations -> YouTube** and click **Connect YouTube**. After you approve access, GitchAlerts resolves your channel and subscribes to its upload/live feed via WebSub, verifying every incoming notification. You can link more than one YouTube channel to a workspace and mark one as **Primary**; **Disconnect** removes the subscription for that channel.
 
-Note: YouTube Super Chat and membership ingestion is still in progress. Credentials can be stored now, but live YouTube alerts are not yet delivered end to end.
+WebSub subscriptions expire after a few days and are renewed automatically by the background worker, so no periodic action is needed.
 
 ## Testing without a live event
 
