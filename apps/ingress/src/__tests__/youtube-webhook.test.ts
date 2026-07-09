@@ -9,16 +9,22 @@ import type { AlertEvent } from '@multi-stream-alerts/shared';
 // ---------------------------------------------------------------------------
 
 interface StubResponse {
+  setHeader: (name: string, value: string) => void;
   status: (code: number) => { json: (body: unknown) => void; send: (body: string) => void };
   lastStatus: number;
   lastBody: unknown;
+  headers: Record<string, string>;
 }
 
 function makeStubResponse(): StubResponse {
   const stub: StubResponse = {
+    setHeader: (name: string, value: string) => {
+      stub.headers[name] = value;
+    },
     status: (_code: number) => ({ json: (_body: unknown) => undefined, send: () => undefined }),
     lastStatus: 0,
     lastBody: undefined,
+    headers: {},
   };
   stub.status = (code: number) => {
     stub.lastStatus = code;
@@ -325,6 +331,26 @@ test('WebSub verification echoes hub.challenge for a known subscription', async 
 
   assert.equal(res.lastStatus, 200);
   assert.equal(res.lastBody, 'challenge-token-123');
+  assert.equal(res.headers['Content-Type'], 'text/plain; charset=utf-8');
+});
+
+test('WebSub verification rejects a challenge with unsafe characters', async () => {
+  const req = {
+    params: { channelSlug: 'alpha' },
+    query: {
+      'hub.mode': 'subscribe',
+      'hub.topic': 'https://www.youtube.com/xml/feeds/videos.xml?channel_id=UC_abc',
+      'hub.challenge': '<script>alert(1)</script>',
+    },
+  };
+  const res = makeStubResponse();
+
+  await handleYoutubeWebSubVerification(req, res, {
+    findChannelBySlug: async () => ({ id: 'channel-1' }),
+    hasSubscription: async () => true,
+  });
+
+  assert.equal(res.lastStatus, 400);
 });
 
 test('WebSub verification rejects an unknown topic with 404', async () => {

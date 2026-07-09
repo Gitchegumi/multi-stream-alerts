@@ -19,8 +19,16 @@ interface YoutubeWebhookResponse {
 }
 
 interface YoutubeVerificationResponse {
+  setHeader: (name: string, value: string) => void;
   status: (code: number) => { send: (body: string) => void; json: (body: unknown) => void };
 }
+
+/**
+ * WebSub `hub.challenge` tokens are opaque, url-safe strings the hub picks.
+ * Bound length and character set so we never reflect an arbitrary payload
+ * back to a caller (defense in depth alongside the text/plain content type).
+ */
+const HUB_CHALLENGE_PATTERN = /^[\w.\-~=+/]{1,256}$/;
 
 export type YoutubeRejectionReason = 'channel_not_found' | 'not_configured' | 'invalid_signature';
 
@@ -189,13 +197,17 @@ export async function handleYoutubeWebSubVerification(
   response: YoutubeVerificationResponse,
   deps: YoutubeVerificationDeps = {},
 ): Promise<void> {
+  // Always respond as plain text: the body is echoed back to the caller, and
+  // the Express default of text/html would make a reflected value executable.
+  response.setHeader('Content-Type', 'text/plain; charset=utf-8');
+
   const channelSlug = queryString(request.params.channelSlug as string | string[] | undefined);
   const query = request.query as Record<string, string | string[] | undefined>;
   const mode = queryString(query['hub.mode']);
   const topic = queryString(query['hub.topic']);
   const challenge = queryString(query['hub.challenge']);
 
-  if (!channelSlug || !mode || !topic || !challenge) {
+  if (!channelSlug || !mode || !topic || !challenge || !HUB_CHALLENGE_PATTERN.test(challenge)) {
     response.status(400).send('Missing WebSub verification parameters');
     return;
   }

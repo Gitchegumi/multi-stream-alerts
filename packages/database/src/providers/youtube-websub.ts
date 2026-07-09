@@ -278,11 +278,21 @@ export async function findExpiringYoutubeSubscriptions(
 }
 
 function buildCallbackUrl(env: NodeJS.ProcessEnv, channelSlug: string): string {
-  const base = (env.INGRESS_PUBLIC_BASE_URL ?? env.PUBLIC_BASE_URL ?? '').replace(/\/+$/, '');
+  const base = stripTrailingSlashes(env.INGRESS_PUBLIC_BASE_URL ?? env.PUBLIC_BASE_URL ?? '');
   if (!base) {
     throw new Error(
       'INGRESS_PUBLIC_BASE_URL (or PUBLIC_BASE_URL) is not set for the webhook callback',
     );
   }
   return `${base}/api/webhooks/youtube/${encodeURIComponent(channelSlug)}`;
+}
+
+/**
+ * Trim trailing slashes with a linear scan instead of a `/\/+$/` regex, whose
+ * ambiguous quantifier trips ReDoS scanners on env-provided input.
+ */
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47 /* '/' */) end -= 1;
+  return value.slice(0, end);
 }
