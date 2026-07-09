@@ -6,6 +6,28 @@ import { buildAnimationStyle } from '@/lib/canvas-animation';
 import type { UseCanvasEditorReturn } from './useCanvasEditor';
 import type { CanvasElement } from '@/lib/canvas-schema';
 
+/* Editor chrome (badges, handles, guides) divides by the stage scale so it
+   keeps a constant on-screen size inside the true-pixel, scaled-down canvas. */
+const badgeClass =
+  'pointer-events-none absolute z-[3] whitespace-nowrap bg-primary text-white text-[length:calc(10px/var(--stage-scale,1))] px-[calc(6px/var(--stage-scale,1))] py-[calc(2px/var(--stage-scale,1))] rounded-[calc(4px/var(--stage-scale,1))]';
+
+const handleClass =
+  'absolute z-[4] bg-panel h-[calc(9px/var(--stage-scale,1))] w-[calc(9px/var(--stage-scale,1))] [border:calc(1px/var(--stage-scale,1))_solid_var(--primary)]';
+
+const handlePositionClasses: Record<'n' | 'e' | 's' | 'w' | 'ne' | 'nw' | 'se' | 'sw', string> = {
+  n: 'left-1/2 -translate-x-1/2 cursor-ns-resize top-[calc(-5px/var(--stage-scale,1))]',
+  s: 'left-1/2 -translate-x-1/2 cursor-ns-resize bottom-[calc(-5px/var(--stage-scale,1))]',
+  e: 'top-1/2 -translate-y-1/2 cursor-ew-resize right-[calc(-5px/var(--stage-scale,1))]',
+  w: 'top-1/2 -translate-y-1/2 cursor-ew-resize left-[calc(-5px/var(--stage-scale,1))]',
+  ne: 'cursor-nesw-resize top-[calc(-5px/var(--stage-scale,1))] right-[calc(-5px/var(--stage-scale,1))]',
+  nw: 'cursor-nwse-resize top-[calc(-5px/var(--stage-scale,1))] left-[calc(-5px/var(--stage-scale,1))]',
+  se: 'cursor-nwse-resize right-[calc(-5px/var(--stage-scale,1))] bottom-[calc(-5px/var(--stage-scale,1))]',
+  sw: 'cursor-nesw-resize left-[calc(-5px/var(--stage-scale,1))] bottom-[calc(-5px/var(--stage-scale,1))]',
+};
+
+const snapGuideClass =
+  'pointer-events-none absolute z-[10000] bg-attention shadow-[0_0_14px_rgba(252,163,17,0.58)]';
+
 /** Breathing room between the fitted canvas and the stage edges, in px. */
 const STAGE_FIT_MARGIN = 48;
 
@@ -112,14 +134,14 @@ export function EditorStage({ editor }: { editor: UseCanvasEditorReturn }) {
   return (
     <section
       ref={sectionRef}
-      className="canvas-editor-stage"
+      className="flex flex-col items-center justify-center overflow-hidden bg-[#131418] [background-image:repeating-conic-gradient(rgba(204,219,220,0.05)_0%_25%,transparent_0%_50%)_50%_50%/26px_26px] [grid-area:stage]"
       tabIndex={0}
       onKeyDown={handleKeyDown}
     >
       {/* The frame occupies the scaled footprint in layout (transforms don't
           affect layout), keeping the canvas centered and the toolbar in view. */}
       <div
-        className="canvas-editor-stage-frame"
+        className="relative shrink-0 shadow-brand [outline:1px_solid_var(--line-strong)]"
         style={{
           width: canvasWidth * displayScale,
           height: canvasHeight * displayScale,
@@ -127,7 +149,9 @@ export function EditorStage({ editor }: { editor: UseCanvasEditorReturn }) {
       >
         <div
           ref={editor.stageRef}
-          className={`canvas-editor-stage-canvas canvas-editor-stage-canvas-${selected?.settings.background ?? 'transparent'}`}
+          className={`relative origin-top-left ${
+            selected?.settings.background === 'dark' ? 'bg-[#101114]' : 'bg-[rgba(19,20,24,0.72)]'
+          }`}
           style={{
             width: canvasWidth,
             height: canvasHeight,
@@ -139,10 +163,14 @@ export function EditorStage({ editor }: { editor: UseCanvasEditorReturn }) {
           {selected ? (
             <>
               {editor.snapGuides.vertical ? (
-                <span className="canvas-editor-snap-guide canvas-editor-snap-guide-v" />
+                <span
+                  className={`${snapGuideClass} inset-y-0 left-1/2 -translate-x-1/2 w-[calc(2px/var(--stage-scale,1))]`}
+                />
               ) : null}
               {editor.snapGuides.horizontal ? (
-                <span className="canvas-editor-snap-guide canvas-editor-snap-guide-h" />
+                <span
+                  className={`${snapGuideClass} inset-x-0 top-1/2 -translate-y-1/2 h-[calc(2px/var(--stage-scale,1))]`}
+                />
               ) : null}
 
               {[...selected.settings.elements]
@@ -164,34 +192,36 @@ export function EditorStage({ editor }: { editor: UseCanvasEditorReturn }) {
       </div>
 
       {selected ? (
-        <div className="canvas-editor-stage-toolbar">
+        <div className="sticky left-1/2 z-20 mt-2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-line bg-[rgba(28,30,35,0.92)] px-2.5 py-1.5 shadow-[0_10px_40px_rgba(0,0,0,0.4)]">
           <button
-            className="canvas-editor-stage-tool"
+            className="cursor-pointer rounded-full border px-2.5 py-[5px] text-xs font-semibold border-transparent bg-transparent text-muted hover:bg-surface-soft hover:text-text"
             type="button"
             aria-label="Zoom out"
             onClick={() => editor.setZoom(Math.max(25, editor.zoom - 10))}
           >
             −
           </button>
-          <span className="canvas-editor-stage-zoom">{editor.zoom}%</span>
+          <span className="min-w-[38px] text-center text-xs tabular-nums text-text">
+            {editor.zoom}%
+          </span>
           <button
-            className="canvas-editor-stage-tool"
+            className="cursor-pointer rounded-full border px-2.5 py-[5px] text-xs font-semibold border-transparent bg-transparent text-muted hover:bg-surface-soft hover:text-text"
             type="button"
             aria-label="Zoom in"
             onClick={() => editor.setZoom(Math.min(200, editor.zoom + 10))}
           >
             +
           </button>
-          <span className="canvas-editor-stage-toolbar-divider" />
+          <span className="mx-0.5 h-[18px] w-px bg-line" />
           <button
-            className="canvas-editor-stage-tool"
+            className="cursor-pointer rounded-full border px-2.5 py-[5px] text-xs font-semibold border-transparent bg-transparent text-muted hover:bg-surface-soft hover:text-text"
             type="button"
             onClick={() => editor.setZoom(100)}
           >
             Fit
           </button>
           <button
-            className={`canvas-editor-stage-tool canvas-editor-stage-tool-snap${editor.snapEnabled ? ' canvas-editor-stage-tool-active' : ''}`}
+            className={`cursor-pointer rounded-full border px-2.5 py-[5px] text-xs font-semibold ${editor.snapEnabled ? 'border-accent bg-surface-hover text-accent' : 'border-transparent bg-transparent text-muted hover:bg-surface-soft hover:text-text'}`}
             type="button"
             aria-pressed={editor.snapEnabled}
             onClick={() => editor.toggleSnap()}
@@ -199,7 +229,11 @@ export function EditorStage({ editor }: { editor: UseCanvasEditorReturn }) {
             Snap
           </button>
           <button
-            className={`canvas-editor-stage-tool canvas-editor-stage-tool-bg${selected.settings.background === 'dark' ? ' canvas-editor-stage-tool-active' : ''}`}
+            className={`cursor-pointer rounded-full border px-2.5 py-[5px] text-xs font-semibold ${
+              selected.settings.background === 'dark'
+                ? 'border-accent bg-surface-hover text-accent'
+                : 'border-transparent bg-transparent text-muted hover:bg-surface-soft hover:text-text'
+            }`}
             type="button"
             onClick={() =>
               editor.patchCanvas(selected.id, {
@@ -252,9 +286,19 @@ function ElementView({
         ? buildAnimationStyle(element, 'out')
         : null;
 
+  // Text elements keep rendering past their box instead of slicing glyphs
+  // mid-letter, matching the browser-source runtime.
+  const isTextType = element.type === 'text' || element.type === 'alert-message';
+
   return (
     <div
-      className={`canvas-editor-element${selected ? ' canvas-editor-element-selected' : ''}${element.locked ? ' canvas-editor-element-locked' : ''} canvas-editor-element-type-${element.type}`}
+      // Selection chrome uses outline (not border) so the element's content box
+      // stays identical to the browser-source runtime and text wraps the same.
+      className={`absolute flex min-h-4 min-w-4 touch-none select-none items-center justify-center bg-transparent text-center text-text [overflow-wrap:anywhere] ${
+        isTextType ? 'overflow-visible' : 'overflow-hidden'
+      }${selected ? ' [outline:calc(1.5px/var(--stage-scale,1))_solid_var(--primary)]' : ''} ${
+        element.locked ? 'cursor-default' : 'cursor-pointer'
+      }`}
       style={{
         left: element.x,
         top: element.y,
@@ -270,7 +314,7 @@ function ElementView({
       }}
     >
       <div
-        className="canvas-editor-element-anim"
+        className="flex h-full w-full items-center justify-center"
         style={{
           opacity: element.opacity,
           background: element.styles.backgroundColor,
@@ -295,16 +339,22 @@ function ElementView({
         }}
       >
         {selected ? (
-          <span className="canvas-editor-element-badge canvas-editor-element-name">
+          <span
+            className={`${badgeClass} font-bold bottom-[calc(100%+5px/var(--stage-scale,1))] left-0`}
+          >
             {element.name}
           </span>
         ) : null}
 
-        <div className="canvas-editor-element-content">
+        <div
+          className={`flex h-full w-full items-center justify-center ${isTextType ? 'overflow-visible' : 'overflow-hidden'}`}
+        >
           {element.type === 'alert-image' ? (
             <AlertImageContent element={element} editor={editor} />
           ) : element.type === 'shape' ? null : (
-            <span className="canvas-editor-element-text">
+            // Padding must match the browser-source runtime text element so
+            // line wrapping is identical.
+            <span className="block w-full p-[18px]">
               {renderCanvasText(element.bindings.textTemplate ?? element.name, editor.previewAlert)}
             </span>
           )}
@@ -312,13 +362,15 @@ function ElementView({
       </div>
       {selected ? (
         <>
-          <span className="canvas-editor-element-badge canvas-editor-element-dims">
+          <span
+            className={`${badgeClass} font-medium font-mono left-1/2 top-[calc(100%+5px/var(--stage-scale,1))] -translate-x-1/2`}
+          >
             {element.width} × {element.height}
           </span>
           {(['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'] as const).map((handle) => (
             <span
               key={handle}
-              className={`canvas-editor-handle canvas-editor-handle-${handle}`}
+              className={`${handleClass} ${handlePositionClasses[handle]}`}
               aria-label={`Resize ${handle}`}
               role="presentation"
               onPointerDown={(event) => handleResizePointerDown(event, handle)}
@@ -354,13 +406,17 @@ function AlertImageContent({
   });
 
   if (!resolved) {
-    return <span className="canvas-editor-element-placeholder">Event image</span>;
+    return (
+      <span className="grid h-full w-full place-items-center border border-dashed border-line-strong p-2 text-[13px] text-muted">
+        Event image
+      </span>
+    );
   }
 
   if (resolved.kind === 'video') {
     return (
       <video
-        className="canvas-editor-element-image"
+        className="pointer-events-none h-full w-full object-contain"
         src={resolved.url}
         autoPlay
         loop
@@ -370,7 +426,13 @@ function AlertImageContent({
     );
   }
 
-  return <img className="canvas-editor-element-image" src={resolved.url} alt={element.name} />;
+  return (
+    <img
+      className="pointer-events-none h-full w-full object-contain"
+      src={resolved.url}
+      alt={element.name}
+    />
+  );
 }
 
 type ReactPointerEvent = React.PointerEvent<HTMLElement>;

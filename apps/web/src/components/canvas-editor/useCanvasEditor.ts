@@ -149,7 +149,7 @@ export type UseCanvasEditorReturn = {
   snapGuides: { horizontal: boolean; vertical: boolean };
   /**
    * Ref that must be attached to the rendered canvas element (the inner
-   * `.canvas-editor-stage-canvas`) so pointer/drag scaling converts screen
+   * scaled stage canvas in EditorStage) so pointer/drag scaling converts screen
    * pixels to canvas units against the actual canvas rect, not the stage area.
    */
   stageRef: React.RefObject<HTMLDivElement | null>;

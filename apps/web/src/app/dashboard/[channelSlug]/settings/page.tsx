@@ -13,6 +13,7 @@ import { WorkspaceSettingsForm } from '@/components/WorkspaceSettingsForm';
 import { DangerZone } from '@/components/DangerZone';
 import { IntegrationsSection } from '@/components/IntegrationsSection';
 import { twitchEnabled, googleEnabled } from '@/lib/auth';
+import { dashboardShellClass } from '@/components/layout-styles';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,7 +47,7 @@ export default async function SettingsPage({
   );
 
   return (
-    <main className="dashboard-shell">
+    <main className={dashboardShellClass}>
       {/* 1. Workspace details */}
       <section className="panel">
         <h2>Settings</h2>

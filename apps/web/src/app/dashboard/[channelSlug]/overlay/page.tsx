@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { prisma, canViewChannel } from '@multi-stream-alerts/database';
 import { requireDashboardSession } from '@/lib/session';
 import { OverlayProfileList } from '@/components/OverlayProfileList';
+import { dashboardShellClass } from '@/components/layout-styles';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +36,7 @@ export default async function OverlayPage({
   }));
 
   return (
-    <main className="dashboard-shell">
+    <main className={dashboardShellClass}>
       <section className="panel">
         <h2>Overlay Profiles</h2>
         <p className="muted">Share these URLs with your streaming software (OBS, etc.).</p>

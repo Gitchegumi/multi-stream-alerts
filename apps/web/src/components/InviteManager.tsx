@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { authFieldClass, authInputClass } from '@/components/auth-styles';
 
 type CodeSummary = {
   id: string;
@@ -196,11 +197,11 @@ export function InviteManager({
   }
 
   return (
-    <section className="grid" style={{ gridTemplateColumns: '1fr', gap: 16, marginTop: 24 }}>
+    <section className="mt-6 grid gap-4">
       <div className="panel">
         <h2>Create a new invite code</h2>
-        <form className="auth-form" onSubmit={handleCreate}>
-          <div className="auth-field">
+        <form className="grid gap-3" onSubmit={handleCreate}>
+          <div className={authFieldClass}>
             <span>Role</span>
             <select
               className="select"
@@ -215,9 +216,10 @@ export function InviteManager({
               ))}
             </select>
           </div>
-          <div className="auth-field">
+          <div className={authFieldClass}>
             <span>Max uses</span>
             <input
+              className={authInputClass}
               type="number"
               min={1}
               max={1000}
@@ -226,18 +228,20 @@ export function InviteManager({
               disabled={pending}
             />
           </div>
-          <div className="auth-field">
+          <div className={authFieldClass}>
             <span>Expires (optional)</span>
             <input
+              className={authInputClass}
               type="datetime-local"
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
               disabled={pending}
             />
           </div>
-          <div className="auth-field">
+          <div className={authFieldClass}>
             <span>Note (optional)</span>
             <input
+              className={authInputClass}
               type="text"
               maxLength={200}
               value={note}
@@ -246,9 +250,10 @@ export function InviteManager({
               disabled={pending}
             />
           </div>
-          <div className="auth-field">
+          <div className={authFieldClass}>
             <span>External enrollment provider (optional)</span>
             <input
+              className={authInputClass}
               type="text"
               maxLength={64}
               value={externalProvider}
@@ -257,9 +262,10 @@ export function InviteManager({
               disabled={pending}
             />
           </div>
-          <div className="auth-field">
+          <div className={authFieldClass}>
             <span>External enrollment token (optional)</span>
             <input
+              className={authInputClass}
               type="password"
               maxLength={2048}
               value={externalToken}
@@ -269,9 +275,10 @@ export function InviteManager({
               autoComplete="off"
             />
           </div>
-          <div className="auth-field">
+          <div className={authFieldClass}>
             <span>Enrollment URL override (optional)</span>
             <input
+              className={authInputClass}
               type="url"
               value={externalEnrollmentUrl}
               onChange={(e) => setExternalEnrollmentUrl(e.target.value)}
@@ -279,9 +286,10 @@ export function InviteManager({
               disabled={pending}
             />
           </div>
-          <div className="auth-field">
+          <div className={authFieldClass}>
             <span>External token expires (optional)</span>
             <input
+              className={authInputClass}
               type="datetime-local"
               value={externalExpiresAt}
               onChange={(e) => setExternalExpiresAt(e.target.value)}
@@ -329,8 +337,7 @@ export function InviteManager({
               return (
                 <div
                   key={code.id}
-                  className="event-row"
-                  style={{ gridTemplateColumns: '1fr auto', alignItems: 'center' }}
+                  className="grid grid-cols-[1fr_auto] items-center gap-1 border-b border-line py-3 last:border-b-0"
                 >
                   <div>
                     <div
@@ -403,7 +410,7 @@ export function InviteManager({
             {redemptions.map((r) => {
               const code = codes.find((c) => c.id === r.inviteCodeId);
               return (
-                <div key={r.id} className="event-row">
+                <div key={r.id} className="grid gap-1 border-b border-line py-3 last:border-b-0">
                   <strong>{r.user.displayName ?? r.user.email}</strong>
                   <span className="muted small">
                     {r.user.email} used <code>{code?.code ?? r.inviteCodeId}</code> ·{' '}

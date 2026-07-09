@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma, listInviteCodes } from '@multi-stream-alerts/database';
 import { InviteManager } from '@/components/InviteManager';
+import { dashboardShellClass } from '@/components/layout-styles';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,7 @@ export default async function AdminInvitesPage() {
   });
 
   return (
-    <main className="dashboard-shell">
+    <main className={dashboardShellClass}>
       <InviteManager
         initialCodes={codes.map((code) => ({
           ...code,

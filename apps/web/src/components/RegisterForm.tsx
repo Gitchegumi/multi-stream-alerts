@@ -4,6 +4,12 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { validateInviteCodeForCookie } from '@/lib/oidc-state';
+import {
+  authFieldClass,
+  authInputClass,
+  authToggleClass,
+  authToggleButtonClass,
+} from '@/components/auth-styles';
 
 type AuthMode = 'oidc' | 'credentials';
 
@@ -131,14 +137,14 @@ export function RegisterForm({
   }
 
   return (
-    <form className="auth-form" onSubmit={handleSubmit}>
+    <form className="grid gap-3" onSubmit={handleSubmit}>
       {oidcEnabled && credentialsEnabled && (
-        <div className="auth-mode-toggle" role="tablist">
+        <div className={authToggleClass} role="tablist">
           <button
             type="button"
             role="tab"
             aria-selected={mode === 'oidc'}
-            className={mode === 'oidc' ? 'active' : ''}
+            className={authToggleButtonClass(mode === 'oidc')}
             onClick={() => {
               setMode('oidc');
               setError(null);
@@ -151,7 +157,7 @@ export function RegisterForm({
             type="button"
             role="tab"
             aria-selected={mode === 'credentials'}
-            className={mode === 'credentials' ? 'active' : ''}
+            className={authToggleButtonClass(mode === 'credentials')}
             onClick={() => {
               setMode('credentials');
               setError(null);
@@ -164,11 +170,12 @@ export function RegisterForm({
       )}
 
       {!(mode === 'oidc' && inviteAccepted) && (
-        <label className="auth-field">
+        <label className={authFieldClass}>
           <span>Invite code</span>
           <input
             type="text"
             required
+            className={authInputClass}
             value={inviteCode}
             onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
             disabled={pending}
@@ -182,11 +189,12 @@ export function RegisterForm({
 
       {mode === 'credentials' && (
         <>
-          <label className="auth-field">
+          <label className={authFieldClass}>
             <span>Email</span>
             <input
               type="email"
               required
+              className={authInputClass}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={pending}
@@ -195,12 +203,13 @@ export function RegisterForm({
             />
           </label>
 
-          <label className="auth-field">
+          <label className={authFieldClass}>
             <span>Password</span>
             <input
               type="password"
               required
               minLength={8}
+              className={authInputClass}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={pending}

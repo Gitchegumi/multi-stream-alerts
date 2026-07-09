@@ -30,7 +30,7 @@ export default async function ScopedOverlayPage({
   const clientIp = getClientIp({ headers: requestHeaders });
   if (isOverlayRouteRateLimited(clientIp)) {
     return (
-      <main className="overlay-denied">
+      <main className="overlay-denied grid min-h-screen place-items-center bg-[rgba(24,25,29,0.94)] text-danger">
         <p>Too many overlay attempts.</p>
       </main>
     );
@@ -44,7 +44,7 @@ export default async function ScopedOverlayPage({
 
   if (!overlayProfile) {
     return (
-      <main className="overlay-denied">
+      <main className="overlay-denied grid min-h-screen place-items-center bg-[rgba(24,25,29,0.94)] text-danger">
         <p>Invalid overlay display key.</p>
       </main>
     );

@@ -25,7 +25,7 @@ export function DangerZone({
   }
 
   return (
-    <div className="danger-zone" style={{ marginTop: 24 }}>
+    <div className="mt-6 border-t border-line pt-4">
       <h3>Danger zone</h3>
       {!confirmDelete ? (
         <button
@@ -37,11 +37,11 @@ export function DangerZone({
           Delete workspace
         </button>
       ) : (
-        <div className="stack" style={{ gap: 8 }}>
+        <div className="grid gap-2">
           <p className="muted">
             This will permanently delete the workspace and all associated data. Are you sure?
           </p>
-          <div className="stack" style={{ flexDirection: 'row', gap: 8 }}>
+          <div className="grid gap-2">
             <button
               className="button-secondary"
               type="button"
@@ -49,7 +49,12 @@ export function DangerZone({
             >
               Cancel
             </button>
-            <button className="button" type="button" disabled={isPending} onClick={deleteWorkspace}>
+            <button
+              className="button bg-attention text-[#17120a] shadow-[0_8px_24px_rgba(252,163,17,0.2)] hover:bg-[#ffbb47]"
+              type="button"
+              disabled={isPending}
+              onClick={deleteWorkspace}
+            >
               Confirm delete
             </button>
           </div>

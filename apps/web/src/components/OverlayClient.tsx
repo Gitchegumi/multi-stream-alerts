@@ -13,6 +13,11 @@ import {
 } from '@/lib/canvas-schema';
 import { buildAnimationStyle } from '@/lib/canvas-animation';
 
+/* `overlay-stage` stays in the markup as a marker class: globals.css uses
+   html:has(.overlay-stage) to keep the page background transparent. */
+const runtimeElementClass =
+  'absolute grid origin-center place-items-center text-center [overflow-wrap:anywhere]';
+
 export function OverlayClient({
   displayKey,
   profile,
@@ -141,9 +146,14 @@ export function OverlayClient({
   }
 
   return (
-    <div className="overlay-viewport">
+    // Full-viewport wrapper that centers and clips the scaled stage so the
+    // browser source fits any window while preserving the canvas aspect ratio
+    // (issue #124).
+    <div className="fixed inset-0 grid place-items-center overflow-hidden bg-transparent">
       <main
-        className={`overlay-stage overlay-stage-${settings.background}`}
+        className={`overlay-stage relative origin-center overflow-hidden ${
+          settings.background === 'dark' ? 'bg-[#101114]' : 'bg-transparent'
+        }`}
         aria-live="polite"
         style={{
           width: settings.width,
@@ -214,18 +224,21 @@ function CanvasRuntimeElement({
       eventVisualUrl: resolveOverlayAssetUrl(alert.visualAssetUrl, displayKey),
     });
     return (
-      <div className="overlay-canvas-runtime-element" style={style}>
+      <div className={`${runtimeElementClass} overflow-hidden`} style={style}>
         <VisualAsset asset={resolved} />
       </div>
     );
   }
 
   if (element.type === 'shape') {
-    return <div className="overlay-canvas-runtime-element" style={style} />;
+    return <div className={`${runtimeElementClass} overflow-hidden`} style={style} />;
   }
 
   return (
-    <div className="overlay-canvas-runtime-element overlay-canvas-runtime-text" style={style}>
+    // overflow-visible lets long wrapped text render past the element box
+    // instead of slicing glyphs mid-letter when a viewer name pushes the text
+    // to an extra line.
+    <div className={`${runtimeElementClass} overflow-visible p-[18px]`} style={style}>
       {renderCanvasText(element.bindings.textTemplate ?? element.name, alert)}
     </div>
   );
@@ -235,11 +248,13 @@ function VisualAsset({ asset }: { asset: ResolvedCanvasAsset }) {
   if (!asset) return null;
 
   if (asset.kind === 'video') {
-    return <video className="overlay-runtime-asset" src={asset.url} autoPlay loop playsInline />;
+    return (
+      <video className="h-full w-full object-contain" src={asset.url} autoPlay loop playsInline />
+    );
   }
 
   // eslint-disable-next-line @next/next/no-img-element
-  return <img className="overlay-runtime-asset" alt="" src={asset.url} />;
+  return <img className="h-full w-full object-contain" alt="" src={asset.url} />;
 }
 
 function resolveOverlayAssetUrl(url: string | undefined, displayKey: string) {

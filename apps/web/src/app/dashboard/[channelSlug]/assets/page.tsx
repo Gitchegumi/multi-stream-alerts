@@ -7,6 +7,7 @@ import {
 } from '@multi-stream-alerts/database';
 import { requireDashboardSession } from '@/lib/session';
 import { AssetLibrary } from '@/components/AssetLibrary';
+import { dashboardShellClass } from '@/components/layout-styles';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,7 +46,7 @@ export default async function AssetsPage({ params }: { params: Promise<{ channel
   }));
 
   return (
-    <main className="dashboard-shell">
+    <main className={dashboardShellClass}>
       <section className="panel">
         <h2>Asset Library</h2>
         <AssetLibrary

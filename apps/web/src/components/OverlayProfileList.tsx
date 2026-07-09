@@ -53,21 +53,26 @@ export function OverlayProfileList({
   }
 
   return (
-    <div className="overlay-profile-list">
+    <div className="grid gap-3">
       {result ? <p className="muted">{result}</p> : null}
 
       {items.length === 0 ? (
         <p className="muted">No overlay profiles found.</p>
       ) : (
         items.map((profile) => (
-          <article className="overlay-profile-row" key={profile.id}>
-            <div className="overlay-profile-info">
+          <article
+            className="grid gap-2.5 rounded-lg border border-line bg-surface-soft p-3"
+            key={profile.id}
+          >
+            <div className="flex flex-wrap items-center gap-2">
               <strong>{profile.name}</strong>
               {!profile.isActive && <span className="badge muted">Inactive</span>}
             </div>
-            <div className="url-item">{profile.url}</div>
+            <div className="max-w-full [overflow-wrap:anywhere] font-mono text-[13px] text-accent">
+              {profile.url}
+            </div>
             <div className="muted small">Key: {profile.displayKey.slice(0, 12)}…</div>
-            <div className="overlay-profile-actions">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 className="button-secondary"
                 type="button"

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import { editorFieldClass } from './editor-styles';
 
 export type NumericFieldProps = {
   value: number;
@@ -66,7 +67,7 @@ export function NumericField({ value, onChange, label, min, max, step = 1 }: Num
 
   const input = (
     <input
-      className="input canvas-editor-numeric-input"
+      className="input w-full"
       type="number"
       min={min}
       max={max}
@@ -83,7 +84,7 @@ export function NumericField({ value, onChange, label, min, max, step = 1 }: Num
   }
 
   return (
-    <label className="canvas-editor-field">
+    <label className={editorFieldClass}>
       <span>{label}</span>
       {input}
     </label>

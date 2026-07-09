@@ -44,7 +44,7 @@ export default async function OverlayEditorPage({
   if (!layout) notFound();
 
   return (
-    <main className="overlay-editor-page">
+    <main className="min-h-[calc(100vh-57px)]">
       <OverlayLayoutEditor
         channelSlug={channel.slug}
         layout={{

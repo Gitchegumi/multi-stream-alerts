@@ -3,6 +3,7 @@ import path from 'node:path';
 import { notFound, redirect } from 'next/navigation';
 import { canViewChannel, prisma } from '@multi-stream-alerts/database';
 import { requireDashboardSession } from '@/lib/session';
+import { dashboardShellClass, dashboardTitleClass } from '@/components/layout-styles';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -64,9 +65,9 @@ export default async function GuidePage({
   const activeDoc = docs.find((item) => item.slug === (doc ?? guideOrder[0])) ?? docs[0];
   if (!activeDoc) {
     return (
-      <main className="dashboard-shell">
+      <main className={dashboardShellClass}>
         <section className="panel">
-          <h1 className="dashboard-title">Guide</h1>
+          <h1 className={dashboardTitleClass}>Guide</h1>
           <p className="muted">No documentation files are available in this build.</p>
         </section>
       </main>
@@ -74,12 +75,19 @@ export default async function GuidePage({
   }
 
   return (
-    <main className="dashboard-shell">
-      <section className="guide-layout">
-        <aside className="guide-tabs" aria-label="Guide sections">
+    <main className={dashboardShellClass}>
+      <section className="grid grid-cols-[minmax(210px,260px)_minmax(0,1fr)] items-start gap-4 max-[900px]:grid-cols-1 max-[900px]:items-stretch">
+        <aside
+          className="sticky top-[73px] grid min-w-0 gap-1 rounded-lg border border-line bg-panel p-2.5 shadow-brand"
+          aria-label="Guide sections"
+        >
           {docs.map((item) => (
             <a
-              className={`guide-tab${item.slug === activeDoc.slug ? ' guide-tab-active' : ''}`}
+              className={`rounded-md px-3 py-2.5 font-bold no-underline ${
+                item.slug === activeDoc.slug
+                  ? 'bg-surface-hover text-accent'
+                  : 'text-muted hover:bg-surface-hover hover:text-accent'
+              }`}
               href={`/dashboard/${encodeURIComponent(channel.slug)}/guide?doc=${encodeURIComponent(item.slug)}`}
               key={item.slug}
             >
@@ -87,7 +95,7 @@ export default async function GuidePage({
             </a>
           ))}
         </aside>
-        <article className="guide-document">
+        <article className="grid min-w-0 gap-3.5 rounded-lg border border-line bg-panel p-6 shadow-brand">
           {activeDoc.blocks.map((block, index) => (
             <MarkdownBlockView
               block={block}
@@ -236,24 +244,34 @@ function MarkdownBlockView({
   docs: GuideDoc[];
 }) {
   if (block.type === 'heading') {
-    if (block.level === 1) return <h1 className="dashboard-title">{block.text}</h1>;
-    if (block.level === 2) return <h2>{block.text}</h2>;
-    return <h3>{block.text}</h3>;
+    if (block.level === 1) return <h1 className={dashboardTitleClass}>{block.text}</h1>;
+    if (block.level === 2) return <h2 className="m-0 mt-2.5 text-[22px]">{block.text}</h2>;
+    return <h3 className="m-0 mt-2 text-lg">{block.text}</h3>;
   }
 
   if (block.type === 'paragraph') {
-    return <p>{renderInlineMarkdown(block.text, channelSlug, docs)}</p>;
+    return (
+      <p className="m-0 leading-[1.65] text-platinum">
+        {renderInlineMarkdown(block.text, channelSlug, docs)}
+      </p>
+    );
   }
 
   if (block.type === 'code') {
-    return <pre>{block.text}</pre>;
+    return (
+      <pre className="overflow-auto rounded-lg border border-line bg-[#121317] p-3.5 text-soft-white">
+        {block.text}
+      </pre>
+    );
   }
 
   const List = block.ordered ? 'ol' : 'ul';
   return (
     <List>
       {block.items.map((item) => (
-        <li key={item}>{renderInlineMarkdown(item, channelSlug, docs)}</li>
+        <li className="leading-[1.65] text-platinum" key={item}>
+          {renderInlineMarkdown(item, channelSlug, docs)}
+        </li>
       ))}
     </List>
   );
@@ -265,14 +283,21 @@ function renderInlineMarkdown(text: string, channelSlug: string, docs: GuideDoc[
       return <strong key={index}>{part.slice(2, -2)}</strong>;
     }
     if (part.startsWith('`') && part.endsWith('`')) {
-      return <code key={index}>{part.slice(1, -1)}</code>;
+      return (
+        <code
+          className="rounded-[5px] border border-line bg-panel-soft px-[5px] py-0.5 text-soft-white"
+          key={index}
+        >
+          {part.slice(1, -1)}
+        </code>
+      );
     }
 
     const link = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(part);
     if (link) {
       const href = guideHref(link[2] ?? '', channelSlug, docs);
       return (
-        <a href={href} key={index}>
+        <a className="text-accent" href={href} key={index}>
           {link[1]}
         </a>
       );

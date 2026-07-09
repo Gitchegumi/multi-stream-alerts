@@ -32,7 +32,7 @@ export function WorkspaceSettingsForm({
   }
 
   return (
-    <div className="settings-form">
+    <div className="grid gap-3">
       {result ? <p className="muted">{result}</p> : null}
 
       <label className="field">

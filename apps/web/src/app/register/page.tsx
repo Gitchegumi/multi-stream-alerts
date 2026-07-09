@@ -37,9 +37,9 @@ export default async function RegisterPage({
   }
 
   return (
-    <main className="auth-shell">
-      <section className="auth-card">
-        <h1 className="auth-title">Create an account</h1>
+    <main className="grid min-h-screen place-items-center [background:radial-gradient(circle_at_50%_0%,rgba(65,102,245,0.22),transparent_30rem),linear-gradient(180deg,#202126_0%,var(--bg)_100%)] p-6">
+      <section className="grid w-[min(420px,100%)] gap-4 rounded-[10px] border border-line bg-panel p-7 shadow-brand">
+        <h1 className="m-0 text-[28px] text-soft-white">Create an account</h1>
         <p className="muted">Registration requires a valid invite code from an administrator.</p>
         {params.inviteReady && (
           <p className="muted small">Invite accepted. Continue to sign in when you are ready.</p>

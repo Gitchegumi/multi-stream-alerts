@@ -7,8 +7,8 @@ export function EditorStatusBar({ editor }: { editor: UseCanvasEditorReturn }) {
   const hasAudio = Boolean(selected?.settings.audioAssetId);
 
   return (
-    <footer className="canvas-editor-status-bar">
-      <div className="canvas-editor-status-left">
+    <footer className="flex items-center justify-between gap-3 border-t border-line bg-[#16171b] px-3.5 text-xs [grid-area:status]">
+      <div className="flex items-center gap-2.5">
         {selected ? (
           <>
             <span>
@@ -20,7 +20,7 @@ export function EditorStatusBar({ editor }: { editor: UseCanvasEditorReturn }) {
               {hasAudio ? ' + audio' : ''}
             </span>
             <span aria-hidden>·</span>
-            <span className="canvas-editor-status-bound">
+            <span className="text-accent">
               Bound to {boundCount} alert {boundCount === 1 ? 'type' : 'types'}
             </span>
           </>
@@ -28,7 +28,7 @@ export function EditorStatusBar({ editor }: { editor: UseCanvasEditorReturn }) {
           <span className="muted">No canvas selected</span>
         )}
       </div>
-      <div className="canvas-editor-status-right muted">
+      <div className="muted overflow-hidden text-ellipsis whitespace-nowrap text-right">
         {editor.result ?? 'Position changes commit on Enter — no canvas jitter'}
       </div>
     </footer>

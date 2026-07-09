@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { WorkspaceOverview } from '@/components/WorkspaceOverview';
 import { prisma } from '@multi-stream-alerts/database';
+import { dashboardShellClass } from '@/components/layout-styles';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,7 +61,7 @@ export default async function AdminWorkspacesPage() {
   }));
 
   return (
-    <main className="dashboard-shell">
+    <main className={dashboardShellClass}>
       <WorkspaceOverview
         total={total}
         workspaces={workspaces.map((ws) => ({

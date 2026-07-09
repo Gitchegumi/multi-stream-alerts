@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { ensureDefaultChannel, getAuthorizedChannels } from '@multi-stream-alerts/database';
 import { requireDashboardSession } from '@/lib/session';
+import { dashboardShellClass } from '@/components/layout-styles';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,7 @@ export default async function DashboardPage({
 
   if (!selectedChannel) {
     return (
-      <main className="dashboard-shell">
+      <main className={dashboardShellClass}>
         {errorParam === 'forbidden' ? (
           <p className="error" role="alert" style={{ marginTop: 12 }}>
             You don't have access to that channel.
