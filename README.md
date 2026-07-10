@@ -74,16 +74,14 @@ Set `INITIAL_DISPLAY_KEY` to a long random value before first startup. The defau
 
 ### Instance-level environment variables
 
-The `.env` file is for instance plumbing and bootstrap values only:
+The `.env` file is for instance plumbing, bootstrap values, and administrator-owned provider credentials:
 
 - Public origins and ports (`PUBLIC_BASE_URL`, `NEXT_PUBLIC_DOCS_URL`, `INGRESS_PUBLIC_BASE_URL`, `NEXTAUTH_URL`, `WEB_PORT`, `INGRESS_PORT`).
 - Database, Redis, upload, and optional S3 storage settings.
 - Auth/session/OIDC settings (`AUTH_SECRET`, `AUTH_OIDC_*`, onboarding flags, and `INITIAL_ADMIN_EMAIL`).
 - Bootstrap defaults (`DEFAULT_CHANNEL_*`, `INITIAL_DISPLAY_KEY`) and the encryption-at-rest key (`INSTANCE_ENCRYPTION_KEY`).
 
-Ko-fi, Twitch, and YouTube platform credentials are configured per workspace in the dashboard at **[workspace] -> Settings -> Integrations**. They are encrypted at rest and are not sent to browser clients after save.
-
-Twitch and YouTube also support OAuth account linking (connect/disconnect platform accounts from the dashboard without manually pasting secrets). This requires instance-level provider credentials in `.env`:
+Ko-fi's verification token is configured per workspace in the dashboard at **[workspace] -> Settings -> Integrations**. Twitch and YouTube use OAuth account linking instead: the administrator configures one provider application per instance, while workspace owners connect their individual platform accounts without pasting developer credentials. This requires the following instance-level values in `.env`:
 
 ```env
 TWITCH_CLIENT_ID=<your-twitch-app-client-id>
@@ -92,7 +90,7 @@ GOOGLE_CLIENT_ID=<your-google-oauth-client-id>
 GOOGLE_CLIENT_SECRET=<your-google-oauth-client-secret>
 ```
 
-When these are set, the Settings -> Integrations page shows OAuth connect/disconnect cards for Twitch and YouTube. When they are missing, the cards show a clear disabled state explaining that an administrator must configure the provider credentials. The per-workspace manual credential fields remain available regardless.
+When these are set, the Settings -> Integrations page shows OAuth connect/disconnect cards for Twitch and YouTube. When they are missing, the cards show a clear disabled state explaining that an administrator must configure the provider credentials. See [OAuth Provider Setup](docs/developer-guide/oauth-provider-setup.md) for the Twitch and Google console steps, exact redirect URLs, scopes, and Google publishing guidance.
 
 ## Authentication Model
 
@@ -205,7 +203,7 @@ If `ONBOARDING_REQUIRE_INVITE=true` and a user attempts to sign in via OIDC with
 
 ## Instance secrets
 
-`INSTANCE_ENCRYPTION_KEY` is a 32-byte key (base64-encoded) used to encrypt per-channel platform credentials (Ko-fi verification token, Twitch EventSub secret / OAuth client credentials / broadcaster ID, YouTube OAuth client credentials) at rest in the database. The app will fail to boot without it — there is no fallback.
+`INSTANCE_ENCRYPTION_KEY` is a 32-byte key (base64-encoded) used to encrypt per-workspace platform secrets, including the Ko-fi verification token and generated EventSub/WebSub secrets, at rest in the database. The Twitch and Google application credentials remain instance-level environment variables. Linked-account OAuth tokens are encrypted separately with `ENCRYPTION_KEY`. The app will fail to boot without `INSTANCE_ENCRYPTION_KEY` - there is no fallback.
 
 Generate it once when you first set up the instance:
 
@@ -253,7 +251,7 @@ https://<your-alerts-domain>/api/webhooks/youtube/<your-channel-slug>
 
 Webhook routes do not use OIDC. They must verify provider secrets/signatures and only ingest events. Ko-fi and YouTube webhooks include the channel slug in the path; Twitch uses a single global callback URL and identifies the channel by matching the inbound HMAC against stored per-channel `eventsubSecret` values.
 
-All webhook validation uses per-workspace integration settings from the database. Platform tokens, OAuth client secrets, and EventSub secrets are never read from request-visible browser payloads and are not logged. Dashboard test alerts call the same `storeAndPublishAlertEvent` path used by real webhook alerts, so disabled or unmapped alert types are suppressed consistently.
+All webhook validation uses per-workspace integration state from the database. Linked-account tokens and generated EventSub/WebSub secrets are never read from request-visible browser payloads and are not logged. Instance-level OAuth client secrets remain in the service environment. Dashboard test alerts call the same `storeAndPublishAlertEvent` path used by real webhook alerts, so disabled or unmapped alert types are suppressed consistently.
 
 ## Alert Event Catalog and Layouts
 
@@ -428,30 +426,21 @@ Duplicate Ko-fi `message_id` values are ignored. Private Ko-fi messages are not 
 
 ## Twitch Setup
 
-Configure per-channel Twitch credentials from Dashboard → [workspace] → Settings → Integrations → Twitch. Each channel stores four fields:
+Create the instance's Twitch application and add `NEXTAUTH_URL/api/auth/callback/twitch` as its OAuth redirect URL. Store its Client ID and Client Secret in `.env`, then connect each channel from **Dashboard -> [workspace] -> Settings -> Integrations -> Twitch**. GitchAlerts generates the per-workspace EventSub secret and provisions the supported subscriptions automatically; workspace owners do not enter developer credentials or callback secrets.
 
-- `eventsubSecret` — per-channel secret used to verify EventSub HMAC signatures. Generate a random 16+ character string; set this in your Twitch app's EventSub subscription callback URL settings **and** store it in the dashboard. The webhook handler matches inbound HMACs against stored secrets to identify the receiving channel.
-- `clientId` / `clientSecret` — Twitch app OAuth credentials used to call the Twitch API (subscriptions, user lookups, etc.).
-- `broadcasterId` — numeric user ID of the channel receiving the events. Find it via the Twitch API (`/users?login=<channel>`) or your Twitch dashboard.
-
-The Twitch EventSub callback URL is global per app. The receiving channel is identified implicitly by which stored `eventsubSecret` validates the inbound HMAC — see `apps/ingress/src/twitch-webhook.ts`.
-
-> **v1 stub:** EventSub subscription creation and event normalization are still future work; v1 verifies the HMAC and returns `501 Not Implemented`.
+The global EventSub callback is `INGRESS_PUBLIC_BASE_URL/api/webhooks/twitch`. See [OAuth Provider Setup](docs/developer-guide/oauth-provider-setup.md) for the complete procedure and required scopes.
 
 ## YouTube Setup
 
-Configure per-channel YouTube credentials from Dashboard → [workspace] → Settings → Integrations → YouTube. Each channel stores two fields:
+Create the instance's Google OAuth web client, enable YouTube Data API v3, and add `NEXTAUTH_URL/api/auth/callback/google` as its authorized redirect URI. Store the Client ID and Client Secret in `.env`, then connect each channel from **Dashboard -> [workspace] -> Settings -> Integrations -> YouTube**. GitchAlerts resolves the channel and creates and renews its WebSub subscription automatically.
 
-- `clientId` — Google OAuth client ID for YouTube Data API access.
-- `clientSecret` — Google OAuth client secret paired with the client ID.
-
-The webhook URL is per-channel:
+The generated webhook URL is per workspace:
 
 ```text
 https://<your-alerts-domain>/api/webhooks/youtube/<your-channel-slug>
 ```
 
-> **v1 stub:** Pub/Sub hub challenge verification and Super Chat / membership event normalization are still future work; v1 verifies the URL resolution and returns `501 Not Implemented`.
+See [OAuth Provider Setup](docs/developer-guide/oauth-provider-setup.md) for the Google consent screen, test-user, publishing, and verification requirements.
 
 ## OBS or Meld Browser Source
 
@@ -527,14 +516,11 @@ The form field `data` should contain a JSON payload with a matching `verificatio
 
 ## Known Limitations
 
-- Twitch EventSub is stubbed with challenge/signature structure but does not yet normalize notifications.
-- YouTube ingestion is stubbed and returns a future-implementation response.
 - Template editing is a dashboard stub in v1.
 - The worker currently subscribes to Redis and logs normalized events for future queue processing.
 
 ## Roadmap
 
-- Twitch EventSub subscription management and normalized alerts.
 - YouTube Super Chat, membership, and live chat support.
 - TikTok adapter research.
 - Dashboard controls for templates and richer overlay settings.
