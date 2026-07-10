@@ -6,7 +6,7 @@ GitchAlerts is configured through a `.env` file at the repository root. Copy the
 cp .env.example .env
 ```
 
-Only `.env.example` is committed. Keep `.env` and any `.env.*.local` files private. The `.env` file is for instance plumbing and bootstrap values only. Ko-fi, Twitch, and YouTube platform credentials are configured per workspace in the dashboard under **Settings -> Integrations**, not here.
+Only `.env.example` is committed. Keep `.env` and any `.env.*.local` files private. The `.env` file holds instance plumbing, bootstrap values, and administrator-owned OAuth provider credentials. Ko-fi's verification token and the linked Twitch/YouTube accounts are managed per workspace in the dashboard under **Settings -> Integrations**.
 
 ## Public origins and ports
 
@@ -59,6 +59,8 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
 ## Twitch / YouTube OAuth provider apps
+
+Follow [OAuth Provider Setup](oauth-provider-setup.md) to create both applications, register the exact redirect URLs, and choose the appropriate Google publishing mode.
 
 Twitch and YouTube are connected exclusively through OAuth — end users click **Connect** and the backend auto-provisions the EventSub / WebSub subscriptions. There are no per-workspace developer credential fields for these providers; the app-level credentials below are admin/deployment configuration.
 

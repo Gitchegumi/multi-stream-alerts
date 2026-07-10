@@ -8,4 +8,5 @@ Deployment notes:
 - Configure the reverse proxy for WebSocket-like long-lived HTTP behavior for Server-Sent Events.
 - Persist PostgreSQL, Redis as appropriate, and asset storage.
 - Keep `INSTANCE_ENCRYPTION_KEY`, provider secrets, and NextAuth secrets stable across restarts.
+- Create the instance-level Twitch and Google applications using [OAuth Provider Setup](oauth-provider-setup.md).
 - For TrueNAS or similar platforms, mount persistent volumes for database and local asset data.
