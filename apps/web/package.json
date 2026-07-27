@@ -15,12 +15,12 @@
     "@multi-stream-alerts/database": "workspace:*",
     "@multi-stream-alerts/shared": "workspace:*",
     "@multi-stream-alerts/ui": "workspace:*",
-    "@next/env": "16.2.10",
-    "jose": "^6.2.3",
-    "next": "16.2.10",
-    "next-auth": "^4.24.14",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
+    "@next/env": "16.2.12",
+    "jose": "^6.2.4",
+    "next": "16.2.12",
+    "next-auth": "^4.24.15",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "zod": "^4.4.3"
   },
   "devDependencies": {
