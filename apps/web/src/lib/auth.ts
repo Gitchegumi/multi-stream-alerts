@@ -10,6 +10,7 @@ import {
   InviteCodeError,
   verifyPassword,
   provisionTwitchEventSub,
+  resolveYoutubeChannel,
   resolveYoutubeChannelId,
   provisionYoutubeWebSub,
   type Prisma,
@@ -19,6 +20,7 @@ import { createChannelWithUniqueSlug } from './channel-slug';
 import { readOnboardingConfig } from './onboarding';
 import { encrypt } from '@multi-stream-alerts/shared';
 import { consumeLinkingState, peekLinkingState } from '@/lib/linking-state';
+import { getPlatformAccountName } from '@/lib/platform-account-name';
 
 type OidcProfile = Profile & {
   sub?: string;
@@ -276,8 +278,18 @@ export const authOptions: NextAuthOptions = {
         }
 
         const platform = account.provider === 'google' ? 'youtube' : 'twitch';
-        const platformAccountName = (profile as Record<string, unknown>)?.name as
-          string | undefined;
+        let platformAccountName = getPlatformAccountName(
+          account.provider,
+          profile as Record<string, unknown> | undefined,
+          account.providerAccountId,
+        );
+        const youtubeChannel =
+          account.provider === 'google' && account.access_token
+            ? await resolveYoutubeChannel(account.access_token)
+            : null;
+        // A Google account name is not necessarily its YouTube channel name.
+        // Prefer the actual channel title returned by YouTube Data API.
+        platformAccountName = youtubeChannel?.title ?? platformAccountName;
 
         const existingCount = await prisma.linkedAccount.count({
           where: { userId: dbUser.id, platform },
@@ -296,7 +308,7 @@ export const authOptions: NextAuthOptions = {
             channelId: linkingChannelId ?? null,
             platform,
             platformAccountId: account.providerAccountId,
-            platformAccountName: platformAccountName ?? null,
+            platformAccountName,
             encryptedAccessToken: encrypt(account.access_token ?? ''),
             encryptedRefreshToken: account.refresh_token ? encrypt(account.refresh_token) : null,
             tokenExpiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
@@ -322,6 +334,7 @@ export const authOptions: NextAuthOptions = {
           providerAccountId: account.providerAccountId,
           accessToken: account.access_token,
           channelId: linkingChannelId ?? null,
+          youtubeChannelId: youtubeChannel?.id,
         });
 
         return true;
@@ -415,6 +428,7 @@ export async function provisionLinkedAccount(input: {
   providerAccountId: string;
   accessToken?: string | null;
   channelId: string | null;
+  youtubeChannelId?: string;
 }): Promise<void> {
   if (!input.channelId) {
     console.warn('[auth] linked account has no workspace; skipping auto-provisioning', {
@@ -437,7 +451,8 @@ export async function provisionLinkedAccount(input: {
       console.warn('[auth] youtube link missing access token; skipping auto-provisioning');
       return;
     }
-    const youtubeChannelId = await resolveYoutubeChannelId(input.accessToken);
+    const youtubeChannelId =
+      input.youtubeChannelId ?? (await resolveYoutubeChannelId(input.accessToken));
     if (!youtubeChannelId) {
       console.warn('[auth] could not resolve YouTube channel id; skipping auto-provisioning');
       return;

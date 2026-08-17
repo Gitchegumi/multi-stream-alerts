@@ -26,7 +26,11 @@
 
 import { randomBytes } from 'node:crypto';
 import { prisma } from '../client';
-import { saveChannelCredentials, clearAllChannelSecrets } from '../integration-credentials';
+import {
+  saveChannelCredentials,
+  clearAllChannelSecrets,
+  getChannelDecryptedSecret,
+} from '../integration-credentials';
 
 const TWITCH_TOKEN_URL = 'https://id.twitch.tv/oauth2/token';
 const TWITCH_EVENTSUB_URL = 'https://api.twitch.tv/helix/eventsub/subscriptions';
@@ -109,6 +113,8 @@ export interface TwitchProvisionDeps {
   getAppToken?: (deps: TwitchProvisionDeps) => Promise<string>;
   /** Persist the generated secret + broadcaster id. Defaults to saveChannelCredentials. */
   saveCredentials?: typeof saveChannelCredentials;
+  /** Read the workspace's existing shared EventSub secret. */
+  getEventSubSecret?: (channelId: string) => Promise<string | null>;
   /** Clear all Twitch secrets on full disconnect. Defaults to clearAllChannelSecrets. */
   clearCredentials?: (input: { channelId: string; provider: 'twitch' }) => Promise<void>;
   /** Record a created subscription id. Defaults to a ProviderSubscription upsert. */
@@ -134,6 +140,14 @@ function resolve(deps: TwitchProvisionDeps): Required<Omit<TwitchProvisionDeps, 
     generateSecret: deps.generateSecret ?? (() => randomBytes(32).toString('hex')),
     getAppToken: deps.getAppToken ?? getTwitchAppAccessToken,
     saveCredentials: deps.saveCredentials ?? saveChannelCredentials,
+    getEventSubSecret:
+      deps.getEventSubSecret ??
+      ((channelId) =>
+        getChannelDecryptedSecret({
+          channelId,
+          provider: 'twitch',
+          key: 'twitch.eventsub_secret',
+        })),
     clearCredentials:
       deps.clearCredentials ??
       ((input) => clearAllChannelSecrets({ channelId: input.channelId, provider: input.provider })),
@@ -241,12 +255,12 @@ export interface TwitchProvisionResult {
 }
 
 /**
- * Provision Twitch EventSub for a channel. Idempotent: removes any
- * previously-tracked subscriptions first (their secret is being rotated),
- * writes a fresh EventSub secret + broadcaster id, then creates one webhook
- * subscription per supported type. Individual subscription failures (e.g. a
- * scope the user declined) are collected and returned, never thrown, so a
- * partial grant still yields a working subset.
+ * Provision Twitch EventSub for a broadcaster in a workspace. The first
+ * linked broadcaster creates the workspace's shared webhook secret. Further
+ * broadcasters reuse that secret and append subscriptions, preserving alerts
+ * for channels that are already linked. Individual subscription failures
+ * (including Twitch's conflict response for an existing subscription) are
+ * collected and returned without aborting the remaining types.
  */
 export async function provisionTwitchEventSub(
   input: { channelId: string; broadcasterUserId: string },
@@ -261,17 +275,19 @@ export async function provisionTwitchEventSub(
     throw new Error('Twitch app credentials are not configured (TWITCH_CLIENT_ID)');
   }
 
-  // Rotate: tear down any existing subscriptions before minting a new secret
-  // (the old subscriptions carry the old secret and would fail verification).
-  await removeRemoteSubscriptions(input.channelId, token, clientId, d);
-
-  const secret = d.generateSecret();
-  await d.saveCredentials({
-    channelId: input.channelId,
-    provider: 'twitch',
-    secrets: { 'twitch.eventsub_secret': secret },
-    publicFields: { twitchBroadcasterId: input.broadcasterUserId },
-  });
+  let secret = await d.getEventSubSecret(input.channelId);
+  if (!secret) {
+    // Clean up any orphaned tracked subscriptions before creating the first
+    // subscription set with a fresh shared secret.
+    await removeRemoteSubscriptions(input.channelId, token, clientId, d);
+    secret = d.generateSecret();
+    await d.saveCredentials({
+      channelId: input.channelId,
+      provider: 'twitch',
+      secrets: { 'twitch.eventsub_secret': secret },
+      publicFields: { twitchBroadcasterId: input.broadcasterUserId },
+    });
+  }
 
   const result: TwitchProvisionResult = { created: [], failed: [] };
 

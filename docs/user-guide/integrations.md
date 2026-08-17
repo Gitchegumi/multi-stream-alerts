@@ -21,7 +21,7 @@ Duplicate Ko-fi `message_id` values are ignored, and private Ko-fi messages are 
 
 Open **Settings -> Integrations -> Twitch** and click **Connect Twitch**. You are redirected to Twitch to approve access; when you return, GitchAlerts links the account and automatically provisions the EventSub subscriptions (follows, subs, gifts, cheers, raids, charity, and channel-point redemptions) against a global webhook callback. There is nothing to paste.
 
-The card shows the linked account and a **Disconnect** button, which also removes the remote EventSub subscriptions. If GitchAlerts later needs broader permissions, the card shows **Needs reconnect** — click Connect again to re-approve.
+The card shows every linked Twitch channel with its own **Disconnect** button. Use **Add another channel** to connect up to five Twitch channels to the workspace. Disconnecting one channel removes its remote EventSub subscriptions while preserving alerts for the others. If GitchAlerts later needs broader permissions, the card shows **Needs reconnect** — connect the affected account again to re-approve.
 
 ## YouTube
 

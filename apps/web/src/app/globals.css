@@ -336,6 +336,25 @@
     font-size: 14px;
   }
 
+  .legal-copy {
+    color: var(--muted);
+    line-height: 1.75;
+  }
+
+  .legal-copy h2 {
+    margin: 2rem 0 0.5rem;
+    color: var(--brand-soft-white);
+    font-size: 1.25rem;
+  }
+
+  .legal-copy li + li {
+    margin-top: 0.5rem;
+  }
+
+  .legal-copy a {
+    color: var(--accent);
+  }
+
   .small {
     font-size: 13px;
   }

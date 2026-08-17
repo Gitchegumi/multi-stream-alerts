@@ -57,6 +57,8 @@ PUBLIC_BASE_URL=https://<your-alerts-domain>
 # NEXT_PUBLIC_DOCS_URL=
 INGRESS_PUBLIC_BASE_URL=https://<your-alerts-domain>
 NEXTAUTH_URL=https://<your-alerts-domain>
+LEGAL_OPERATOR_NAME=<your-name-or-organization>
+LEGAL_CONTACT_EMAIL=privacy@example.com
 APP_DATA_PATH=/path/to/your/app/data
 UPLOADS_PATH=/path/to/your/app/data/uploads
 UPLOAD_DIR=/app/uploads
@@ -67,6 +69,8 @@ GITCHALERTS_VERSION=v0.1.0
 UPDATE_CHECK_ENABLED=true
 UPDATE_CHECK_REPO=Gitchegumi/multi-stream-alerts
 ```
+
+The public homepage links to `/privacy` and `/terms`. Set the legal operator name and contact email, then review the generic policy text for your deployment before using those URLs in a public OAuth consent screen.
 
 `NEXTAUTH_URL` must match the browser-facing origin used to open the dashboard. For reverse proxy deployments, use `https://<your-alerts-domain>`. For local-only testing without a proxy, use the local origin you are opening in the browser.
 

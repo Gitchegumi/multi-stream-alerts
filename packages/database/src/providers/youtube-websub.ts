@@ -26,7 +26,7 @@ import { saveChannelCredentials, clearAllChannelSecrets } from '../integration-c
 
 const YOUTUBE_HUB_URL = 'https://pubsubhubbub.appspot.com/subscribe';
 const YOUTUBE_DATA_CHANNELS_URL =
-  'https://www.googleapis.com/youtube/v3/channels?part=id&mine=true';
+  'https://www.googleapis.com/youtube/v3/channels?part=id,snippet&mine=true';
 const YOUTUBE_TOPIC_BASE = 'https://www.youtube.com/xml/feeds/videos.xml?channel_id=';
 
 /** Default WebSub lease we request, in seconds (Google caps this). */
@@ -110,26 +110,36 @@ async function defaultDeleteSubscriptionRecords(channelId: string): Promise<void
 // Channel-id resolution
 // ---------------------------------------------------------------------------
 
-/**
- * Resolve the caller's YouTube channel id (UC…) from an OAuth access token
- * carrying the `youtube.readonly` scope. Returns null if the account has no
- * channel or the API call fails.
- */
-export async function resolveYoutubeChannelId(
+export type YoutubeChannelIdentity = { id: string; title: string | null };
+
+/** Resolve the caller's YouTube channel id and public title. */
+export async function resolveYoutubeChannel(
   accessToken: string,
   deps: YoutubeProvisionDeps = {},
-): Promise<string | null> {
+): Promise<YoutubeChannelIdentity | null> {
   const fetchFn = deps.fetchFn ?? fetch;
   try {
     const res = await fetchFn(YOUTUBE_DATA_CHANNELS_URL, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!res.ok) return null;
-    const json = (await res.json()) as { items?: Array<{ id?: string }> };
-    return json.items?.[0]?.id ?? null;
+    const json = (await res.json()) as {
+      items?: Array<{ id?: string; snippet?: { title?: string } }>;
+    };
+    const channel = json.items?.[0];
+    if (!channel?.id) return null;
+    return { id: channel.id, title: channel.snippet?.title?.trim() || null };
   } catch {
     return null;
   }
+}
+
+/** Backward-compatible id-only helper used by existing callers. */
+export async function resolveYoutubeChannelId(
+  accessToken: string,
+  deps: YoutubeProvisionDeps = {},
+): Promise<string | null> {
+  return (await resolveYoutubeChannel(accessToken, deps))?.id ?? null;
 }
 
 // ---------------------------------------------------------------------------

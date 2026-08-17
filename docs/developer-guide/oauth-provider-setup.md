@@ -10,6 +10,8 @@ Set the public origins before registering either provider:
 NEXTAUTH_URL=https://alerts.example.com
 PUBLIC_BASE_URL=https://alerts.example.com
 INGRESS_PUBLIC_BASE_URL=https://alerts.example.com
+LEGAL_OPERATOR_NAME=Example Creator LLC
+LEGAL_CONTACT_EMAIL=privacy@example.com
 ```
 
 `NEXTAUTH_URL` is the browser-facing dashboard origin. `INGRESS_PUBLIC_BASE_URL` is the publicly reachable webhook origin and falls back to `PUBLIC_BASE_URL` when omitted. Production provider URLs must use HTTPS. If the dashboard and ingress services share a domain, configure the reverse proxy to send `/api/auth/*` to the web service and `/api/webhooks/*` to the ingress service.
@@ -24,6 +26,8 @@ The resulting URLs are:
 | YouTube WebSub callback  | `https://alerts.example.com/api/webhooks/youtube/<workspace-slug>` | Ingress service |
 
 Register the OAuth redirect URLs in the provider consoles. GitchAlerts creates the EventSub and WebSub callbacks automatically when a user connects an account; do not register them as OAuth redirect URLs.
+
+GitchAlerts also serves a public, descriptive homepage at `NEXTAUTH_URL`, a privacy policy at `NEXTAUTH_URL/privacy`, and terms at `NEXTAUTH_URL/terms`. The footer links to both legal pages. Customize the operator name and contact above, review the policy text for the deployment's actual hosting and data practices, and keep all three URLs publicly accessible without signing in.
 
 ## Twitch
 
@@ -72,7 +76,7 @@ Restart or recreate the web service so it reads the new environment. Then:
 1. Sign in to GitchAlerts and open **Dashboard -> [workspace] -> Settings -> Integrations**.
 2. Confirm the Twitch card no longer says **Unavailable**.
 3. Select **Connect Twitch**, authorize the channel owner account, and return to GitchAlerts.
-4. Confirm the card shows the linked account and a **Connected** badge. GitchAlerts generates the EventSub secret and provisions the supported subscriptions automatically.
+4. Confirm the card shows the linked account and a **Connected** badge. GitchAlerts generates the EventSub secret and provisions the supported subscriptions automatically. Use **Add another channel** to link additional Twitch channels; the workspace shares one webhook secret while keeping a separate subscription set for each broadcaster.
 
 ## Google / YouTube
 
@@ -80,7 +84,16 @@ Restart or recreate the web service so it reads the new environment. Then:
 
 1. Open the [Google Cloud Console](https://console.cloud.google.com/) and create or select a project for this GitchAlerts instance.
 2. Go to **APIs & Services -> Library**, find **YouTube Data API v3**, and select **Enable**.
-3. Open **Google Auth Platform -> Branding** and configure the app name, user support email, and developer contact email. Public deployments should also provide the requested homepage, privacy-policy, terms-of-service, and authorized-domain information.
+3. Open **Google Auth Platform -> Branding** and configure the app name, user support email, and developer contact email. Use these public URLs, replacing the example origin with `NEXTAUTH_URL`:
+
+   | Branding field        | URL                                  |
+   | --------------------- | ------------------------------------ |
+   | Application home page | `https://alerts.example.com/`        |
+   | Privacy policy        | `https://alerts.example.com/privacy` |
+   | Terms of service      | `https://alerts.example.com/terms`   |
+
+   The app name and branding must match the deployed homepage. Add the root domain under **Authorized domains** and verify its ownership in Google Search Console using a Google Cloud project owner or editor account.
+
 4. Open **Google Auth Platform -> Audience**:
    - Choose **Internal** only when every linking user belongs to the same Google Workspace organization.
    - Otherwise choose **External**. While the app is in **Testing**, add every Google account that will link a YouTube channel as a test user.
@@ -115,6 +128,8 @@ An External app in **Testing** is sufficient for initial or private testing, so 
 - A test user who manages a YouTube Brand Account can authorize that Brand Account.
 
 Set the app to **In production** when users beyond the test-user list need access. `youtube.readonly` accesses private user data and appears as a sensitive scope in Google Auth Platform. An unverified production app can show an **unverified app** warning and is subject to Google's user cap. Complete Google's branding and data-access verification to remove those restrictions for a stable public deployment. Google may require verified domains, a privacy policy, a scope justification, and a video demonstrating the complete authorization flow.
+
+Before submitting, open the homepage, privacy policy, and terms in a signed-out browser. Confirm that the privacy URL on the OAuth consent screen exactly matches the footer link and that the policy explains how Google data is accessed, used, stored, shared, retained, and deleted. The verification demonstration video should show the complete OAuth consent screen in English, the Connect YouTube flow, and the linked channel appearing in GitchAlerts.
 
 An Internal app restricted to one Google Workspace organization normally does not need public-user verification, but it cannot be used by accounts outside that organization.
 

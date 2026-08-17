@@ -13,9 +13,11 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import {
   prisma,
+  provisionTwitchEventSub,
   teardownTwitchEventSub,
   teardownYoutubeWebSub,
 } from '@multi-stream-alerts/database';
+import { encrypt } from '@multi-stream-alerts/shared';
 
 /**
  * GET — list all linked accounts for the authenticated user.
@@ -95,7 +97,15 @@ export async function DELETE(request: NextRequest) {
 
   const updated = await prisma.linkedAccount.update({
     where: { id },
-    data: { isActive: false, isPrimary: false },
+    data: {
+      isActive: false,
+      isPrimary: false,
+      // Disconnecting ends the OAuth grant's use in GitchAlerts. Remove the
+      // locally stored token material while retaining non-secret metadata.
+      encryptedAccessToken: encrypt(''),
+      encryptedRefreshToken: null,
+      tokenExpiresAt: null,
+    },
     select: {
       id: true,
       platform: true,
@@ -137,11 +147,27 @@ async function teardownProviderIfLastAccount(
   const remaining = await prisma.linkedAccount.count({
     where: { channelId, platform, isActive: true },
   });
-  if (remaining > 0) return;
-
   if (platform === 'twitch') {
+    if (remaining > 0) {
+      // Twitch subscriptions share one webhook secret per workspace. Rebuild
+      // the set after removing one account so the disconnected broadcaster's
+      // remote subscriptions stop without affecting the remaining channels.
+      const accounts = await prisma.linkedAccount.findMany({
+        where: { channelId, platform: 'twitch', isActive: true },
+        select: { platformAccountId: true },
+      });
+      await teardownTwitchEventSub({ channelId });
+      for (const linked of accounts) {
+        await provisionTwitchEventSub({
+          channelId,
+          broadcasterUserId: linked.platformAccountId,
+        });
+      }
+      return;
+    }
     await teardownTwitchEventSub({ channelId });
   } else if (platform === 'youtube') {
+    if (remaining > 0) return;
     const channel = await prisma.channel.findUnique({
       where: { id: channelId },
       select: { slug: true },

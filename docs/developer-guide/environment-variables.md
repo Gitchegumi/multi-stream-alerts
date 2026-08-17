@@ -14,6 +14,7 @@ Only `.env.example` is committed. Keep `.env` and any `.env.*.local` files priva
 - `INGRESS_PUBLIC_BASE_URL`: public origin for the webhook ingress service.
 - `NEXTAUTH_URL`: canonical dashboard origin used for auth callbacks. It must match the browser-facing origin you use to open the dashboard.
 - `NEXT_PUBLIC_DOCS_URL`: optional external documentation URL shown in dashboard navigation. When unset, the dashboard links to the docs in this repository.
+- `LEGAL_OPERATOR_NAME`, `LEGAL_CONTACT_EMAIL`: operator identity and contact shown on the public privacy policy and terms pages. Set both before publishing an OAuth app or accepting public users.
 - `WEB_PORT`: host port mapped to the web container (default `3000`).
 - `INGRESS_PORT`: host port mapped to the ingress container (default `8080`).
 
