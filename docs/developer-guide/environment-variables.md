@@ -14,6 +14,7 @@ Only `.env.example` is committed. Keep `.env` and any `.env.*.local` files priva
 - `INGRESS_PUBLIC_BASE_URL`: public origin for the webhook ingress service.
 - `NEXTAUTH_URL`: canonical dashboard origin used for auth callbacks. It must match the browser-facing origin you use to open the dashboard.
 - `NEXT_PUBLIC_DOCS_URL`: optional external documentation URL shown in dashboard navigation. When unset, the dashboard links to the docs in this repository.
+- `LEGAL_OPERATOR_NAME`, `LEGAL_CONTACT_EMAIL`: operator identity and contact shown on the public privacy policy and terms pages. Set both before publishing an OAuth app or accepting public users.
 - `WEB_PORT`: host port mapped to the web container (default `3000`).
 - `INGRESS_PORT`: host port mapped to the ingress container (default `8080`).
 
@@ -60,7 +61,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
 ## Twitch / YouTube OAuth provider apps
 
-Follow [OAuth Provider Setup](oauth-provider-setup.md) to create both applications, register the exact redirect URLs, and choose the appropriate Google publishing mode.
+Follow [Twitch and YouTube OAuth Setup](oauth-provider-setup.md) to create both applications, register the exact redirect URLs, and choose the appropriate Google publishing mode.
 
 Twitch and YouTube are connected exclusively through OAuth — end users click **Connect** and the backend auto-provisions the EventSub / WebSub subscriptions. There are no per-workspace developer credential fields for these providers; the app-level credentials below are admin/deployment configuration.
 

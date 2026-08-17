@@ -26,7 +26,11 @@
 
 import { randomBytes } from 'node:crypto';
 import { prisma } from '../client';
-import { saveChannelCredentials, clearAllChannelSecrets } from '../integration-credentials';
+import {
+  saveChannelCredentials,
+  clearAllChannelSecrets,
+  getChannelDecryptedSecret,
+} from '../integration-credentials';
 
 const TWITCH_TOKEN_URL = 'https://id.twitch.tv/oauth2/token';
 const TWITCH_EVENTSUB_URL = 'https://api.twitch.tv/helix/eventsub/subscriptions';
@@ -109,18 +113,24 @@ export interface TwitchProvisionDeps {
   getAppToken?: (deps: TwitchProvisionDeps) => Promise<string>;
   /** Persist the generated secret + broadcaster id. Defaults to saveChannelCredentials. */
   saveCredentials?: typeof saveChannelCredentials;
+  /** Read the workspace's existing shared EventSub secret. */
+  getEventSubSecret?: (channelId: string) => Promise<string | null>;
   /** Clear all Twitch secrets on full disconnect. Defaults to clearAllChannelSecrets. */
   clearCredentials?: (input: { channelId: string; provider: 'twitch' }) => Promise<void>;
   /** Record a created subscription id. Defaults to a ProviderSubscription upsert. */
   recordSubscription?: (input: {
     channelId: string;
+    providerAccountId: string;
     providerSubscriptionId: string;
     type: string;
   }) => Promise<void>;
   /** List tracked subscription ids for teardown. Defaults to a ProviderSubscription query. */
-  listSubscriptions?: (channelId: string) => Promise<Array<{ providerSubscriptionId: string }>>;
+  listSubscriptions?: (
+    channelId: string,
+    providerAccountId?: string,
+  ) => Promise<Array<{ providerSubscriptionId: string }>>;
   /** Delete tracked subscription rows. Defaults to a ProviderSubscription deleteMany. */
-  deleteSubscriptionRecords?: (channelId: string) => Promise<void>;
+  deleteSubscriptionRecords?: (channelId: string, providerAccountId?: string) => Promise<void>;
   /** Environment (for client id/secret + callback base). Defaults to process.env. */
   env?: NodeJS.ProcessEnv;
 }
@@ -134,6 +144,14 @@ function resolve(deps: TwitchProvisionDeps): Required<Omit<TwitchProvisionDeps, 
     generateSecret: deps.generateSecret ?? (() => randomBytes(32).toString('hex')),
     getAppToken: deps.getAppToken ?? getTwitchAppAccessToken,
     saveCredentials: deps.saveCredentials ?? saveChannelCredentials,
+    getEventSubSecret:
+      deps.getEventSubSecret ??
+      ((channelId) =>
+        getChannelDecryptedSecret({
+          channelId,
+          provider: 'twitch',
+          key: 'twitch.eventsub_secret',
+        })),
     clearCredentials:
       deps.clearCredentials ??
       ((input) => clearAllChannelSecrets({ channelId: input.channelId, provider: input.provider })),
@@ -146,6 +164,7 @@ function resolve(deps: TwitchProvisionDeps): Required<Omit<TwitchProvisionDeps, 
 
 async function defaultRecordSubscription(input: {
   channelId: string;
+  providerAccountId: string;
   providerSubscriptionId: string;
   type: string;
 }): Promise<void> {
@@ -154,25 +173,36 @@ async function defaultRecordSubscription(input: {
     create: {
       channelId: input.channelId,
       provider: 'twitch',
+      providerAccountId: input.providerAccountId,
       providerSubscriptionId: input.providerSubscriptionId,
       type: input.type,
       status: 'enabled',
     },
-    update: { status: 'enabled', type: input.type },
+    update: {
+      status: 'enabled',
+      type: input.type,
+      providerAccountId: input.providerAccountId,
+    },
   });
 }
 
 async function defaultListSubscriptions(
   channelId: string,
+  providerAccountId?: string,
 ): Promise<Array<{ providerSubscriptionId: string }>> {
   return prisma.providerSubscription.findMany({
-    where: { channelId, provider: 'twitch' },
+    where: { channelId, provider: 'twitch', ...(providerAccountId && { providerAccountId }) },
     select: { providerSubscriptionId: true },
   });
 }
 
-async function defaultDeleteSubscriptionRecords(channelId: string): Promise<void> {
-  await prisma.providerSubscription.deleteMany({ where: { channelId, provider: 'twitch' } });
+async function defaultDeleteSubscriptionRecords(
+  channelId: string,
+  providerAccountId?: string,
+): Promise<void> {
+  await prisma.providerSubscription.deleteMany({
+    where: { channelId, provider: 'twitch', ...(providerAccountId && { providerAccountId }) },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -241,12 +271,12 @@ export interface TwitchProvisionResult {
 }
 
 /**
- * Provision Twitch EventSub for a channel. Idempotent: removes any
- * previously-tracked subscriptions first (their secret is being rotated),
- * writes a fresh EventSub secret + broadcaster id, then creates one webhook
- * subscription per supported type. Individual subscription failures (e.g. a
- * scope the user declined) are collected and returned, never thrown, so a
- * partial grant still yields a working subset.
+ * Provision Twitch EventSub for a broadcaster in a workspace. The first
+ * linked broadcaster creates the workspace's shared webhook secret. Further
+ * broadcasters reuse that secret and append subscriptions, preserving alerts
+ * for channels that are already linked. Individual subscription failures
+ * (including Twitch's conflict response for an existing subscription) are
+ * collected and returned without aborting the remaining types.
  */
 export async function provisionTwitchEventSub(
   input: { channelId: string; broadcasterUserId: string },
@@ -261,17 +291,19 @@ export async function provisionTwitchEventSub(
     throw new Error('Twitch app credentials are not configured (TWITCH_CLIENT_ID)');
   }
 
-  // Rotate: tear down any existing subscriptions before minting a new secret
-  // (the old subscriptions carry the old secret and would fail verification).
-  await removeRemoteSubscriptions(input.channelId, token, clientId, d);
-
-  const secret = d.generateSecret();
-  await d.saveCredentials({
-    channelId: input.channelId,
-    provider: 'twitch',
-    secrets: { 'twitch.eventsub_secret': secret },
-    publicFields: { twitchBroadcasterId: input.broadcasterUserId },
-  });
+  let secret = await d.getEventSubSecret(input.channelId);
+  if (!secret) {
+    // Clean up any orphaned tracked subscriptions before creating the first
+    // subscription set with a fresh shared secret.
+    await removeRemoteSubscriptions(input.channelId, token, clientId, d);
+    secret = d.generateSecret();
+    await d.saveCredentials({
+      channelId: input.channelId,
+      provider: 'twitch',
+      secrets: { 'twitch.eventsub_secret': secret },
+      publicFields: { twitchBroadcasterId: input.broadcasterUserId },
+    });
+  }
 
   const result: TwitchProvisionResult = { created: [], failed: [] };
 
@@ -300,6 +332,7 @@ export async function provisionTwitchEventSub(
         if (id) {
           await d.recordSubscription({
             channelId: input.channelId,
+            providerAccountId: input.broadcasterUserId,
             providerSubscriptionId: id,
             type: sub.type,
           });
@@ -324,8 +357,9 @@ export async function provisionTwitchEventSub(
 
 /**
  * Tear down all Twitch EventSub subscriptions for a channel and clear its
- * stored EventSub secret + broadcaster id. Called on disconnect. Best-effort
- * on the remote deletes; always clears local state.
+ * stored EventSub secret + broadcaster id. Remote deletion is fail-closed:
+ * credentials and local tracking remain intact when Twitch rejects a delete
+ * so the operation can be retried without rotating the shared secret.
  */
 export async function teardownTwitchEventSub(
   input: { channelId: string },
@@ -334,22 +368,31 @@ export async function teardownTwitchEventSub(
   const d = resolve(deps);
   const clientId = d.env.TWITCH_CLIENT_ID;
 
-  try {
-    if (clientId) {
-      const token = await d.getAppToken(deps);
-      await removeRemoteSubscriptions(input.channelId, token, clientId, d);
-    } else {
-      // No app creds to talk to Twitch — still drop local tracking rows.
-      await d.deleteSubscriptionRecords(input.channelId);
-    }
-  } catch (err) {
-    console.warn('twitch eventsub teardown: remote delete failed', {
-      channelId: input.channelId,
-      reason: errorReason(err),
-    });
+  if (!clientId) {
+    throw new Error('Twitch app credentials are not configured (TWITCH_CLIENT_ID)');
   }
 
+  const token = await d.getAppToken(deps);
+  await removeRemoteSubscriptions(input.channelId, token, clientId, d);
   await d.clearCredentials({ channelId: input.channelId, provider: 'twitch' });
+}
+
+/**
+ * Remove only one broadcaster's EventSub subscriptions. The workspace secret
+ * is deliberately preserved because every linked broadcaster shares it.
+ */
+export async function teardownTwitchBroadcasterEventSub(
+  input: { channelId: string; broadcasterUserId: string },
+  deps: TwitchProvisionDeps = {},
+): Promise<void> {
+  const d = resolve(deps);
+  const clientId = d.env.TWITCH_CLIENT_ID;
+  if (!clientId) {
+    throw new Error('Twitch app credentials are not configured (TWITCH_CLIENT_ID)');
+  }
+
+  const token = await d.getAppToken(deps);
+  await removeRemoteSubscriptions(input.channelId, token, clientId, d, input.broadcasterUserId);
 }
 
 /**
@@ -361,25 +404,33 @@ async function removeRemoteSubscriptions(
   token: string,
   clientId: string,
   d: ReturnType<typeof resolve>,
+  providerAccountId?: string,
 ): Promise<void> {
-  const existing = await d.listSubscriptions(channelId);
+  const existing = await d.listSubscriptions(channelId, providerAccountId);
+  const failures: string[] = [];
   for (const sub of existing) {
     try {
-      await d.fetchFn(
+      const response = await d.fetchFn(
         `${TWITCH_EVENTSUB_URL}?id=${encodeURIComponent(sub.providerSubscriptionId)}`,
         {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}`, 'Client-Id': clientId },
         },
       );
+      // A prior partial attempt may already have removed this subscription.
+      if (!response.ok && response.status !== 404) {
+        failures.push(`http_${response.status}`);
+      }
     } catch (err) {
-      console.warn('twitch eventsub: failed to delete subscription', {
-        channelId,
-        reason: errorReason(err),
-      });
+      failures.push(errorReason(err));
     }
   }
-  await d.deleteSubscriptionRecords(channelId);
+
+  if (failures.length > 0) {
+    throw new Error(`Twitch rejected ${failures.length} EventSub deletion(s)`);
+  }
+
+  await d.deleteSubscriptionRecords(channelId, providerAccountId);
 }
 
 function buildCallbackUrl(env: NodeJS.ProcessEnv): string {

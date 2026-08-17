@@ -4,7 +4,7 @@ GitchAlerts turns events from Ko-fi, Twitch, and YouTube into alerts on your can
 
 Twitch and YouTube connect through OAuth: you click **Connect**, sign in to the provider, approve access, and GitchAlerts links the account and sets up event delivery for you. You never paste EventSub secrets, Client IDs, Client Secrets, or stream keys. Ko-fi has no OAuth flow, so it keeps a small manual token field. Any stored secrets are encrypted at rest and are never sent back to the browser.
 
-The app-level Twitch/YouTube provider credentials are configured once by the self-hosting administrator via environment variables. Administrators can follow [OAuth Provider Setup](../developer-guide/oauth-provider-setup.md); the complete variable reference is under [Environment Variables](../developer-guide/environment-variables.md). If the credentials are not set, the Connect buttons show an **Unavailable** state.
+The app-level Twitch/YouTube provider credentials are configured once by the self-hosting administrator via environment variables. Administrators can follow [Twitch and YouTube OAuth Setup](../developer-guide/oauth-provider-setup.md); the complete variable reference is under [Environment Variables](../developer-guide/environment-variables.md). If the credentials are not set, the Connect buttons show an **Unavailable** state.
 
 ## Ko-fi
 
@@ -21,7 +21,7 @@ Duplicate Ko-fi `message_id` values are ignored, and private Ko-fi messages are 
 
 Open **Settings -> Integrations -> Twitch** and click **Connect Twitch**. You are redirected to Twitch to approve access; when you return, GitchAlerts links the account and automatically provisions the EventSub subscriptions (follows, subs, gifts, cheers, raids, charity, and channel-point redemptions) against a global webhook callback. There is nothing to paste.
 
-The card shows the linked account and a **Disconnect** button, which also removes the remote EventSub subscriptions. If GitchAlerts later needs broader permissions, the card shows **Needs reconnect** — click Connect again to re-approve.
+The card shows every linked Twitch channel with its own **Disconnect** button. Use **Add another channel** to connect up to five Twitch channels to the workspace. Disconnecting one channel removes its remote EventSub subscriptions while preserving alerts for the others. If GitchAlerts later needs broader permissions, the card shows **Needs reconnect** — connect the affected account again to re-approve.
 
 ## YouTube
 

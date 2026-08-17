@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 import type { getVersionStatus } from '@/lib/update-check';
 import { NavBar } from './NavBar';
+import { SiteFooter } from './SiteFooter';
 
 type DashboardUser = {
   email: string;
@@ -24,13 +25,17 @@ export function DashboardShell({
 }) {
   const pathname = usePathname();
   const isDashboard = pathname?.startsWith('/dashboard') ?? false;
+  const isOverlay = pathname?.startsWith('/overlay/') ?? false;
+
+  if (isOverlay) return children;
 
   return (
-    <>
+    <div className="flex min-h-screen flex-col">
       {isDashboard && user && (
         <NavBar user={user} defaultChannelSlug={defaultChannelSlug} versionStatus={versionStatus} />
       )}
-      {children}
-    </>
+      <div className="flex-1">{children}</div>
+      <SiteFooter />
+    </div>
   );
 }

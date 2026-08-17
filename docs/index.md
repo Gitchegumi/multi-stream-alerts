@@ -19,7 +19,7 @@ GitchAlerts is a self-hosted alert and canvas system for creators who want strea
 - [Architecture](developer-guide/architecture.md)
 - [Local development](developer-guide/local-development.md)
 - [Environment variables](developer-guide/environment-variables.md)
-- [OAuth provider setup](developer-guide/oauth-provider-setup.md)
+- [Twitch and YouTube OAuth setup](developer-guide/oauth-provider-setup.md)
 - [Database](developer-guide/database.md)
 - [Auth](developer-guide/auth.md)
 - [Webhooks](developer-guide/webhooks.md)

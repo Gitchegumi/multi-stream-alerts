@@ -143,7 +143,7 @@ export function IntegrationCard({
           <div>
             <div className="flex items-center gap-2">
               <span className="font-semibold text-gray-900">
-                {account.platformAccountName ?? account.platformAccountId}
+                {account.platformAccountName ?? `${PLATFORM_LABELS[platform]} account`}
               </span>
               {account.isPrimary && (
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
@@ -151,7 +151,9 @@ export function IntegrationCard({
                 </span>
               )}
             </div>
-            <p className="text-xs text-gray-500">{account.platformAccountId}</p>
+            {!account.platformAccountName && (
+              <p className="text-xs text-gray-500">Reconnect to refresh the account name</p>
+            )}
             <div className="mt-1 flex items-center gap-1.5">
               <span className="inline-block h-2 w-2 rounded-full bg-green-500"></span>
               <span className="text-xs text-green-600">Active</span>
@@ -183,8 +185,8 @@ export function IntegrationCard({
         <div className="mt-4 rounded-lg bg-gray-50 p-4">
           <p className="mb-3 text-sm text-gray-700">
             Disconnect {PLATFORM_LABELS[platform]} account{' '}
-            <strong>{account.platformAccountName ?? account.platformAccountId}</strong>? This will
-            stop all alerts for this account.
+            <strong>{account.platformAccountName ?? `${PLATFORM_LABELS[platform]} account`}</strong>
+            ? This will stop all alerts for this account.
           </p>
           <div className="flex gap-2">
             <button

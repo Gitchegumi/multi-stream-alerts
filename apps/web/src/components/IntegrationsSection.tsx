@@ -19,6 +19,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
+import { MAX_TWITCH_CHANNELS_PER_WORKSPACE } from '@/lib/linked-account-policy';
 import { type CredentialStatus, type IntegrationProvider } from '@multi-stream-alerts/database';
 import { IntegrationSettingsForm } from '@/components/IntegrationSettingsForm';
 import { PlatformIcon } from '@/components/PlatformIcon';
@@ -183,7 +184,7 @@ export function IntegrationsSection({
   };
 
   const handleDisconnect = async (account: LinkedAccount) => {
-    const label = account.platformAccountName ?? account.platformAccountId;
+    const label = account.platformAccountName ?? `${capitalize(account.platform)} account`;
     if (!confirm(`Disconnect ${account.platform} account "${label}"? This stops its alerts.`)) {
       return;
     }
@@ -224,7 +225,7 @@ export function IntegrationsSection({
     }
   };
 
-  const twitchAccount = accounts.find((a) => a.platform === 'twitch' && a.isActive);
+  const twitchAccounts = accounts.filter((a) => a.platform === 'twitch' && a.isActive);
   const youtubeAccounts = accounts.filter((a) => a.platform === 'youtube' && a.isActive);
 
   const getStatus = (provider: IntegrationProvider): CredentialStatus =>
@@ -242,7 +243,7 @@ export function IntegrationsSection({
   // OAuth grant is stale (e.g. scopes were expanded) — surface "reconnect".
   const twitchTone: BadgeTone = !twitchOAuthEnabled
     ? 'unavailable'
-    : twitchAccount
+    : twitchAccounts.length > 0
       ? twitchStatus.isEnabled
         ? 'connected'
         : 'reconnect'
@@ -287,13 +288,27 @@ export function IntegrationsSection({
             <AdminNote provider="Twitch" envVars={['TWITCH_CLIENT_ID', 'TWITCH_CLIENT_SECRET']} />
           ) : isLoadingAccounts ? (
             <CardSkeleton />
-          ) : twitchAccount ? (
-            <AccountRow
-              account={twitchAccount}
-              busy={busyId === twitchAccount.id}
-              onDisconnect={() => handleDisconnect(twitchAccount)}
-              canManage={canManage}
-            />
+          ) : twitchAccounts.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              {twitchAccounts.map((account) => (
+                <AccountRow
+                  key={account.id}
+                  account={account}
+                  busy={busyId === account.id}
+                  onDisconnect={() => handleDisconnect(account)}
+                  canManage={canManage}
+                />
+              ))}
+              {canManage && twitchAccounts.length < MAX_TWITCH_CHANNELS_PER_WORKSPACE && (
+                <button
+                  type="button"
+                  className="link-button self-start text-sm"
+                  onClick={() => handleConnect('twitch')}
+                >
+                  + Add another channel
+                </button>
+              )}
+            </div>
           ) : (
             <ConnectPrompt
               note="Auto-configures EventSub — no secrets to enter."
@@ -428,7 +443,7 @@ function AccountRow({
       <div className="min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="truncate font-medium text-soft-white">
-            {account.platformAccountName ?? account.platformAccountId}
+            {account.platformAccountName ?? `${capitalize(account.platform)} account`}
           </span>
           {account.isPrimary && (
             <span className="rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
@@ -436,7 +451,9 @@ function AccountRow({
             </span>
           )}
         </div>
-        <p className="truncate text-xs text-muted">{account.platformAccountId}</p>
+        {!account.platformAccountName && (
+          <p className="truncate text-xs text-muted">Reconnect to refresh the account name</p>
+        )}
       </div>
       {canManage && (
         <div className="flex shrink-0 items-center gap-1.5">

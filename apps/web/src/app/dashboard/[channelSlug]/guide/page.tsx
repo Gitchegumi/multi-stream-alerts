@@ -23,6 +23,7 @@ const guideOrder = [
   'developer-guide/local-development',
   'developer-guide/deployment',
   'developer-guide/environment-variables',
+  'developer-guide/oauth-provider-setup',
   'developer-guide/auth',
   'developer-guide/database',
   'developer-guide/overlays-and-canvases',

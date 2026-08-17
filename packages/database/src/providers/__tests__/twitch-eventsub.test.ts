@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   provisionTwitchEventSub,
+  teardownTwitchBroadcasterEventSub,
   teardownTwitchEventSub,
   getTwitchAppAccessToken,
   __resetTwitchAppTokenCacheForTesting,
@@ -48,7 +49,11 @@ test('getTwitchAppAccessToken throws when app creds are missing', async () => {
 });
 
 test('provisionTwitchEventSub writes the secret, creates all subscriptions, and records ids', async () => {
-  const created: Array<{ providerSubscriptionId: string; type: string }> = [];
+  const created: Array<{
+    providerAccountId: string;
+    providerSubscriptionId: string;
+    type: string;
+  }> = [];
   let savedSecret: string | undefined;
   let savedBroadcaster: string | undefined;
   const callbacks: string[] = [];
@@ -72,8 +77,13 @@ test('provisionTwitchEventSub writes the secret, creates all subscriptions, and 
       savedBroadcaster = input.publicFields?.twitchBroadcasterId;
       return {} as never;
     }) as unknown as TwitchProvisionDeps['saveCredentials'],
+    getEventSubSecret: async () => null,
     recordSubscription: async (input) => {
-      created.push({ providerSubscriptionId: input.providerSubscriptionId, type: input.type });
+      created.push({
+        providerAccountId: input.providerAccountId,
+        providerSubscriptionId: input.providerSubscriptionId,
+        type: input.type,
+      });
     },
     listSubscriptions: async () => [],
     deleteSubscriptionRecords: async () => {},
@@ -89,6 +99,7 @@ test('provisionTwitchEventSub writes the secret, creates all subscriptions, and 
   assert.equal(result.created.length, SUPPORTED_TWITCH_SUBSCRIPTIONS.length);
   assert.equal(result.failed.length, 0);
   assert.equal(created.length, SUPPORTED_TWITCH_SUBSCRIPTIONS.length);
+  assert.ok(created.every((subscription) => subscription.providerAccountId === '12345'));
   assert.ok(
     callbacks.every((c) => c === 'https://alerts.example.com/api/webhooks/twitch'),
     'all subscriptions use the ingress callback',
@@ -108,6 +119,7 @@ test('provisionTwitchEventSub records per-type failures without aborting', async
       return jsonResponse(202, { data: [{ id: `sub-${n}` }] });
     }) as unknown as typeof fetch,
     saveCredentials: (async () => ({}) as never) as TwitchProvisionDeps['saveCredentials'],
+    getEventSubSecret: async () => null,
     recordSubscription: async () => {},
     listSubscriptions: async () => [],
     deleteSubscriptionRecords: async () => {},
@@ -123,7 +135,7 @@ test('provisionTwitchEventSub records per-type failures without aborting', async
   assert.equal(result.created.length, SUPPORTED_TWITCH_SUBSCRIPTIONS.length - 1);
 });
 
-test('provisionTwitchEventSub tears down existing subscriptions before rotating the secret', async () => {
+test('provisionTwitchEventSub tears down orphaned subscriptions before creating the first secret', async () => {
   const deleted: string[] = [];
   let recordsDeleted = false;
   const deps: TwitchProvisionDeps = {
@@ -138,6 +150,7 @@ test('provisionTwitchEventSub tears down existing subscriptions before rotating 
       return jsonResponse(202, { data: [{ id: 'new-sub' }] });
     }) as unknown as typeof fetch,
     saveCredentials: (async () => ({}) as never) as TwitchProvisionDeps['saveCredentials'],
+    getEventSubSecret: async () => null,
     recordSubscription: async () => {},
     listSubscriptions: async () => [{ providerSubscriptionId: 'old-sub-1' }],
     deleteSubscriptionRecords: async () => {
@@ -152,6 +165,41 @@ test('provisionTwitchEventSub tears down existing subscriptions before rotating 
     'existing subscription should be deleted remotely',
   );
   assert.ok(recordsDeleted, 'local tracking rows should be cleared before recreating');
+});
+
+test('provisionTwitchEventSub reuses the shared secret when adding another broadcaster', async () => {
+  const deleted: string[] = [];
+  const secrets: string[] = [];
+  let credentialsWritten = false;
+  const deps: TwitchProvisionDeps = {
+    env: ENV,
+    getAppToken: async () => 'app-token',
+    getEventSubSecret: async () => 'shared-secret',
+    fetchFn: (async (url: string, init: RequestInit) => {
+      if (init.method === 'DELETE') deleted.push(url);
+      if (init.method === 'POST') {
+        const body = JSON.parse(String(init.body)) as { transport: { secret: string } };
+        secrets.push(body.transport.secret);
+      }
+      return jsonResponse(202, { data: [{ id: `sub-${secrets.length}` }] });
+    }) as unknown as typeof fetch,
+    saveCredentials: (async () => {
+      credentialsWritten = true;
+      return {} as never;
+    }) as TwitchProvisionDeps['saveCredentials'],
+    recordSubscription: async () => {},
+    listSubscriptions: async () => [{ providerSubscriptionId: 'existing-sub' }],
+    deleteSubscriptionRecords: async () => {},
+  };
+
+  await provisionTwitchEventSub(
+    { channelId: 'chan-1', broadcasterUserId: 'second-broadcaster' },
+    deps,
+  );
+
+  assert.equal(deleted.length, 0, 'existing broadcaster subscriptions must be preserved');
+  assert.equal(credentialsWritten, false, 'the shared secret must not be rotated');
+  assert.ok(secrets.every((secret) => secret === 'shared-secret'));
 });
 
 test('teardownTwitchEventSub deletes remote subscriptions and clears credentials', async () => {
@@ -175,4 +223,57 @@ test('teardownTwitchEventSub deletes remote subscriptions and clears credentials
 
   assert.ok(deleted.some((u) => u.includes('sub-a')));
   assert.ok(cleared, 'stored Twitch secret should be cleared on disconnect');
+});
+
+test('teardownTwitchBroadcasterEventSub removes only the selected broadcaster records', async () => {
+  const listCalls: Array<string | undefined> = [];
+  const deleteCalls: Array<string | undefined> = [];
+  let credentialsCleared = false;
+  const deps: TwitchProvisionDeps = {
+    env: ENV,
+    getAppToken: async () => 'app-token',
+    fetchFn: (async () => jsonResponse(204, {})) as unknown as typeof fetch,
+    listSubscriptions: async (_channelId, providerAccountId) => {
+      listCalls.push(providerAccountId);
+      return [{ providerSubscriptionId: 'selected-sub' }];
+    },
+    deleteSubscriptionRecords: async (_channelId, providerAccountId) => {
+      deleteCalls.push(providerAccountId);
+    },
+    clearCredentials: async () => {
+      credentialsCleared = true;
+    },
+  };
+
+  await teardownTwitchBroadcasterEventSub(
+    { channelId: 'chan-1', broadcasterUserId: 'broadcaster-2' },
+    deps,
+  );
+
+  assert.deepEqual(listCalls, ['broadcaster-2']);
+  assert.deepEqual(deleteCalls, ['broadcaster-2']);
+  assert.equal(credentialsCleared, false, 'the workspace shared secret must be preserved');
+});
+
+test('teardownTwitchBroadcasterEventSub fails closed on a rejected remote delete', async () => {
+  let recordsDeleted = false;
+  const deps: TwitchProvisionDeps = {
+    env: ENV,
+    getAppToken: async () => 'app-token',
+    fetchFn: (async () => jsonResponse(500, {})) as unknown as typeof fetch,
+    listSubscriptions: async () => [{ providerSubscriptionId: 'selected-sub' }],
+    deleteSubscriptionRecords: async () => {
+      recordsDeleted = true;
+    },
+  };
+
+  await assert.rejects(
+    () =>
+      teardownTwitchBroadcasterEventSub(
+        { channelId: 'chan-1', broadcasterUserId: 'broadcaster-2' },
+        deps,
+      ),
+    /rejected 1 EventSub deletion/,
+  );
+  assert.equal(recordsDeleted, false, 'local tracking must remain available for retry');
 });

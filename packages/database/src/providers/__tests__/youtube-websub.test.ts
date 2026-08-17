@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  resolveYoutubeChannel,
   resolveYoutubeChannelId,
   provisionYoutubeWebSub,
   teardownYoutubeWebSub,
@@ -24,6 +25,18 @@ test('resolveYoutubeChannelId returns the first channel id from the Data API', a
     jsonResponse(200, { items: [{ id: 'UC_channel_123' }] })) as unknown as typeof fetch;
   const id = await resolveYoutubeChannelId('access-token', { fetchFn });
   assert.equal(id, 'UC_channel_123');
+});
+
+test('resolveYoutubeChannel returns the channel title used in account settings', async () => {
+  const fetchFn = (async () =>
+    jsonResponse(200, {
+      items: [{ id: 'UC_channel_123', snippet: { title: 'GitcheGumi Gaming' } }],
+    })) as unknown as typeof fetch;
+
+  assert.deepEqual(await resolveYoutubeChannel('access-token', { fetchFn }), {
+    id: 'UC_channel_123',
+    title: 'GitcheGumi Gaming',
+  });
 });
 
 test('resolveYoutubeChannelId returns null on error or empty result', async () => {
