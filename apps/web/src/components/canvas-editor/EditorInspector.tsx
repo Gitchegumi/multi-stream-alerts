@@ -1,20 +1,17 @@
 'use client';
 
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type FocusEvent,
-  type KeyboardEvent,
-} from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import type { UseCanvasEditorReturn } from './useCanvasEditor';
 import { NumericField } from './NumericField';
 import {
   EVENT_VARIABLES,
+  applyCanvasTextColor,
+  canvasRichTextToPlainText,
+  plainTextToCanvasRichText,
   resolveAssetKind,
+  updateCanvasRichText,
   type CanvasElement,
+  type CanvasRichText,
   type CanvasSettings,
 } from '@/lib/canvas-schema';
 import {
@@ -444,10 +441,7 @@ function ElementInspector({
       {isText || isImage ? (
         <div className="grid gap-2.5 border-b border-line pb-3.5 last:border-b-0 last:pb-0">
           {isText ? (
-            <TemplateField
-              element={element}
-              onChange={(textTemplate) => patchBindings({ textTemplate })}
-            />
+            <TemplateField element={element} onChange={(richText) => patchBindings({ richText })} />
           ) : (
             <>
               <div className="grid min-h-[120px] place-items-center overflow-hidden rounded-md border border-line bg-panel">
@@ -530,7 +524,7 @@ function ElementInspector({
               max={300}
             />
             <label className="grid grid-cols-[1fr_28px] items-center gap-2 text-xs text-muted [&>span:first-child]:font-semibold">
-              <span>Color</span>
+              <span>Default color</span>
               <input
                 className="h-7 w-7 cursor-pointer rounded-sm border border-line bg-transparent p-0"
                 type="color"
@@ -637,22 +631,34 @@ function TemplateField({
   onChange,
 }: {
   element: CanvasElement;
-  onChange: (value: string) => void;
+  onChange: (value: CanvasRichText) => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showTokens, setShowTokens] = useState(false);
   const [tokenIndex, setTokenIndex] = useState(0);
-  const value = element.bindings.textTemplate ?? '';
+  const [selection, setSelection] = useState({ start: 0, end: 0 });
+  const [selectionColor, setSelectionColor] = useState(element.styles.color ?? '#f0f0f0');
+  const content = element.bindings.richText ?? plainTextToCanvasRichText('');
+  const value = canvasRichTextToPlainText(content);
+
+  function rememberSelection(textarea: HTMLTextAreaElement) {
+    setSelection({
+      start: textarea.selectionStart ?? 0,
+      end: textarea.selectionEnd ?? textarea.selectionStart ?? 0,
+    });
+  }
 
   function insertToken(token: string) {
     const textarea = textareaRef.current;
     if (!textarea) {
-      onChange(insertTokenAt(value, token, value.length, value.length));
+      onChange(
+        updateCanvasRichText(content, insertTokenAt(value, token, value.length, value.length)),
+      );
       return;
     }
     const start = textarea.selectionStart ?? value.length;
     const end = textarea.selectionEnd ?? start;
-    onChange(insertTokenAt(value, token, start, end));
+    onChange(updateCanvasRichText(content, insertTokenAt(value, token, start, end)));
     setShowTokens(false);
     window.setTimeout(() => {
       const position = start + token.length;
@@ -678,9 +684,10 @@ function TemplateField({
   }
 
   function handleChange(event: ChangeEvent<HTMLTextAreaElement>) {
-    onChange(event.currentTarget.value);
     const text = event.currentTarget.value;
+    onChange(updateCanvasRichText(content, text));
     const cursor = event.currentTarget.selectionStart ?? text.length;
+    setSelection({ start: cursor, end: event.currentTarget.selectionEnd ?? cursor });
     const charBefore = text[cursor - 1];
     if (charBefore === '/') {
       setShowTokens(true);
@@ -688,6 +695,17 @@ function TemplateField({
     } else if (showTokens && charBefore !== undefined && !/[a-zA-Z0-9_{}]/i.test(charBefore)) {
       setShowTokens(false);
     }
+  }
+
+  function handleSelectionColor(event: ChangeEvent<HTMLInputElement>) {
+    const color = event.currentTarget.value;
+    setSelectionColor(color);
+    if (selection.start === selection.end) return;
+    onChange(applyCanvasTextColor(content, selection.start, selection.end, color));
+    window.requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(selection.start, selection.end);
+    });
   }
 
   return (
@@ -700,8 +718,20 @@ function TemplateField({
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
+          onSelect={(event) => rememberSelection(event.currentTarget)}
           rows={4}
           placeholder={CONTENT_PLACEHOLDER}
+        />
+      </label>
+      <label className="flex items-center justify-between gap-3 text-xs text-muted">
+        <span>Selection color</span>
+        <input
+          aria-label="Selection color"
+          className="h-7 w-7 cursor-pointer rounded-sm border border-line bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-40"
+          type="color"
+          value={selectionColor}
+          disabled={selection.start === selection.end}
+          onChange={handleSelectionColor}
         />
       </label>
       {showTokens ? (
@@ -727,7 +757,7 @@ function TemplateField({
           ))}
         </div>
       ) : null}
-      <p className={editorHintClass}>Type / to insert event data</p>
+      <p className={editorHintClass}>Type / to insert event data. Select text to apply a color.</p>
     </div>
   );
 }
