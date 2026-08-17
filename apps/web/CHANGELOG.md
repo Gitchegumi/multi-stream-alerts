@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.21](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-web-v0.1.20...alerts-web-v0.1.21) (2026-08-17)
+
+
+### Bug Fixes
+
+* **auth:** cast advisory lock result ([#156](https://github.com/Gitchegumi/multi-stream-alerts/issues/156)) ([22a5f3e](https://github.com/Gitchegumi/multi-stream-alerts/commit/22a5f3ebdad5ff5151054da99252a5e34af7743d))
+
 ## [0.1.20](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-web-v0.1.19...alerts-web-v0.1.20) (2026-08-17)
 
 
