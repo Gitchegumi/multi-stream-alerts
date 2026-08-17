@@ -10,7 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { authOptions, withWorkspaceLinkLock, type WithWorkspaceLinkLock } from '@/lib/auth';
 import {
   canManageChannelCredentials,
   prisma,
@@ -105,6 +105,7 @@ export type LinkedAccountHandlerDeps = {
   teardownTwitchBroadcasterEventSub: typeof teardownTwitchBroadcasterEventSub;
   teardownTwitchEventSub: typeof teardownTwitchEventSub;
   teardownYoutubeWebSub: typeof teardownYoutubeWebSub;
+  withWorkspaceLinkLock: WithWorkspaceLinkLock;
   encrypt: typeof encrypt;
 };
 
@@ -114,6 +115,7 @@ const defaultHandlerDeps: LinkedAccountHandlerDeps = {
   teardownTwitchBroadcasterEventSub,
   teardownTwitchEventSub,
   teardownYoutubeWebSub,
+  withWorkspaceLinkLock,
   encrypt,
 };
 
@@ -147,24 +149,63 @@ export async function handleDeleteLinkedAccount({
   }
 
   if (account.platform === 'twitch' && account.channelId) {
-    try {
-      await deps.teardownTwitchBroadcasterEventSub({
-        channelId: account.channelId,
-        broadcasterUserId: account.platformAccountId,
+    return deps.withWorkspaceLinkLock(account.channelId, async (tx) => {
+      // Re-read after acquiring the same lock used by OAuth commitment. A link
+      // may have activated another broadcaster while this request was waiting.
+      const lockedAccount = await tx.linkedAccount.findFirst({
+        where: { id, userId: session.user.id },
       });
-    } catch (err) {
-      console.error('[linked-accounts] Twitch broadcaster teardown failed', {
-        channelId: account.channelId,
-        reason: err instanceof Error ? err.message : 'unknown_error',
+      if (!lockedAccount) {
+        return { status: 404, body: { error: 'Account not found' } };
+      }
+
+      try {
+        await deps.teardownTwitchBroadcasterEventSub({
+          channelId: account.channelId!,
+          broadcasterUserId: lockedAccount.platformAccountId,
+        });
+      } catch (err) {
+        console.error('[linked-accounts] Twitch broadcaster teardown failed', {
+          channelId: account.channelId,
+          reason: err instanceof Error ? err.message : 'unknown_error',
+        });
+        return {
+          status: 502,
+          body: { error: 'Twitch could not confirm subscription removal; try again' },
+        };
+      }
+
+      const updated = await deactivateLinkedAccount(lockedAccount.id, tx, deps);
+      const remaining = await tx.linkedAccount.count({
+        where: { channelId: account.channelId, platform: 'twitch', isActive: true },
       });
-      return {
-        status: 502,
-        body: { error: 'Twitch could not confirm subscription removal; try again' },
-      };
-    }
+      if (remaining === 0) {
+        await deps.teardownTwitchEventSub({ channelId: account.channelId! });
+      }
+
+      return { status: 200, body: { account: updated } };
+    });
   }
 
-  const updated = await deps.prisma.linkedAccount.update({
+  const updated = await deactivateLinkedAccount(account.id, deps.prisma, deps);
+
+  await teardownProviderIfLastAccount(account.channelId, account.platform, deps).catch((err) => {
+    console.error('[linked-accounts] provider teardown failed', {
+      platform: account.platform,
+      channelId: account.channelId,
+      reason: err instanceof Error ? err.message : 'unknown_error',
+    });
+  });
+
+  return { status: 200, body: { account: updated } };
+}
+
+async function deactivateLinkedAccount(
+  id: string,
+  database: Pick<typeof prisma, 'linkedAccount'>,
+  deps: LinkedAccountHandlerDeps,
+) {
+  return database.linkedAccount.update({
     where: { id },
     data: {
       isActive: false,
@@ -187,16 +228,6 @@ export async function handleDeleteLinkedAccount({
       updatedAt: true,
     },
   });
-
-  await teardownProviderIfLastAccount(account.channelId, account.platform, deps).catch((err) => {
-    console.error('[linked-accounts] provider teardown failed', {
-      platform: account.platform,
-      channelId: account.channelId,
-      reason: err instanceof Error ? err.message : 'unknown_error',
-    });
-  });
-
-  return { status: 200, body: { account: updated } };
 }
 
 /** Clear shared provider state only after the final account is inactive. */

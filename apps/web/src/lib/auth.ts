@@ -236,7 +236,7 @@ export type WithWorkspaceLinkLock = <T>(
 ) => Promise<T>;
 
 /**
- * Serialize linked-account activation per workspace. PostgreSQL releases the
+ * Serialize linked-account lifecycle changes per workspace. PostgreSQL releases the
  * advisory lock automatically when the transaction commits or rolls back.
  */
 export async function withWorkspaceLinkLock<T>(
