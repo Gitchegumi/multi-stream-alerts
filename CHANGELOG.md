@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.12](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.10.11...v0.10.12) (2026-08-17)
+
+
+### Bug Fixes
+
+* **auth:** cast advisory lock result ([#156](https://github.com/Gitchegumi/multi-stream-alerts/issues/156)) ([22a5f3e](https://github.com/Gitchegumi/multi-stream-alerts/commit/22a5f3ebdad5ff5151054da99252a5e34af7743d))
+
 ## [0.10.11](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.10.10...v0.10.11) (2026-08-17)
 
 
