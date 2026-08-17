@@ -441,7 +441,11 @@ function ElementInspector({
       {isText || isImage ? (
         <div className="grid gap-2.5 border-b border-line pb-3.5 last:border-b-0 last:pb-0">
           {isText ? (
-            <TemplateField element={element} onChange={(richText) => patchBindings({ richText })} />
+            <TemplateField
+              key={element.id}
+              element={element}
+              onChange={(richText) => patchBindings({ richText })}
+            />
           ) : (
             <>
               <div className="grid min-h-[120px] place-items-center overflow-hidden rounded-md border border-line bg-panel">
