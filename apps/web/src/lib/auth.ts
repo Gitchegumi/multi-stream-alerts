@@ -4,6 +4,7 @@ import TwitchProvider from 'next-auth/providers/twitch';
 import GoogleProvider from 'next-auth/providers/google';
 import { cookies } from 'next/headers';
 import {
+  canManageChannelCredentials,
   prisma,
   redeemInviteCodeInTransaction,
   assertInviteIsUsable,
@@ -21,6 +22,7 @@ import { readOnboardingConfig } from './onboarding';
 import { encrypt } from '@multi-stream-alerts/shared';
 import { consumeLinkingState, peekLinkingState } from '@/lib/linking-state';
 import { getPlatformAccountName } from '@/lib/platform-account-name';
+import { MAX_TWITCH_CHANNELS_PER_WORKSPACE } from '@/lib/linked-account-policy';
 
 type OidcProfile = Profile & {
   sub?: string;
@@ -226,6 +228,144 @@ if (googleEnabled) {
   );
 }
 
+export type LinkedOAuthSignInDeps = {
+  prisma: typeof prisma;
+  canManageChannelCredentials: typeof canManageChannelCredentials;
+  resolveYoutubeChannel: typeof resolveYoutubeChannel;
+  provisionLinkedAccount: typeof provisionLinkedAccount;
+  encrypt: typeof encrypt;
+};
+
+/**
+ * Commit a Twitch/YouTube OAuth grant only after rechecking current workspace
+ * authority and the server-side Twitch channel cap. The signed linking state
+ * identifies intent, but it is not an authorization snapshot: roles may have
+ * changed while the user was at the provider consent screen.
+ */
+export async function handleLinkedOAuthSignIn(
+  {
+    account,
+    profile,
+    linkingState,
+  }: {
+    account: {
+      provider: string;
+      providerAccountId: string;
+      access_token?: string | null;
+      refresh_token?: string | null;
+      expires_at?: number | null;
+    };
+    profile: Profile | undefined;
+    linkingState: { userId: string; channelId: string | null };
+  },
+  deps?: LinkedOAuthSignInDeps,
+): Promise<boolean> {
+  const d: LinkedOAuthSignInDeps = deps ?? {
+    prisma,
+    canManageChannelCredentials,
+    resolveYoutubeChannel,
+    provisionLinkedAccount,
+    encrypt,
+  };
+  if (account.provider !== 'twitch' && account.provider !== 'google') {
+    return false;
+  }
+  const { userId, channelId } = linkingState;
+  if (!channelId) {
+    console.warn('OAuth sign-in: linking state has no workspace', { provider: account.provider });
+    return false;
+  }
+
+  const dbUser = await d.prisma.user.findUnique({ where: { id: userId } });
+  if (!dbUser) {
+    console.warn('OAuth sign-in: linking user no longer exists', { provider: account.provider });
+    return false;
+  }
+  if (!(await d.canManageChannelCredentials(dbUser.id, dbUser.role, channelId))) {
+    console.warn('OAuth sign-in: linking user no longer manages workspace credentials', {
+      provider: account.provider,
+      channelId,
+    });
+    return false;
+  }
+
+  const platform = account.provider === 'google' ? 'youtube' : 'twitch';
+  const existing = await d.prisma.linkedAccount.findUnique({
+    where: {
+      userId_platform_platformAccountId: {
+        userId: dbUser.id,
+        platform,
+        platformAccountId: account.providerAccountId,
+      },
+    },
+    select: { channelId: true, isActive: true },
+  });
+
+  if (platform === 'twitch') {
+    const activeCount = await d.prisma.linkedAccount.count({
+      where: { channelId, platform: 'twitch', isActive: true },
+    });
+    const reconnectingActiveAccount = existing?.isActive && existing.channelId === channelId;
+    if (activeCount >= MAX_TWITCH_CHANNELS_PER_WORKSPACE && !reconnectingActiveAccount) {
+      console.warn('OAuth sign-in: workspace Twitch channel limit reached', { channelId });
+      return false;
+    }
+  }
+
+  let platformAccountName = getPlatformAccountName(
+    account.provider,
+    profile as Record<string, unknown> | undefined,
+    account.providerAccountId,
+  );
+  const youtubeChannel =
+    account.provider === 'google' && account.access_token
+      ? await d.resolveYoutubeChannel(account.access_token)
+      : null;
+  platformAccountName = youtubeChannel?.title ?? platformAccountName;
+
+  const existingCount = await d.prisma.linkedAccount.count({
+    where: { userId: dbUser.id, platform },
+  });
+  await d.prisma.linkedAccount.upsert({
+    where: {
+      userId_platform_platformAccountId: {
+        userId: dbUser.id,
+        platform,
+        platformAccountId: account.providerAccountId,
+      },
+    },
+    create: {
+      userId: dbUser.id,
+      channelId,
+      platform,
+      platformAccountId: account.providerAccountId,
+      platformAccountName,
+      encryptedAccessToken: d.encrypt(account.access_token ?? ''),
+      encryptedRefreshToken: account.refresh_token ? d.encrypt(account.refresh_token) : null,
+      tokenExpiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
+      isActive: true,
+      isPrimary: existingCount === 0,
+    },
+    update: {
+      channelId,
+      platformAccountName: platformAccountName ?? undefined,
+      encryptedAccessToken: d.encrypt(account.access_token ?? ''),
+      encryptedRefreshToken: account.refresh_token ? d.encrypt(account.refresh_token) : null,
+      tokenExpiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
+      isActive: true,
+    },
+  });
+
+  await d.provisionLinkedAccount({
+    platform,
+    providerAccountId: account.providerAccountId,
+    accessToken: account.access_token,
+    channelId,
+    youtubeChannelId: youtubeChannel?.id,
+  });
+  return true;
+}
+
 export const authOptions: NextAuthOptions = {
   secret: process.env.AUTH_SECRET,
   session: { strategy: 'jwt' },
@@ -266,78 +406,7 @@ export const authOptions: NextAuthOptions = {
           return false;
         }
 
-        const { userId: linkingUserId, channelId: linkingChannelId } = linkingState;
-
-        const dbUser = await prisma.user.findUnique({ where: { id: linkingUserId } });
-        if (!dbUser) {
-          console.warn('OAuth sign-in: no user found for linkingUserId', {
-            linkingUserId,
-            provider: account.provider,
-          });
-          return false;
-        }
-
-        const platform = account.provider === 'google' ? 'youtube' : 'twitch';
-        let platformAccountName = getPlatformAccountName(
-          account.provider,
-          profile as Record<string, unknown> | undefined,
-          account.providerAccountId,
-        );
-        const youtubeChannel =
-          account.provider === 'google' && account.access_token
-            ? await resolveYoutubeChannel(account.access_token)
-            : null;
-        // A Google account name is not necessarily its YouTube channel name.
-        // Prefer the actual channel title returned by YouTube Data API.
-        platformAccountName = youtubeChannel?.title ?? platformAccountName;
-
-        const existingCount = await prisma.linkedAccount.count({
-          where: { userId: dbUser.id, platform },
-        });
-
-        await prisma.linkedAccount.upsert({
-          where: {
-            userId_platform_platformAccountId: {
-              userId: dbUser.id,
-              platform,
-              platformAccountId: account.providerAccountId,
-            },
-          },
-          create: {
-            userId: dbUser.id,
-            channelId: linkingChannelId ?? null,
-            platform,
-            platformAccountId: account.providerAccountId,
-            platformAccountName,
-            encryptedAccessToken: encrypt(account.access_token ?? ''),
-            encryptedRefreshToken: account.refresh_token ? encrypt(account.refresh_token) : null,
-            tokenExpiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
-            isActive: true,
-            isPrimary: existingCount === 0,
-          },
-          update: {
-            channelId: linkingChannelId ?? null,
-            platformAccountName: platformAccountName ?? undefined,
-            encryptedAccessToken: encrypt(account.access_token ?? ''),
-            encryptedRefreshToken: account.refresh_token ? encrypt(account.refresh_token) : null,
-            tokenExpiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
-            isActive: true,
-          },
-        });
-
-        // Auto-provision the provider integration for the linked workspace so
-        // the user never has to configure EventSub/WebSub by hand (issue #128).
-        // Best-effort: a provisioning failure must never block the OAuth
-        // round-trip — it surfaces as a not-yet-ready connection status.
-        await provisionLinkedAccount({
-          platform,
-          providerAccountId: account.providerAccountId,
-          accessToken: account.access_token,
-          channelId: linkingChannelId ?? null,
-          youtubeChannelId: youtubeChannel?.id,
-        });
-
-        return true;
+        return handleLinkedOAuthSignIn({ account, profile, linkingState });
       }
 
       return handleOidcSignIn({ account, profile: oidcProfile }, oidcSignInDeps);

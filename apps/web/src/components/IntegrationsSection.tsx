@@ -19,6 +19,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
+import { MAX_TWITCH_CHANNELS_PER_WORKSPACE } from '@/lib/linked-account-policy';
 import { type CredentialStatus, type IntegrationProvider } from '@multi-stream-alerts/database';
 import { IntegrationSettingsForm } from '@/components/IntegrationSettingsForm';
 import { PlatformIcon } from '@/components/PlatformIcon';
@@ -42,7 +43,6 @@ type Props = {
 };
 
 const MAX_YOUTUBE_CHANNELS = 5;
-const MAX_TWITCH_CHANNELS = 5;
 
 // ---------------------------------------------------------------------------
 // Status badge
@@ -299,7 +299,7 @@ export function IntegrationsSection({
                   canManage={canManage}
                 />
               ))}
-              {canManage && twitchAccounts.length < MAX_TWITCH_CHANNELS && (
+              {canManage && twitchAccounts.length < MAX_TWITCH_CHANNELS_PER_WORKSPACE && (
                 <button
                   type="button"
                   className="link-button self-start text-sm"

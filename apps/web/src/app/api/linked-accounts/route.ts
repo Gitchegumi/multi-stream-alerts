@@ -12,8 +12,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import {
+  canManageChannelCredentials,
   prisma,
-  provisionTwitchEventSub,
+  teardownTwitchBroadcasterEventSub,
   teardownTwitchEventSub,
   teardownYoutubeWebSub,
 } from '@multi-stream-alerts/database';
@@ -87,22 +88,90 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Missing account id' }, { status: 400 });
   }
 
-  const account = await prisma.linkedAccount.findFirst({
+  const result = await handleDeleteLinkedAccount({
+    id,
+    session: { user: { id: session.user.id, role: session.user.role } },
+  });
+  return NextResponse.json(result.body, { status: result.status });
+}
+
+export type LinkedAccountHandlerSession = {
+  user: { id: string; role: 'admin' | 'owner' | 'editor' | 'viewer' };
+};
+
+export type LinkedAccountHandlerDeps = {
+  prisma: typeof prisma;
+  canManageChannelCredentials: typeof canManageChannelCredentials;
+  teardownTwitchBroadcasterEventSub: typeof teardownTwitchBroadcasterEventSub;
+  teardownTwitchEventSub: typeof teardownTwitchEventSub;
+  teardownYoutubeWebSub: typeof teardownYoutubeWebSub;
+  encrypt: typeof encrypt;
+};
+
+const defaultHandlerDeps: LinkedAccountHandlerDeps = {
+  prisma,
+  canManageChannelCredentials,
+  teardownTwitchBroadcasterEventSub,
+  teardownTwitchEventSub,
+  teardownYoutubeWebSub,
+  encrypt,
+};
+
+/**
+ * Disconnect a linked account after rechecking current workspace authority.
+ * Twitch teardown happens before token removal and is scoped to the selected
+ * broadcaster, so a failed provider call cannot strand the other channels.
+ */
+export async function handleDeleteLinkedAccount({
+  id,
+  session,
+  deps = defaultHandlerDeps,
+}: {
+  id: string;
+  session: LinkedAccountHandlerSession;
+  deps?: LinkedAccountHandlerDeps;
+}): Promise<{ status: number; body: unknown }> {
+  const account = await deps.prisma.linkedAccount.findFirst({
     where: { id, userId: session.user.id },
   });
 
   if (!account) {
-    return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+    return { status: 404, body: { error: 'Account not found' } };
   }
 
-  const updated = await prisma.linkedAccount.update({
+  if (
+    account.channelId &&
+    !(await deps.canManageChannelCredentials(session.user.id, session.user.role, account.channelId))
+  ) {
+    return { status: 403, body: { error: 'Forbidden' } };
+  }
+
+  if (account.platform === 'twitch' && account.channelId) {
+    try {
+      await deps.teardownTwitchBroadcasterEventSub({
+        channelId: account.channelId,
+        broadcasterUserId: account.platformAccountId,
+      });
+    } catch (err) {
+      console.error('[linked-accounts] Twitch broadcaster teardown failed', {
+        channelId: account.channelId,
+        reason: err instanceof Error ? err.message : 'unknown_error',
+      });
+      return {
+        status: 502,
+        body: { error: 'Twitch could not confirm subscription removal; try again' },
+      };
+    }
+  }
+
+  const updated = await deps.prisma.linkedAccount.update({
     where: { id },
     data: {
       isActive: false,
       isPrimary: false,
       // Disconnecting ends the OAuth grant's use in GitchAlerts. Remove the
       // locally stored token material while retaining non-secret metadata.
-      encryptedAccessToken: encrypt(''),
+      encryptedAccessToken: deps.encrypt(''),
       encryptedRefreshToken: null,
       tokenExpiresAt: null,
     },
@@ -119,10 +188,7 @@ export async function DELETE(request: NextRequest) {
     },
   });
 
-  // Tear down the provider's auto-provisioned subscriptions once the last
-  // active account of this platform for the workspace is gone (issue #128).
-  // Best-effort: a teardown failure must not fail the disconnect response.
-  await teardownProviderIfLastAccount(account.channelId, account.platform).catch((err) => {
+  await teardownProviderIfLastAccount(account.channelId, account.platform, deps).catch((err) => {
     console.error('[linked-accounts] provider teardown failed', {
       platform: account.platform,
       channelId: account.channelId,
@@ -130,50 +196,31 @@ export async function DELETE(request: NextRequest) {
     });
   });
 
-  return NextResponse.json({ account: updated });
+  return { status: 200, body: { account: updated } };
 }
 
-/**
- * Remove the provider's remote subscriptions + stored secret for a workspace,
- * but only when no other active linked account of the same platform remains
- * (a workspace can have several YouTube channels linked).
- */
+/** Clear shared provider state only after the final account is inactive. */
 async function teardownProviderIfLastAccount(
   channelId: string | null,
   platform: string,
+  deps: LinkedAccountHandlerDeps,
 ): Promise<void> {
   if (!channelId) return;
 
-  const remaining = await prisma.linkedAccount.count({
+  const remaining = await deps.prisma.linkedAccount.count({
     where: { channelId, platform, isActive: true },
   });
   if (platform === 'twitch') {
-    if (remaining > 0) {
-      // Twitch subscriptions share one webhook secret per workspace. Rebuild
-      // the set after removing one account so the disconnected broadcaster's
-      // remote subscriptions stop without affecting the remaining channels.
-      const accounts = await prisma.linkedAccount.findMany({
-        where: { channelId, platform: 'twitch', isActive: true },
-        select: { platformAccountId: true },
-      });
-      await teardownTwitchEventSub({ channelId });
-      for (const linked of accounts) {
-        await provisionTwitchEventSub({
-          channelId,
-          broadcasterUserId: linked.platformAccountId,
-        });
-      }
-      return;
-    }
-    await teardownTwitchEventSub({ channelId });
+    if (remaining > 0) return;
+    await deps.teardownTwitchEventSub({ channelId });
   } else if (platform === 'youtube') {
     if (remaining > 0) return;
-    const channel = await prisma.channel.findUnique({
+    const channel = await deps.prisma.channel.findUnique({
       where: { id: channelId },
       select: { slug: true },
     });
     if (channel) {
-      await teardownYoutubeWebSub({ channelId, channelSlug: channel.slug });
+      await deps.teardownYoutubeWebSub({ channelId, channelSlug: channel.slug });
     }
   }
 }

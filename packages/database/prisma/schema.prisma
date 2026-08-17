@@ -446,6 +446,7 @@ model ProviderSubscription {
   id                     String    @id @default(cuid())
   channelId              String    @map("channel_id")
   provider               String // "twitch" | "youtube"
+  providerAccountId      String?   @map("provider_account_id")
   providerSubscriptionId String    @map("provider_subscription_id")
   type                   String // EventSub type (e.g. "channel.follow") or "websub"
   status                 String    @default("enabled")
@@ -456,6 +457,7 @@ model ProviderSubscription {
 
   @@unique([providerSubscriptionId])
   @@index([channelId, provider])
+  @@index([channelId, provider, providerAccountId], map: "provider_subscriptions_channel_provider_account_idx")
   @@index([provider, expiresAt])
   @@map("provider_subscriptions")
 }

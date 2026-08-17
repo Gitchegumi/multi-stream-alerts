@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   provisionTwitchEventSub,
+  teardownTwitchBroadcasterEventSub,
   teardownTwitchEventSub,
   getTwitchAppAccessToken,
   __resetTwitchAppTokenCacheForTesting,
@@ -48,7 +49,11 @@ test('getTwitchAppAccessToken throws when app creds are missing', async () => {
 });
 
 test('provisionTwitchEventSub writes the secret, creates all subscriptions, and records ids', async () => {
-  const created: Array<{ providerSubscriptionId: string; type: string }> = [];
+  const created: Array<{
+    providerAccountId: string;
+    providerSubscriptionId: string;
+    type: string;
+  }> = [];
   let savedSecret: string | undefined;
   let savedBroadcaster: string | undefined;
   const callbacks: string[] = [];
@@ -74,7 +79,11 @@ test('provisionTwitchEventSub writes the secret, creates all subscriptions, and 
     }) as unknown as TwitchProvisionDeps['saveCredentials'],
     getEventSubSecret: async () => null,
     recordSubscription: async (input) => {
-      created.push({ providerSubscriptionId: input.providerSubscriptionId, type: input.type });
+      created.push({
+        providerAccountId: input.providerAccountId,
+        providerSubscriptionId: input.providerSubscriptionId,
+        type: input.type,
+      });
     },
     listSubscriptions: async () => [],
     deleteSubscriptionRecords: async () => {},
@@ -90,6 +99,7 @@ test('provisionTwitchEventSub writes the secret, creates all subscriptions, and 
   assert.equal(result.created.length, SUPPORTED_TWITCH_SUBSCRIPTIONS.length);
   assert.equal(result.failed.length, 0);
   assert.equal(created.length, SUPPORTED_TWITCH_SUBSCRIPTIONS.length);
+  assert.ok(created.every((subscription) => subscription.providerAccountId === '12345'));
   assert.ok(
     callbacks.every((c) => c === 'https://alerts.example.com/api/webhooks/twitch'),
     'all subscriptions use the ingress callback',
@@ -213,4 +223,57 @@ test('teardownTwitchEventSub deletes remote subscriptions and clears credentials
 
   assert.ok(deleted.some((u) => u.includes('sub-a')));
   assert.ok(cleared, 'stored Twitch secret should be cleared on disconnect');
+});
+
+test('teardownTwitchBroadcasterEventSub removes only the selected broadcaster records', async () => {
+  const listCalls: Array<string | undefined> = [];
+  const deleteCalls: Array<string | undefined> = [];
+  let credentialsCleared = false;
+  const deps: TwitchProvisionDeps = {
+    env: ENV,
+    getAppToken: async () => 'app-token',
+    fetchFn: (async () => jsonResponse(204, {})) as unknown as typeof fetch,
+    listSubscriptions: async (_channelId, providerAccountId) => {
+      listCalls.push(providerAccountId);
+      return [{ providerSubscriptionId: 'selected-sub' }];
+    },
+    deleteSubscriptionRecords: async (_channelId, providerAccountId) => {
+      deleteCalls.push(providerAccountId);
+    },
+    clearCredentials: async () => {
+      credentialsCleared = true;
+    },
+  };
+
+  await teardownTwitchBroadcasterEventSub(
+    { channelId: 'chan-1', broadcasterUserId: 'broadcaster-2' },
+    deps,
+  );
+
+  assert.deepEqual(listCalls, ['broadcaster-2']);
+  assert.deepEqual(deleteCalls, ['broadcaster-2']);
+  assert.equal(credentialsCleared, false, 'the workspace shared secret must be preserved');
+});
+
+test('teardownTwitchBroadcasterEventSub fails closed on a rejected remote delete', async () => {
+  let recordsDeleted = false;
+  const deps: TwitchProvisionDeps = {
+    env: ENV,
+    getAppToken: async () => 'app-token',
+    fetchFn: (async () => jsonResponse(500, {})) as unknown as typeof fetch,
+    listSubscriptions: async () => [{ providerSubscriptionId: 'selected-sub' }],
+    deleteSubscriptionRecords: async () => {
+      recordsDeleted = true;
+    },
+  };
+
+  await assert.rejects(
+    () =>
+      teardownTwitchBroadcasterEventSub(
+        { channelId: 'chan-1', broadcasterUserId: 'broadcaster-2' },
+        deps,
+      ),
+    /rejected 1 EventSub deletion/,
+  );
+  assert.equal(recordsDeleted, false, 'local tracking must remain available for retry');
 });
