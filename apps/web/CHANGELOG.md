@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.22](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-web-v0.1.21...alerts-web-v0.1.22) (2026-08-17)
+
+
+### Bug Fixes
+
+* **overlays:** restore video and audio playback ([#158](https://github.com/Gitchegumi/multi-stream-alerts/issues/158)) ([908e7ce](https://github.com/Gitchegumi/multi-stream-alerts/commit/908e7ce992b250871747b7f826db9dc1d69ee7c9))
+
 ## [0.1.21](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-web-v0.1.20...alerts-web-v0.1.21) (2026-08-17)
 
 

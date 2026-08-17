@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.13](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.10.12...v0.10.13) (2026-08-17)
+
+
+### Bug Fixes
+
+* **overlays:** restore video and audio playback ([#158](https://github.com/Gitchegumi/multi-stream-alerts/issues/158)) ([908e7ce](https://github.com/Gitchegumi/multi-stream-alerts/commit/908e7ce992b250871747b7f826db9dc1d69ee7c9))
+
 ## [0.10.12](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.10.11...v0.10.12) (2026-08-17)
 
 
