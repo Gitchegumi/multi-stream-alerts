@@ -4,10 +4,11 @@ import { authOptions } from '@/lib/auth';
 import { getVersionStatus } from '@/lib/update-check';
 import { getAuthorizedChannels } from '@multi-stream-alerts/database';
 import { DashboardShell } from '@/components/DashboardShell';
+import { APP_NAME } from '@/lib/app-identity';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'GitcheGumi Alerts',
+  title: APP_NAME,
   description: 'Self-hosted stream alerts and overlays',
   icons: {
     icon: [
@@ -23,7 +24,10 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const [session, versionStatus] = await Promise.all([getServerSession(authOptions), getVersionStatus()]);
+  const [session, versionStatus] = await Promise.all([
+    getServerSession(authOptions),
+    getVersionStatus(),
+  ]);
   let defaultChannelSlug: string | null = null;
   if (session?.user?.id) {
     const channels = await getAuthorizedChannels(session.user.id, session.user.role);
