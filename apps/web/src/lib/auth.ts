@@ -244,10 +244,15 @@ export async function withWorkspaceLinkLock<T>(
   operation: (tx: WorkspaceLinkTransaction) => Promise<T>,
   database: typeof prisma = prisma,
 ): Promise<T> {
-  return database.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${channelId}, 0))`;
-    return operation(tx);
-  });
+  return database.$transaction(
+    async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${channelId}, 0))`;
+      return operation(tx);
+    },
+    // Twitch creates several EventSub subscriptions serially. The default
+    // interactive-transaction timeout is too short for provider round trips.
+    { maxWait: 10_000, timeout: 60_000 },
+  );
 }
 
 export type LinkedOAuthSignInDeps = {
@@ -379,6 +384,18 @@ export async function handleLinkedOAuthSignIn(
         isActive: true,
       },
     });
+
+    // Twitch's shared EventSub secret is selected and persisted during
+    // provisioning. Keep that work inside the same workspace lock as account
+    // activation so concurrent first links cannot create subscriptions with
+    // different secrets. YouTube provisioning is serialized consistently.
+    await d.provisionLinkedAccount({
+      platform,
+      providerAccountId: account.providerAccountId,
+      accessToken: account.access_token,
+      channelId,
+      youtubeChannelId: youtubeChannel?.id,
+    });
     return true;
   });
 
@@ -387,13 +404,6 @@ export async function handleLinkedOAuthSignIn(
     return false;
   }
 
-  await d.provisionLinkedAccount({
-    platform,
-    providerAccountId: account.providerAccountId,
-    accessToken: account.access_token,
-    channelId,
-    youtubeChannelId: youtubeChannel?.id,
-  });
   return true;
 }
 
