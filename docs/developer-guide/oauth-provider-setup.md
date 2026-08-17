@@ -1,6 +1,23 @@
-# OAuth Provider Setup
+# Twitch and YouTube OAuth Setup
 
 GitchAlerts needs one Twitch developer application and one Google OAuth client for each deployed instance. The administrator creates these applications and stores their credentials in `.env`. Workspace owners then link their own Twitch or YouTube accounts from the dashboard. Those grants and tokens belong to the workspace connection, not to the deployment configuration.
+
+## Provider console checklist
+
+OAuth setup is not automatic. The developer who deploys GitchAlerts must configure both provider consoles before users can connect channels:
+
+1. Open the [Twitch Developer Console](https://dev.twitch.tv/console/apps), register an application, and add `NEXTAUTH_URL/api/auth/callback/twitch` as its **OAuth Redirect URL**.
+2. Open the [Google Cloud Console](https://console.cloud.google.com/), enable **YouTube Data API v3**, create a **Web application** OAuth client, and add `NEXTAUTH_URL/api/auth/callback/google` as its **Authorized redirect URI**.
+3. Put the resulting client IDs and client secrets in the deployment environment, then restart the web service.
+
+For a production deployment at `https://alerts.example.com`, the exact redirect values are:
+
+```text
+https://alerts.example.com/api/auth/callback/twitch
+https://alerts.example.com/api/auth/callback/google
+```
+
+Do not put Twitch EventSub or YouTube WebSub webhook URLs in either OAuth redirect field. GitchAlerts registers those webhook callbacks after a workspace owner connects a channel.
 
 ## Before you begin
 
@@ -119,7 +136,7 @@ Restart or recreate the web service so it reads the new environment. Then:
 
 Google requires the redirect URI to match exactly, including scheme, host, port, path, case, and trailing slash. Production redirects must use HTTPS; localhost is the exception for local development.
 
-### Testing, publishing, and verification
+## Optional: publish and verify the Google OAuth app
 
 An External app in **Testing** is sufficient for initial or private testing, so Google verification is not required to prove the setup works. It has important limits:
 
@@ -127,9 +144,20 @@ An External app in **Testing** is sufficient for initial or private testing, so 
 - Because GitchAlerts requests `youtube.readonly` and offline access, a test user's grant and refresh token expire after seven days. The user must reconnect after expiry.
 - A test user who manages a YouTube Brand Account can authorize that Brand Account.
 
-Set the app to **In production** when users beyond the test-user list need access. `youtube.readonly` accesses private user data and appears as a sensitive scope in Google Auth Platform. An unverified production app can show an **unverified app** warning and is subject to Google's user cap. Complete Google's branding and data-access verification to remove those restrictions for a stable public deployment. Google may require verified domains, a privacy policy, a scope justification, and a video demonstrating the complete authorization flow.
+Set the app to **In production** when users beyond the test-user list need access. `youtube.readonly` accesses private user data and appears as a sensitive scope in Google Auth Platform. An unverified production app can show an **unverified app** warning and is subject to Google's user cap.
 
-Before submitting, open the homepage, privacy policy, and terms in a signed-out browser. Confirm that the privacy URL on the OAuth consent screen exactly matches the footer link and that the policy explains how Google data is accessed, used, stored, shared, retained, and deleted. The verification demonstration video should show the complete OAuth consent screen in English, the Connect YouTube flow, and the linked channel appearing in GitchAlerts.
+To prepare a public deployment for Google verification:
+
+1. In **Google Auth Platform -> Branding**, complete every required field. Use the deployed GitchAlerts homepage, privacy policy, and terms URLs. The app name, logo, and description must match the public site.
+2. Add only domains you own under **Authorized domains**. Verify the root domain in [Google Search Console](https://search.google.com/search-console) using an account that is also an owner or editor of the Google Cloud project.
+3. In **Google Auth Platform -> Audience**, select **External**, add test users while validating the integration, and move the app to **In production** when it is ready for public users.
+4. In **Google Auth Platform -> Data Access**, request only the scopes listed above and provide a specific justification for `youtube.readonly`. For example: GitchAlerts uses read-only access to identify the channel selected by the signed-in user and subscribe its public video and live-stream feed to alerts; it does not modify YouTube data.
+5. Open the homepage, privacy policy, and terms in a signed-out browser. The homepage must explain what GitchAlerts does and link to the same privacy URL configured on the consent screen. The policy must accurately describe how Google user data is accessed, used, stored, shared, retained, and deleted.
+6. Record an unlisted demonstration video. Show the complete OAuth consent screen in English, the exact requested scopes, the **Connect YouTube** flow, the selected channel appearing by name in GitchAlerts, and the product feature that uses the authorized data.
+7. Open the verification area in Google Auth Platform and submit the brand and sensitive-scope verification request. Supply the verified domains, scope justification, demonstration video, and any other evidence requested for the project.
+8. Monitor the project contact email and answer reviewer questions. If the implementation or requested scopes change during review, update the consent-screen configuration and demonstration before resubmitting.
+
+Google reviews the deployed app, not just its source code. Replace the example legal operator and contact values, make sure the published policy matches the deployment's real practices, and keep the submitted pages available throughout review. See Google's current [OAuth app verification requirements](https://support.google.com/cloud/answer/13464321) and [OAuth 2.0 policies](https://developers.google.com/identity/protocols/oauth2/policies) before submitting because the console workflow and evidence requirements can change.
 
 An Internal app restricted to one Google Workspace organization normally does not need public-user verification, but it cannot be used by accounts outside that organization.
 

@@ -94,7 +94,7 @@ GOOGLE_CLIENT_ID=<your-google-oauth-client-id>
 GOOGLE_CLIENT_SECRET=<your-google-oauth-client-secret>
 ```
 
-When these are set, the Settings -> Integrations page shows OAuth connect/disconnect cards for Twitch and YouTube. When they are missing, the cards show a clear disabled state explaining that an administrator must configure the provider credentials. See [OAuth Provider Setup](docs/developer-guide/oauth-provider-setup.md) for the Twitch and Google console steps, exact redirect URLs, scopes, and Google publishing guidance.
+When these are set, the Settings -> Integrations page shows OAuth connect/disconnect cards for Twitch and YouTube. When they are missing, the cards show a clear disabled state explaining that an administrator must configure the provider credentials. See [Twitch and YouTube OAuth Setup](docs/developer-guide/oauth-provider-setup.md) for the Twitch and Google console steps, exact redirect URLs, scopes, and Google publishing guidance.
 
 ## Authentication Model
 
@@ -432,7 +432,7 @@ Duplicate Ko-fi `message_id` values are ignored. Private Ko-fi messages are not 
 
 Create the instance's Twitch application and add `NEXTAUTH_URL/api/auth/callback/twitch` as its OAuth redirect URL. Store its Client ID and Client Secret in `.env`, then connect each channel from **Dashboard -> [workspace] -> Settings -> Integrations -> Twitch**. GitchAlerts generates the per-workspace EventSub secret and provisions the supported subscriptions automatically; workspace owners do not enter developer credentials or callback secrets.
 
-The global EventSub callback is `INGRESS_PUBLIC_BASE_URL/api/webhooks/twitch`. See [OAuth Provider Setup](docs/developer-guide/oauth-provider-setup.md) for the complete procedure and required scopes.
+The global EventSub callback is `INGRESS_PUBLIC_BASE_URL/api/webhooks/twitch`. See [Twitch and YouTube OAuth Setup](docs/developer-guide/oauth-provider-setup.md) for the complete procedure and required scopes.
 
 ## YouTube Setup
 
@@ -444,7 +444,7 @@ The generated webhook URL is per workspace:
 https://<your-alerts-domain>/api/webhooks/youtube/<your-channel-slug>
 ```
 
-See [OAuth Provider Setup](docs/developer-guide/oauth-provider-setup.md) for the Google consent screen, test-user, publishing, and verification requirements.
+See [Twitch and YouTube OAuth Setup](docs/developer-guide/oauth-provider-setup.md) for the Google consent screen, test-user, publishing, and verification requirements.
 
 ## OBS or Meld Browser Source
 
