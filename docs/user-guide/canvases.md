@@ -7,7 +7,7 @@ From **Alerts**, you can:
 - Create a canvas.
 - Select a canvas from the left panel.
 - Add text, alert message, event image, and shape layers.
-- Pick stored image or video assets for media layers. Supported visual formats are PNG, JPG, GIF, WebP, SVG, MP4, and WebM. Animated GIF/WebP and video assets play automatically in the editor preview, test alerts, and the browser source.
+- Pick stored image or video assets for media layers. Supported visual formats are PNG, JPG, GIF, WebP, SVG, MP4, and WebM. Animated GIF/WebP and video assets play automatically in the editor preview, test alerts, and the browser source. For video assets, use the element inspector to mute the video's audio track or set its volume independently from the canvas sound asset.
 - Pick stored audio for the canvas and adjust volume.
 - Select layers and adjust position, size, visibility, lock state, opacity, and text variables.
 - Rename a canvas.

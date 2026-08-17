@@ -312,6 +312,8 @@ function ElementInspector({
 
   const isText = element.type === 'text' || element.type === 'alert-message';
   const isImage = element.type === 'alert-image';
+  const selectedAsset = isImage ? assetForElement(element, editor.assets) : null;
+  const isVideo = selectedAsset?.assetType === 'video' || element.bindings.assetType === 'video';
 
   return (
     <div className="grid gap-3.5 p-3.5">
@@ -473,6 +475,36 @@ function ElementInspector({
                 Supported: {SUPPORTED_VISUAL_FORMATS}. Animated GIF/WebP and video play
                 automatically.
               </p>
+              {isVideo ? (
+                <div className="grid gap-2.5 rounded-md border border-line bg-panel p-2.5">
+                  <label className="flex cursor-pointer items-center gap-2 text-[13px]">
+                    <input
+                      type="checkbox"
+                      checked={element.bindings.videoMuted ?? false}
+                      onChange={(event) =>
+                        patchBindings({ videoMuted: event.currentTarget.checked })
+                      }
+                    />
+                    Mute video audio
+                  </label>
+                  <label className={editorFieldClass}>
+                    <span>Video volume {element.bindings.videoVolume ?? 100}%</span>
+                    <input
+                      className="w-full accent-accent"
+                      type="range"
+                      min={0}
+                      max={100}
+                      disabled={element.bindings.videoMuted ?? false}
+                      value={element.bindings.videoVolume ?? 100}
+                      onChange={(event) =>
+                        patchBindings({
+                          videoVolume: clamp(Number(event.currentTarget.value), 0, 100),
+                        })
+                      }
+                    />
+                  </label>
+                </div>
+              ) : null}
             </>
           )}
         </div>

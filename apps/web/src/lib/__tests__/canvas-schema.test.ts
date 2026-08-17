@@ -98,6 +98,8 @@ test('normalizeCanvasSettings preserves canvas audio and fixed element assets', 
           assetId: 'asset-image',
           assetType: 'video',
           assetUrl: 'https://cdn.example.com/alert.png',
+          videoMuted: true,
+          videoVolume: 35,
         },
       },
     ],
@@ -109,4 +111,17 @@ test('normalizeCanvasSettings preserves canvas audio and fixed element assets', 
   assert.equal(result.settings.elements[0]?.bindings.assetId, 'asset-image');
   assert.equal(result.settings.elements[0]?.bindings.assetType, 'video');
   assert.equal(result.settings.elements[0]?.bindings.assetUrl, 'https://cdn.example.com/alert.png');
+  assert.equal(result.settings.elements[0]?.bindings.videoMuted, true);
+  assert.equal(result.settings.elements[0]?.bindings.videoVolume, 35);
+});
+
+test('normalizeCanvasSettings defaults and clamps video audio controls', () => {
+  const defaults = normalizeCanvasSettings({ elements: [{ type: 'alert-image' }] }).settings;
+  assert.equal(defaults.elements[0]?.bindings.videoMuted, false);
+  assert.equal(defaults.elements[0]?.bindings.videoVolume, 100);
+
+  const clamped = normalizeCanvasSettings({
+    elements: [{ type: 'alert-image', bindings: { videoVolume: 140 } }],
+  }).settings;
+  assert.equal(clamped.elements[0]?.bindings.videoVolume, 100);
 });

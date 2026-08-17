@@ -12,6 +12,7 @@ import {
   type ResolvedCanvasAsset,
 } from '@/lib/canvas-schema';
 import { buildAnimationStyle } from '@/lib/canvas-animation';
+import { CanvasVideo } from '@/components/CanvasVideo';
 
 /* `overlay-stage` stays in the markup as a marker class: globals.css uses
    html:has(.overlay-stage) to keep the page background transparent. */
@@ -225,7 +226,7 @@ function CanvasRuntimeElement({
     });
     return (
       <div className={`${runtimeElementClass} overflow-hidden`} style={style}>
-        <VisualAsset asset={resolved} />
+        <VisualAsset asset={resolved} element={element} />
       </div>
     );
   }
@@ -244,12 +245,17 @@ function CanvasRuntimeElement({
   );
 }
 
-function VisualAsset({ asset }: { asset: ResolvedCanvasAsset }) {
+function VisualAsset({ asset, element }: { asset: ResolvedCanvasAsset; element: CanvasElement }) {
   if (!asset) return null;
 
   if (asset.kind === 'video') {
     return (
-      <video className="h-full w-full object-contain" src={asset.url} autoPlay loop playsInline />
+      <CanvasVideo
+        className="h-full w-full object-contain"
+        src={asset.url}
+        muted={element.bindings.videoMuted ?? false}
+        volume={element.bindings.videoVolume ?? 100}
+      />
     );
   }
 

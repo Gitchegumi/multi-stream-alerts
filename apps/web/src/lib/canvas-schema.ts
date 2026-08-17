@@ -33,6 +33,10 @@ export type CanvasElement = {
     assetType?: 'image' | 'video';
     assetId?: string;
     assetUrl?: string;
+    /** Whether the audio track of a bound video asset is disabled. */
+    videoMuted?: boolean;
+    /** Video-track volume as a percentage, independent of canvas sound audio. */
+    videoVolume?: number;
   };
   animation: {
     // `none` intentionally disables any editor-applied entrance animation so the
@@ -131,6 +135,13 @@ export function serializeCanvasSettings(settings: CanvasSettings): CanvasSetting
       zIndex: clamp(Math.round(element.zIndex), 0, 10000),
       rotation: clamp(Math.round(element.rotation), -360, 360),
       opacity: clamp(Number(element.opacity), 0, 1),
+      bindings: {
+        ...element.bindings,
+        videoVolume:
+          element.bindings.videoVolume === undefined
+            ? undefined
+            : clamp(Math.round(element.bindings.videoVolume), 0, 100),
+      },
     })),
     defaultDurationMs: clamp(Math.round(settings.defaultDurationMs), 500, 60000),
     audioAssetId: settings.audioAssetId,
@@ -241,7 +252,13 @@ export function createCanvasElement(
       width: 280,
       height: 280,
       styles: {},
-      bindings: { assetRole: 'eventVisual', assetId: undefined, assetUrl: undefined },
+      bindings: {
+        assetRole: 'eventVisual',
+        assetId: undefined,
+        assetUrl: undefined,
+        videoMuted: false,
+        videoVolume: 100,
+      },
       animation: { in: 'pop', out: 'fade', durationMs: DEFAULT_DURATION_MS },
     },
     shape: {
@@ -314,12 +331,22 @@ function normalizeElement(
       locked: typeof value.locked === 'boolean' ? value.locked : false,
       hidden: typeof value.hidden === 'boolean' ? value.hidden : false,
       styles: isRecord(value.styles) ? { ...base.styles, ...value.styles } : base.styles,
-      bindings: isRecord(value.bindings) ? { ...base.bindings, ...value.bindings } : base.bindings,
+      bindings: normalizeBindings(value.bindings, base.bindings),
       animation: isRecord(value.animation)
         ? { ...base.animation, ...value.animation }
         : base.animation,
     },
   ];
+}
+
+function normalizeBindings(value: unknown, fallback: CanvasElement['bindings']) {
+  if (!isRecord(value)) return fallback;
+  return {
+    ...fallback,
+    ...value,
+    videoMuted: typeof value.videoMuted === 'boolean' ? value.videoMuted : false,
+    videoVolume: coerceNumber(value.videoVolume, 100, 0, 100),
+  } as CanvasElement['bindings'];
 }
 
 function eventValues(alert: AlertEvent): Record<string, string> {

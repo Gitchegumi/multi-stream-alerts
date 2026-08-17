@@ -127,4 +127,43 @@ test('session authorization can read local asset bytes', async () => {
     Buffer.from('png'),
   );
   assert.equal((result.headers as Record<string, string>)['content-type'], 'image/png');
+  assert.equal((result.headers as Record<string, string>)['accept-ranges'], 'bytes');
+});
+
+test('local media assets support byte range requests', async () => {
+  const result = await handleGet({
+    request: new Request('https://alerts.example/api/assets/asset-1/content', {
+      headers: { range: 'bytes=2-5' },
+    }),
+    assetId: 'asset-1',
+    deps: makeDeps({
+      asset: makeAsset({ storageKey: 'channel-1/clip.webm', mimeType: 'video/webm' }),
+      session: { user: { id: 'user-1', role: 'owner' } },
+      canView: true,
+      storageBody: Buffer.from('0123456789'),
+    }),
+  });
+
+  assert.equal(result.status, 206);
+  assert.equal(Buffer.from(result.body as ArrayBuffer).toString(), '2345');
+  assert.equal((result.headers as Record<string, string>)['content-range'], 'bytes 2-5/10');
+  assert.equal((result.headers as Record<string, string>)['content-length'], '4');
+});
+
+test('unsatisfiable byte ranges return 416', async () => {
+  const result = await handleGet({
+    request: new Request('https://alerts.example/api/assets/asset-1/content', {
+      headers: { range: 'bytes=20-30' },
+    }),
+    assetId: 'asset-1',
+    deps: makeDeps({
+      asset: makeAsset({ storageKey: 'channel-1/clip.webm', mimeType: 'video/webm' }),
+      session: { user: { id: 'user-1', role: 'owner' } },
+      canView: true,
+      storageBody: Buffer.from('0123456789'),
+    }),
+  });
+
+  assert.equal(result.status, 416);
+  assert.equal((result.headers as Record<string, string>)['content-range'], 'bytes */10');
 });

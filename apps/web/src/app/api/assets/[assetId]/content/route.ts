@@ -72,15 +72,56 @@ export async function handleGet({
   }
 
   const body = await deps.storage.get(asset.storageKey);
+  const range = parseByteRange(request.headers.get('range'), body.byteLength);
+  if (range === 'invalid') {
+    return {
+      status: 416,
+      body: null,
+      headers: {
+        'accept-ranges': 'bytes',
+        'content-range': `bytes */${body.byteLength}`,
+      },
+    };
+  }
+  const responseBody = range ? body.subarray(range.start, range.end + 1) : body;
   return {
-    status: 200,
-    body: toArrayBuffer(body),
+    status: range ? 206 : 200,
+    body: toArrayBuffer(responseBody),
     headers: {
       'content-type': asset.mimeType,
       'cache-control': 'private, max-age=3600',
-      'content-length': body.byteLength.toString(),
+      'accept-ranges': 'bytes',
+      'content-length': responseBody.byteLength.toString(),
+      ...(range ? { 'content-range': `bytes ${range.start}-${range.end}/${body.byteLength}` } : {}),
     },
   };
+}
+
+function parseByteRange(value: string | null, size: number) {
+  if (!value) return null;
+  const match = /^bytes=(\d*)-(\d*)$/.exec(value.trim());
+  if (!match || size === 0) return 'invalid' as const;
+
+  const [, startText = '', endText = ''] = match;
+  if (!startText && !endText) return 'invalid' as const;
+  if (!startText) {
+    const suffixLength = Number(endText);
+    if (!Number.isSafeInteger(suffixLength) || suffixLength <= 0) return 'invalid' as const;
+    return { start: Math.max(0, size - suffixLength), end: size - 1 };
+  }
+
+  const start = Number(startText);
+  const requestedEnd = endText ? Number(endText) : size - 1;
+  if (
+    !Number.isSafeInteger(start) ||
+    !Number.isSafeInteger(requestedEnd) ||
+    start < 0 ||
+    start >= size ||
+    requestedEnd < start
+  ) {
+    return 'invalid' as const;
+  }
+  return { start, end: Math.min(requestedEnd, size - 1) };
 }
 
 function toArrayBuffer(buffer: Buffer) {

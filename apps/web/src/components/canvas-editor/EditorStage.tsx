@@ -5,6 +5,7 @@ import { renderCanvasText, resolveCanvasElementAsset } from '@/lib/canvas-schema
 import { buildAnimationStyle } from '@/lib/canvas-animation';
 import type { UseCanvasEditorReturn } from './useCanvasEditor';
 import type { CanvasElement } from '@/lib/canvas-schema';
+import { CanvasVideo } from '@/components/CanvasVideo';
 
 /* Editor chrome (badges, handles, guides) divides by the stage scale so it
    keeps a constant on-screen size inside the true-pixel, scaled-down canvas. */
@@ -415,13 +416,12 @@ function AlertImageContent({
 
   if (resolved.kind === 'video') {
     return (
-      <video
+      <CanvasVideo
+        key={`${resolved.url}-${editor.previewAlert?.id ?? 'editing'}`}
         className="pointer-events-none h-full w-full object-contain"
         src={resolved.url}
-        autoPlay
-        loop
-        muted
-        playsInline
+        muted={!editor.previewAlert || (element.bindings.videoMuted ?? false)}
+        volume={element.bindings.videoVolume ?? 100}
       />
     );
   }
