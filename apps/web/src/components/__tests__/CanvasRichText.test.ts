@@ -17,7 +17,8 @@ test('CanvasRichText escapes content and preserves controlled span colors and ne
     }),
   );
 
-  assert.match(markup, /&lt;script&gt;alert\(1\)&lt;\/script&gt;\n/);
-  assert.match(markup, /style="color:#fca311">SampleViewer<\/span>/);
-  assert.doesNotMatch(markup, /<script>/);
+  assert.equal(
+    markup,
+    '<span>&lt;script&gt;alert(1)&lt;/script&gt;\n</span><span style="color:#fca311">SampleViewer</span>',
+  );
 });
