@@ -11,3 +11,5 @@ To use it:
 5. Refresh the source after changing assignments, canvas status, layout, media, or sizing. If the streaming app does not show the latest canvas changes, refresh the browser source first.
 
 Canvas URLs do not open the dashboard and do not require a dashboard session. Keep the display key private because it grants read access to that canvas stream.
+
+Videos with audio play automatically in browser-source environments that permit audible autoplay, including typical OBS browser-source configurations. A normal browser tab may initially block audible autoplay; GitchAlerts still starts the video muted so the visual remains visible, and restores its configured audio after the next click or key press in the page.
