@@ -1,6 +1,6 @@
 {
   "name": "multi-stream-alerts",
-  "version": "0.10.10",
+  "version": "0.10.11",
   "private": true,
   "description": "A self-hosted alert and overlay system for creators who want to own their stream tools, data, and assets instead of depending on third-party platforms.",
   "scripts": {

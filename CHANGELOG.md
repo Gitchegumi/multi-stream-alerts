@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.11](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.10.10...v0.10.11) (2026-08-17)
+
+
+### Bug Fixes
+
+* **homepage:** clarify app identity and purpose ([0bee620](https://github.com/Gitchegumi/multi-stream-alerts/commit/0bee6200b14066ae6f5d01fc368c7b81cc661392))
+* **homepage:** clarify GitchAlerts identity and purpose ([35d2bdd](https://github.com/Gitchegumi/multi-stream-alerts/commit/35d2bdd6b6276517ae5c80459200f6eb7823f20b))
+
 ## [0.10.10](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.10.9...v0.10.10) (2026-08-17)
 
 
