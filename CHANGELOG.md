@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.10.10](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.10.9...v0.10.10) (2026-08-17)
+
+
+### Features
+
+* **integrations:** add friendly identities and legal pages ([b0c8ff1](https://github.com/Gitchegumi/multi-stream-alerts/commit/b0c8ff10cd867e702a6cfddc5ec124c559512e9b))
+* **integrations:** show account names and add legal pages ([64196b0](https://github.com/Gitchegumi/multi-stream-alerts/commit/64196b0724ac5a8a6f9ea688667f7361ce715e46))
+
+
+### Bug Fixes
+
+* **auth:** serialize Twitch account limit checks ([a47992f](https://github.com/Gitchegumi/multi-stream-alerts/commit/a47992f15a4e38fea26980cfe499212a9432c69f))
+* **twitch:** preserve channels on partial disconnect ([931ba23](https://github.com/Gitchegumi/multi-stream-alerts/commit/931ba23d2db24bee6592c2d0f2a085c1bea14b50))
+* **twitch:** serialize account disconnects ([9a4ba80](https://github.com/Gitchegumi/multi-stream-alerts/commit/9a4ba80f14e5f740516b6c33511bca45b7e9555a))
+* **twitch:** serialize shared secret provisioning ([e6cbab6](https://github.com/Gitchegumi/multi-stream-alerts/commit/e6cbab698bfb128ec01b82745e740a283f2af1d1))
+
 ## [0.10.9](https://github.com/Gitchegumi/multi-stream-alerts/compare/v0.10.8...v0.10.9) (2026-07-09)
 
 
