@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handleLinkedOAuthSignIn, type LinkedOAuthSignInDeps } from '../auth.ts';
+import {
+  handleLinkedOAuthSignIn,
+  withWorkspaceLinkLock,
+  type LinkedOAuthSignInDeps,
+  type WorkspaceLinkTransaction,
+} from '../auth.ts';
 
 const account = {
   provider: 'twitch',
@@ -19,7 +24,6 @@ function makeDeps({
   existing?: { channelId: string | null; isActive: boolean } | null;
 } = {}) {
   const calls = { upserts: 0, provisions: 0 };
-  let countCall = 0;
   const deps: LinkedOAuthSignInDeps = {
     prisma: {
       user: {
@@ -27,10 +31,7 @@ function makeDeps({
       },
       linkedAccount: {
         findUnique: async () => existing,
-        count: async () => {
-          countCall += 1;
-          return countCall === 1 ? activeCount : activeCount;
-        },
+        count: async () => activeCount,
         upsert: async () => {
           calls.upserts += 1;
           return {};
@@ -42,6 +43,8 @@ function makeDeps({
     provisionLinkedAccount: async () => {
       calls.provisions += 1;
     },
+    withWorkspaceLinkLock: async (_channelId, operation) =>
+      operation(deps.prisma as unknown as WorkspaceLinkTransaction),
     encrypt: (value) => `encrypted:${value}`,
   };
   return { deps, calls };
@@ -116,4 +119,125 @@ test('OAuth commitment allows an active account to reconnect at the cap', async 
   assert.equal(accepted, true);
   assert.equal(calls.upserts, 1);
   assert.equal(calls.provisions, 1);
+});
+
+test('concurrent OAuth commitments cannot activate a sixth Twitch account', async () => {
+  const activeAccounts = Array.from({ length: 4 }, (_, index) => ({
+    userId: 'owner-1',
+    channelId: 'channel-1',
+    platform: 'twitch',
+    platformAccountId: `existing-${index + 1}`,
+    isActive: true,
+  }));
+  let provisions = 0;
+  let lockTail = Promise.resolve();
+  const lockKeys: string[] = [];
+
+  const transaction = {
+    linkedAccount: {
+      findUnique: async (args: {
+        where: {
+          userId_platform_platformAccountId: { platformAccountId: string };
+        };
+      }) =>
+        activeAccounts.find(
+          (candidate) =>
+            candidate.platformAccountId ===
+            args.where.userId_platform_platformAccountId.platformAccountId,
+        ) ?? null,
+      count: async (args: { where: { channelId?: string; userId?: string; platform: string } }) =>
+        activeAccounts.filter(
+          (candidate) =>
+            candidate.platform === args.where.platform &&
+            (!args.where.channelId || candidate.channelId === args.where.channelId) &&
+            (!args.where.userId || candidate.userId === args.where.userId) &&
+            candidate.isActive,
+        ).length,
+      upsert: async (args: {
+        create: {
+          userId: string;
+          channelId: string;
+          platform: string;
+          platformAccountId: string;
+          isActive: boolean;
+        };
+      }) => {
+        activeAccounts.push({
+          userId: args.create.userId,
+          channelId: args.create.channelId,
+          platform: args.create.platform,
+          platformAccountId: args.create.platformAccountId,
+          isActive: args.create.isActive,
+        });
+        return {};
+      },
+    },
+  } as unknown as WorkspaceLinkTransaction;
+
+  const fakeDatabase = {
+    $transaction: async <T>(
+      callback: (
+        tx: WorkspaceLinkTransaction & {
+          $queryRaw: (strings: TemplateStringsArray, ...values: unknown[]) => Promise<unknown>;
+        },
+      ) => Promise<T>,
+    ): Promise<T> => {
+      let releaseLock: (() => void) | undefined;
+      const tx = {
+        ...transaction,
+        $queryRaw: async (_strings: TemplateStringsArray, ...values: unknown[]) => {
+          lockKeys.push(String(values[0]));
+          const previous = lockTail;
+          lockTail = new Promise<void>((resolve) => {
+            releaseLock = resolve;
+          });
+          await previous;
+          return [];
+        },
+      };
+      try {
+        return await callback(tx);
+      } finally {
+        releaseLock?.();
+      }
+    },
+  };
+
+  const deps: LinkedOAuthSignInDeps = {
+    prisma: {
+      user: {
+        findUnique: async () => ({ id: 'owner-1', role: 'owner' }),
+      },
+    } as unknown as LinkedOAuthSignInDeps['prisma'],
+    canManageChannelCredentials: async () => true,
+    resolveYoutubeChannel: async () => null,
+    provisionLinkedAccount: async () => {
+      provisions += 1;
+    },
+    withWorkspaceLinkLock: (channelId, operation) =>
+      withWorkspaceLinkLock(
+        channelId,
+        operation,
+        fakeDatabase as unknown as LinkedOAuthSignInDeps['prisma'],
+      ),
+    encrypt: (value) => `encrypted:${value}`,
+  };
+
+  const results = await Promise.all(
+    ['broadcaster-5', 'broadcaster-6'].map((providerAccountId) =>
+      handleLinkedOAuthSignIn(
+        {
+          account: { ...account, providerAccountId },
+          profile: { login: providerAccountId },
+          linkingState: { userId: 'owner-1', channelId: 'channel-1' },
+        },
+        deps,
+      ),
+    ),
+  );
+
+  assert.deepEqual(results.sort(), [false, true]);
+  assert.equal(activeAccounts.length, 5);
+  assert.equal(provisions, 1);
+  assert.deepEqual(lockKeys, ['channel-1', 'channel-1']);
 });

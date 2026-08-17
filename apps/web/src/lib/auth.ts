@@ -228,11 +228,34 @@ if (googleEnabled) {
   );
 }
 
+export type WorkspaceLinkTransaction = Pick<Prisma.TransactionClient, 'linkedAccount'>;
+
+export type WithWorkspaceLinkLock = <T>(
+  channelId: string,
+  operation: (tx: WorkspaceLinkTransaction) => Promise<T>,
+) => Promise<T>;
+
+/**
+ * Serialize linked-account activation per workspace. PostgreSQL releases the
+ * advisory lock automatically when the transaction commits or rolls back.
+ */
+export async function withWorkspaceLinkLock<T>(
+  channelId: string,
+  operation: (tx: WorkspaceLinkTransaction) => Promise<T>,
+  database: typeof prisma = prisma,
+): Promise<T> {
+  return database.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${channelId}, 0))`;
+    return operation(tx);
+  });
+}
+
 export type LinkedOAuthSignInDeps = {
   prisma: typeof prisma;
   canManageChannelCredentials: typeof canManageChannelCredentials;
   resolveYoutubeChannel: typeof resolveYoutubeChannel;
   provisionLinkedAccount: typeof provisionLinkedAccount;
+  withWorkspaceLinkLock: WithWorkspaceLinkLock;
   encrypt: typeof encrypt;
 };
 
@@ -265,6 +288,7 @@ export async function handleLinkedOAuthSignIn(
     canManageChannelCredentials,
     resolveYoutubeChannel,
     provisionLinkedAccount,
+    withWorkspaceLinkLock,
     encrypt,
   };
   if (account.provider !== 'twitch' && account.provider !== 'google') {
@@ -290,28 +314,6 @@ export async function handleLinkedOAuthSignIn(
   }
 
   const platform = account.provider === 'google' ? 'youtube' : 'twitch';
-  const existing = await d.prisma.linkedAccount.findUnique({
-    where: {
-      userId_platform_platformAccountId: {
-        userId: dbUser.id,
-        platform,
-        platformAccountId: account.providerAccountId,
-      },
-    },
-    select: { channelId: true, isActive: true },
-  });
-
-  if (platform === 'twitch') {
-    const activeCount = await d.prisma.linkedAccount.count({
-      where: { channelId, platform: 'twitch', isActive: true },
-    });
-    const reconnectingActiveAccount = existing?.isActive && existing.channelId === channelId;
-    if (activeCount >= MAX_TWITCH_CHANNELS_PER_WORKSPACE && !reconnectingActiveAccount) {
-      console.warn('OAuth sign-in: workspace Twitch channel limit reached', { channelId });
-      return false;
-    }
-  }
-
   let platformAccountName = getPlatformAccountName(
     account.provider,
     profile as Record<string, unknown> | undefined,
@@ -323,38 +325,67 @@ export async function handleLinkedOAuthSignIn(
       : null;
   platformAccountName = youtubeChannel?.title ?? platformAccountName;
 
-  const existingCount = await d.prisma.linkedAccount.count({
-    where: { userId: dbUser.id, platform },
-  });
-  await d.prisma.linkedAccount.upsert({
-    where: {
-      userId_platform_platformAccountId: {
+  const committed = await d.withWorkspaceLinkLock(channelId, async (tx) => {
+    const existing = await tx.linkedAccount.findUnique({
+      where: {
+        userId_platform_platformAccountId: {
+          userId: dbUser.id,
+          platform,
+          platformAccountId: account.providerAccountId,
+        },
+      },
+      select: { channelId: true, isActive: true },
+    });
+
+    if (platform === 'twitch') {
+      const activeCount = await tx.linkedAccount.count({
+        where: { channelId, platform: 'twitch', isActive: true },
+      });
+      const reconnectingActiveAccount = existing?.isActive && existing.channelId === channelId;
+      if (activeCount >= MAX_TWITCH_CHANNELS_PER_WORKSPACE && !reconnectingActiveAccount) {
+        return false;
+      }
+    }
+
+    const existingCount = await tx.linkedAccount.count({
+      where: { userId: dbUser.id, platform },
+    });
+    await tx.linkedAccount.upsert({
+      where: {
+        userId_platform_platformAccountId: {
+          userId: dbUser.id,
+          platform,
+          platformAccountId: account.providerAccountId,
+        },
+      },
+      create: {
         userId: dbUser.id,
+        channelId,
         platform,
         platformAccountId: account.providerAccountId,
+        platformAccountName,
+        encryptedAccessToken: d.encrypt(account.access_token ?? ''),
+        encryptedRefreshToken: account.refresh_token ? d.encrypt(account.refresh_token) : null,
+        tokenExpiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
+        isActive: true,
+        isPrimary: existingCount === 0,
       },
-    },
-    create: {
-      userId: dbUser.id,
-      channelId,
-      platform,
-      platformAccountId: account.providerAccountId,
-      platformAccountName,
-      encryptedAccessToken: d.encrypt(account.access_token ?? ''),
-      encryptedRefreshToken: account.refresh_token ? d.encrypt(account.refresh_token) : null,
-      tokenExpiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
-      isActive: true,
-      isPrimary: existingCount === 0,
-    },
-    update: {
-      channelId,
-      platformAccountName: platformAccountName ?? undefined,
-      encryptedAccessToken: d.encrypt(account.access_token ?? ''),
-      encryptedRefreshToken: account.refresh_token ? d.encrypt(account.refresh_token) : null,
-      tokenExpiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
-      isActive: true,
-    },
+      update: {
+        channelId,
+        platformAccountName: platformAccountName ?? undefined,
+        encryptedAccessToken: d.encrypt(account.access_token ?? ''),
+        encryptedRefreshToken: account.refresh_token ? d.encrypt(account.refresh_token) : null,
+        tokenExpiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
+        isActive: true,
+      },
+    });
+    return true;
   });
+
+  if (!committed) {
+    console.warn('OAuth sign-in: workspace Twitch channel limit reached', { channelId });
+    return false;
+  }
 
   await d.provisionLinkedAccount({
     platform,
