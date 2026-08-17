@@ -246,7 +246,12 @@ export async function withWorkspaceLinkLock<T>(
 ): Promise<T> {
   return database.$transaction(
     async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${channelId}, 0))`;
+      // PostgreSQL declares pg_advisory_xact_lock as returning `void`, which
+      // Prisma cannot deserialize from $queryRaw. Cast the otherwise-unused
+      // result while keeping the parameterized workspace key and lock scope.
+      await tx.$queryRaw<Array<{ lock_acquired: string }>>`
+        SELECT pg_advisory_xact_lock(hashtextextended(${channelId}, 0))::text AS lock_acquired
+      `;
       return operation(tx);
     },
     // Twitch creates several EventSub subscriptions serially. The default
