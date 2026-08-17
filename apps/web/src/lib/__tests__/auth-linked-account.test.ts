@@ -61,6 +61,7 @@ function makeAccountTransaction(activeAccounts: ActiveAccount[]): WorkspaceLinkT
 function makeLockedDatabase(transaction: WorkspaceLinkTransaction) {
   let lockTail = Promise.resolve();
   const lockKeys: string[] = [];
+  const lockQueries: string[] = [];
   const database = {
     $transaction: async <T>(
       callback: (
@@ -72,7 +73,8 @@ function makeLockedDatabase(transaction: WorkspaceLinkTransaction) {
       let releaseLock: (() => void) | undefined;
       const tx = {
         ...transaction,
-        $queryRaw: async (_strings: TemplateStringsArray, ...values: unknown[]) => {
+        $queryRaw: async (strings: TemplateStringsArray, ...values: unknown[]) => {
+          lockQueries.push(strings.join('?'));
           lockKeys.push(String(values[0]));
           const previous = lockTail;
           lockTail = new Promise<void>((resolve) => {
@@ -89,7 +91,7 @@ function makeLockedDatabase(transaction: WorkspaceLinkTransaction) {
       }
     },
   };
-  return { database, lockKeys };
+  return { database, lockKeys, lockQueries };
 }
 
 function makeDeps({
@@ -197,6 +199,21 @@ test('OAuth commitment allows an active account to reconnect at the cap', async 
   assert.equal(accepted, true);
   assert.equal(calls.upserts, 1);
   assert.equal(calls.provisions, 1);
+});
+
+test('workspace advisory lock casts PostgreSQL void to a Prisma-supported type', async () => {
+  const transaction = makeAccountTransaction([]);
+  const { database, lockQueries } = makeLockedDatabase(transaction);
+
+  const result = await withWorkspaceLinkLock(
+    'channel-1',
+    async () => 'locked',
+    database as unknown as LinkedOAuthSignInDeps['prisma'],
+  );
+
+  assert.equal(result, 'locked');
+  assert.equal(lockQueries.length, 1);
+  assert.match(lockQueries[0]!, /pg_advisory_xact_lock[\s\S]*::text AS lock_acquired/);
 });
 
 test('concurrent OAuth commitments cannot activate a sixth Twitch account', async () => {
