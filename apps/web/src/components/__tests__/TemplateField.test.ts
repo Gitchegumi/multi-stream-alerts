@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { insertTokenAt, CONTENT_PLACEHOLDER } from '../canvas-editor/EditorInspector';
+
+const inspectorSource = await readFile(
+  new URL('../canvas-editor/EditorInspector.tsx', import.meta.url),
+  'utf8',
+);
 
 // Regression tests for issue #109: the inspector Content textarea was showing
 // placeholder/helper text and the typed value at the same time because a
@@ -12,6 +18,13 @@ import { insertTokenAt, CONTENT_PLACEHOLDER } from '../canvas-editor/EditorInspe
 test('CONTENT_PLACEHOLDER is a non-empty string', () => {
   assert.ok(CONTENT_PLACEHOLDER.length > 0);
   assert.ok(CONTENT_PLACEHOLDER.includes('{{viewerName}}'));
+});
+
+test('TemplateField remounts when the selected layer changes', () => {
+  // The element id key gives each layer its own component lifecycle. Switching
+  // layers therefore resets the textarea selection, color picker, and token
+  // popup before the new layer can be edited.
+  assert.ok(inspectorSource.includes('key={element.id}'));
 });
 
 test('insertTokenAt appends token when start and end are at the end', () => {

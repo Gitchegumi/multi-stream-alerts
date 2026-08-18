@@ -218,6 +218,8 @@ export function useCanvasEditor({
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [isPending, startTransition] = useTransition();
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const saveSequenceRef = useRef(new Map<string, number>());
+  const saveQueueRef = useRef(new Map<string, Promise<void>>());
   const previewTimers = useRef<{ exit: number | null; clear: number | null }>({
     exit: null,
     clear: null,
@@ -350,43 +352,77 @@ export function useCanvasEditor({
     patch: Omit<Partial<CanvasProfile>, 'settings'> & { settings?: Partial<CanvasSettings> },
   ) {
     const currentCanvas = canvases.find((canvas) => canvas.id === canvasId);
-    if (patch.settings && !currentCanvas) return;
+    if (!currentCanvas) return;
+    const settings = patch.settings
+      ? serializeCanvasSettings({ ...currentCanvas.settings, ...patch.settings })
+      : currentCanvas.settings;
+    const optimisticCanvas: CanvasProfile = {
+      ...currentCanvas,
+      ...patch,
+      settings,
+    };
+    const requestSequence = (saveSequenceRef.current.get(canvasId) ?? 0) + 1;
+    saveSequenceRef.current.set(canvasId, requestSequence);
+    setCanvases((current) =>
+      current.map((canvas) => (canvas.id === canvasId ? optimisticCanvas : canvas)),
+    );
     setResult(null);
+    // Keep saves ordered per canvas. Rapid textarea edits may enqueue several
+    // snapshots; serialization guarantees the newest snapshot is also the last
+    // database write, while the optimistic state keeps the native caret stable.
+    const previousSave = saveQueueRef.current.get(canvasId) ?? Promise.resolve();
+    const save = previousSave
+      .catch(() => undefined)
+      .then(async () => {
+        const response = await fetch(
+          `/api/channels/${encodeURIComponent(channelSlug)}/overlay-profiles/${encodeURIComponent(
+            currentCanvas.slug,
+          )}`,
+          {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              name: patch.name,
+              slug: patch.slug,
+              isActive: patch.isActive,
+              settings: patch.settings ? settings : undefined,
+            }),
+          },
+        );
+        if (!response.ok) {
+          if (saveSequenceRef.current.get(canvasId) === requestSequence) {
+            setResult('Could not update canvas.');
+          }
+          return;
+        }
+        const body = (await response.json()) as { profile: RawProfile };
+        const canvas = normalizeProfile(body.profile, channelSlug);
+        if (saveSequenceRef.current.get(canvasId) !== requestSequence) return;
+        setCanvases((current) => current.map((item) => (item.id === canvas.id ? canvas : item)));
+        if (selected === canvasId) {
+          setSelected(canvas.id);
+          setDraftName(canvas.name);
+        }
+        setSelectedElement((current) =>
+          current && canvas.settings.elements.some((element) => element.id === current)
+            ? current
+            : (canvas.settings.elements[0]?.id ?? null),
+        );
+        setResult('Canvas updated.');
+      })
+      .catch(() => {
+        if (saveSequenceRef.current.get(canvasId) === requestSequence) {
+          setResult('Could not update canvas.');
+        }
+      });
+    saveQueueRef.current.set(canvasId, save);
+    void save.finally(() => {
+      if (saveQueueRef.current.get(canvasId) === save) {
+        saveQueueRef.current.delete(canvasId);
+      }
+    });
     startTransition(async () => {
-      const response = await fetch(
-        `/api/channels/${encodeURIComponent(channelSlug)}/overlay-profiles/${encodeURIComponent(
-          currentCanvas!.slug,
-        )}`,
-        {
-          method: 'PATCH',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            name: patch.name,
-            slug: patch.slug,
-            isActive: patch.isActive,
-            settings: patch.settings
-              ? serializeCanvasSettings({ ...currentCanvas!.settings, ...patch.settings })
-              : undefined,
-          }),
-        },
-      );
-      if (!response.ok) {
-        setResult('Could not update canvas.');
-        return;
-      }
-      const body = (await response.json()) as { profile: RawProfile };
-      const canvas = normalizeProfile(body.profile, channelSlug);
-      setCanvases((current) => current.map((item) => (item.id === canvas.id ? canvas : item)));
-      if (selected === canvasId) {
-        setSelected(canvas.id);
-        setDraftName(canvas.name);
-      }
-      setSelectedElement((current) =>
-        current && canvas.settings.elements.some((element) => element.id === current)
-          ? current
-          : (canvas.settings.elements[0]?.id ?? null),
-      );
-      setResult('Canvas updated.');
+      await save;
     });
   }
 

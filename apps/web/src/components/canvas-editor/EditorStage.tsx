@@ -1,11 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { renderCanvasText, resolveCanvasElementAsset } from '@/lib/canvas-schema';
+import { resolveCanvasElementAsset } from '@/lib/canvas-schema';
 import { buildAnimationStyle } from '@/lib/canvas-animation';
 import type { UseCanvasEditorReturn } from './useCanvasEditor';
 import type { CanvasElement } from '@/lib/canvas-schema';
 import { CanvasVideo } from '@/components/CanvasVideo';
+import { CanvasRichText } from '@/components/CanvasRichText';
 
 /* Editor chrome (badges, handles, guides) divides by the stage scale so it
    keeps a constant on-screen size inside the true-pixel, scaled-down canvas. */
@@ -355,8 +356,11 @@ function ElementView({
           ) : element.type === 'shape' ? null : (
             // Padding must match the browser-source runtime text element so
             // line wrapping is identical.
-            <span className="block w-full p-[18px]">
-              {renderCanvasText(element.bindings.textTemplate ?? element.name, editor.previewAlert)}
+            <span className="block w-full whitespace-pre-wrap p-[18px]">
+              <CanvasRichText
+                content={element.bindings.richText ?? { spans: [{ text: '', styles: {} }] }}
+                alert={editor.previewAlert}
+              />
             </span>
           )}
         </div>

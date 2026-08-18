@@ -3,6 +3,20 @@ import { overlayMessage, type AlertEvent } from '@multi-stream-alerts/shared';
 export type CanvasBackground = 'transparent' | 'dark';
 export type CanvasElementType = 'text' | 'alert-message' | 'alert-image' | 'shape';
 
+export type CanvasTextStyle = {
+  color?: string;
+};
+
+export type CanvasTextSpan = {
+  text: string;
+  styles: CanvasTextStyle;
+};
+
+/** Controlled rich-text content. New inline styles can be added to CanvasTextStyle. */
+export type CanvasRichText = {
+  spans: CanvasTextSpan[];
+};
+
 export type CanvasElement = {
   id: string;
   type: CanvasElementType;
@@ -28,7 +42,7 @@ export type CanvasElement = {
     textStrokeWidth?: number;
   };
   bindings: {
-    textTemplate?: string;
+    richText?: CanvasRichText;
     assetRole?: 'eventVisual';
     assetType?: 'image' | 'video';
     assetId?: string;
@@ -158,11 +172,92 @@ export function shouldRenderAlertOnCanvas(
   return assignedKeys.size === 0 || Boolean(alert.eventKey && assignedKeys.has(alert.eventKey));
 }
 
-export function renderCanvasText(template: string, alert: AlertEvent | null) {
+export function plainTextToCanvasRichText(text: string): CanvasRichText {
+  return { spans: [{ text, styles: {} }] };
+}
+
+export function canvasRichTextToPlainText(content: CanvasRichText): string {
+  return content.spans.map((span) => span.text).join('');
+}
+
+/**
+ * Resolve event variables without losing the controlled style attached to the
+ * source range. A variable split across spans uses the style at its first
+ * character, while ordinary text keeps each span's exact formatting.
+ */
+export function renderCanvasRichText(
+  content: CanvasRichText,
+  alert: AlertEvent | null,
+): CanvasTextSpan[] {
+  const source = canvasRichTextToPlainText(content);
   const values = alert ? eventValues(alert) : sampleValues();
-  return template.replace(/\{\{([a-zA-Z0-9]+)\}\}/g, (token, key: string) => {
-    return values[key] ?? token;
-  });
+  const rendered: CanvasTextSpan[] = [];
+  const variablePattern = /\{\{([a-zA-Z0-9]+)\}\}/g;
+  let sourceOffset = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = variablePattern.exec(source))) {
+    appendSourceRange(rendered, content, sourceOffset, match.index);
+    const token = match[0];
+    const replacement = values[match[1] ?? ''] ?? token;
+    rendered.push({ text: replacement, styles: styleAtOffset(content, match.index) });
+    sourceOffset = match.index + token.length;
+  }
+  appendSourceRange(rendered, content, sourceOffset, source.length);
+  return mergeCanvasTextSpans(rendered);
+}
+
+/** Apply a color to exactly the selected source range. */
+export function applyCanvasTextColor(
+  content: CanvasRichText,
+  start: number,
+  end: number,
+  color: string,
+): CanvasRichText {
+  const length = canvasRichTextToPlainText(content).length;
+  const rangeStart = clamp(Math.min(start, end), 0, length);
+  const rangeEnd = clamp(Math.max(start, end), 0, length);
+  if (rangeStart === rangeEnd) return content;
+
+  return {
+    spans: transformCanvasTextRange(content, rangeStart, rangeEnd, (text, styles) => ({
+      text,
+      styles: { ...styles, color: sanitizeColor(color) },
+    })),
+  };
+}
+
+/** Preserve span formatting while applying a native textarea edit. */
+export function updateCanvasRichText(content: CanvasRichText, nextText: string): CanvasRichText {
+  const previousText = canvasRichTextToPlainText(content);
+  if (previousText === nextText) return content;
+
+  let start = 0;
+  while (
+    start < previousText.length &&
+    start < nextText.length &&
+    previousText[start] === nextText[start]
+  ) {
+    start += 1;
+  }
+  let previousEnd = previousText.length;
+  let nextEnd = nextText.length;
+  while (
+    previousEnd > start &&
+    nextEnd > start &&
+    previousText[previousEnd - 1] === nextText[nextEnd - 1]
+  ) {
+    previousEnd -= 1;
+    nextEnd -= 1;
+  }
+
+  const insertionStyle = styleAtOffset(content, start > 0 ? start - 1 : start);
+  const spans: CanvasTextSpan[] = [];
+  appendSourceRange(spans, content, 0, start);
+  const insertion = nextText.slice(start, nextEnd);
+  spans.push({ text: insertion, styles: insertionStyle });
+  appendSourceRange(spans, content, previousEnd, previousText.length);
+  return { spans: mergeCanvasTextSpans(spans) };
 }
 
 /** Visual asset kinds an `alert-image` element can render. */
@@ -232,7 +327,7 @@ export function createCanvasElement(
         fontWeight: '800',
         textShadow: '0 4px 18px rgba(0, 0, 0, 0.55)',
       },
-      bindings: { textTemplate: '{{viewerName}}' },
+      bindings: { richText: plainTextToCanvasRichText('{{viewerName}}') },
       animation: { in: 'fade', out: 'fade', durationMs: DEFAULT_DURATION_MS },
     },
     'alert-message': {
@@ -245,7 +340,7 @@ export function createCanvasElement(
         fontWeight: '800',
         borderRadius: 8,
       },
-      bindings: { textTemplate: '{{viewerName}}: {{message}}' },
+      bindings: { richText: plainTextToCanvasRichText('{{viewerName}}: {{message}}') },
       animation: { in: 'pop', out: 'fade', durationMs: DEFAULT_DURATION_MS },
     },
     'alert-image': {
@@ -342,11 +437,103 @@ function normalizeElement(
 function normalizeBindings(value: unknown, fallback: CanvasElement['bindings']) {
   if (!isRecord(value)) return fallback;
   return {
-    ...fallback,
-    ...value,
+    richText: normalizeCanvasRichText(value.richText, fallback.richText),
+    assetRole: value.assetRole === 'eventVisual' ? value.assetRole : fallback.assetRole,
+    assetType:
+      value.assetType === 'image' || value.assetType === 'video'
+        ? value.assetType
+        : fallback.assetType,
+    assetId: isNonEmptyString(value.assetId) ? value.assetId : fallback.assetId,
+    assetUrl: isNonEmptyString(value.assetUrl) ? value.assetUrl : fallback.assetUrl,
     videoMuted: typeof value.videoMuted === 'boolean' ? value.videoMuted : false,
     videoVolume: coerceNumber(value.videoVolume, 100, 0, 100),
-  } as CanvasElement['bindings'];
+  };
+}
+
+function normalizeCanvasRichText(
+  value: unknown,
+  fallback: CanvasRichText | undefined,
+): CanvasRichText | undefined {
+  if (!isRecord(value) || !Array.isArray(value.spans)) return fallback;
+  const spans = value.spans.flatMap((span): CanvasTextSpan[] => {
+    if (!isRecord(span) || typeof span.text !== 'string') return [];
+    const styles = isRecord(span.styles) ? span.styles : {};
+    const color = typeof styles.color === 'string' ? sanitizeColor(styles.color) : undefined;
+    return [
+      {
+        text: span.text,
+        styles: color ? { color } : {},
+      },
+    ];
+  });
+  return { spans: mergeCanvasTextSpans(spans) };
+}
+
+function appendSourceRange(
+  target: CanvasTextSpan[],
+  content: CanvasRichText,
+  start: number,
+  end: number,
+) {
+  if (start >= end) return;
+  let offset = 0;
+  for (const span of content.spans) {
+    const spanEnd = offset + span.text.length;
+    const sliceStart = Math.max(start, offset);
+    const sliceEnd = Math.min(end, spanEnd);
+    if (sliceStart < sliceEnd) {
+      target.push({
+        text: span.text.slice(sliceStart - offset, sliceEnd - offset),
+        styles: { ...span.styles },
+      });
+    }
+    offset = spanEnd;
+  }
+}
+
+function transformCanvasTextRange(
+  content: CanvasRichText,
+  start: number,
+  end: number,
+  transform: (text: string, styles: CanvasTextStyle) => CanvasTextSpan | null,
+) {
+  const result: CanvasTextSpan[] = [];
+  appendSourceRange(result, content, 0, start);
+  const selected: CanvasTextSpan[] = [];
+  appendSourceRange(selected, content, start, end);
+  for (const span of selected) {
+    const transformed = transform(span.text, span.styles);
+    if (transformed) result.push(transformed);
+  }
+  appendSourceRange(result, content, end, canvasRichTextToPlainText(content).length);
+  return mergeCanvasTextSpans(result);
+}
+
+function styleAtOffset(content: CanvasRichText, requestedOffset: number): CanvasTextStyle {
+  let offset = 0;
+  for (const span of content.spans) {
+    if (requestedOffset < offset + span.text.length) return { ...span.styles };
+    offset += span.text.length;
+  }
+  return { ...(content.spans.at(-1)?.styles ?? {}) };
+}
+
+function mergeCanvasTextSpans(spans: CanvasTextSpan[]): CanvasTextSpan[] {
+  const merged: CanvasTextSpan[] = [];
+  for (const span of spans) {
+    if (!span.text) continue;
+    const previous = merged.at(-1);
+    if (previous && previous.styles.color === span.styles.color) {
+      previous.text += span.text;
+    } else {
+      merged.push({ text: span.text, styles: { ...span.styles } });
+    }
+  }
+  return merged.length ? merged : [{ text: '', styles: {} }];
+}
+
+function sanitizeColor(value: string) {
+  return /^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : undefined;
 }
 
 function eventValues(alert: AlertEvent): Record<string, string> {

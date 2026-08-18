@@ -2,10 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { AlertEvent } from '@multi-stream-alerts/shared';
 import {
+  applyCanvasTextColor,
+  canvasRichTextToPlainText,
   normalizeCanvasSettings,
-  renderCanvasText,
+  plainTextToCanvasRichText,
+  renderCanvasRichText,
   serializeCanvasSettings,
   shouldRenderAlertOnCanvas,
+  updateCanvasRichText,
 } from '../canvas-schema.ts';
 
 const alert: AlertEvent = {
@@ -47,7 +51,7 @@ test('normalizeCanvasSettings repairs unsupported and out-of-bounds element data
         height: 0,
         opacity: 3,
         zIndex: -4,
-        bindings: { textTemplate: '{{viewerName}}' },
+        bindings: { richText: plainTextToCanvasRichText('{{viewerName}}') },
       },
       { type: 'ticker' },
     ],
@@ -69,11 +73,71 @@ test('shouldRenderAlertOnCanvas respects assigned event keys', () => {
   assert.equal(shouldRenderAlertOnCanvas({ alertEventKeys: ['kofi.tipped'] }, alert), false);
 });
 
-test('renderCanvasText replaces known variables and leaves unknown variables intact', () => {
-  assert.equal(
-    renderCanvasText('{{viewerName}} {{platform}} {{eventType}} {{unknown}}', alert),
-    'DockeGumi twitch followed {{unknown}}',
-  );
+test('renderCanvasRichText resolves variables and keeps inline styles attached', () => {
+  const content = {
+    spans: [
+      { text: '{{viewerName}}', styles: { color: '#ff0000' } },
+      { text: '\n{{platform}} {{eventType}} {{unknown}}', styles: {} },
+    ],
+  };
+
+  assert.deepEqual(renderCanvasRichText(content, alert), [
+    { text: 'DockeGumi', styles: { color: '#ff0000' } },
+    { text: '\ntwitch followed {{unknown}}', styles: {} },
+  ]);
+});
+
+test('rich text editing preserves styles outside the changed range', () => {
+  const content = {
+    spans: [
+      { text: '{{viewerName}}', styles: { color: '#ff0000' } },
+      { text: ' tipped\n$ {{amount}}', styles: {} },
+    ],
+  };
+  const edited = updateCanvasRichText(content, '{{viewerName}} generously tipped\n$ {{amount}}');
+
+  assert.equal(canvasRichTextToPlainText(edited), '{{viewerName}} generously tipped\n$ {{amount}}');
+  assert.deepEqual(edited.spans[0], {
+    text: '{{viewerName}}',
+    styles: { color: '#ff0000' },
+  });
+  assert.match(edited.spans.at(-1)?.text ?? '', /\n\$ \{\{amount\}\}/);
+});
+
+test('applyCanvasTextColor formats only the selected range', () => {
+  const content = plainTextToCanvasRichText('Hello {{viewerName}}!');
+  const formatted = applyCanvasTextColor(content, 6, 20, '#FCA311');
+
+  assert.deepEqual(formatted.spans, [
+    { text: 'Hello ', styles: {} },
+    { text: '{{viewerName}}', styles: { color: '#fca311' } },
+    { text: '!', styles: {} },
+  ]);
+});
+
+test('normalizeCanvasSettings preserves rich text whitespace and rejects legacy text templates', () => {
+  const result = normalizeCanvasSettings({
+    elements: [
+      {
+        type: 'text',
+        bindings: {
+          textTemplate: 'legacy content',
+          richText: {
+            spans: [
+              { text: '{{viewerName}}\n  ', styles: { color: '#ABCDEF' } },
+              { text: '$ {{amount}}', styles: {} },
+            ],
+          },
+        },
+      },
+    ],
+  });
+
+  assert.deepEqual(result.settings.elements[0]?.bindings.richText?.spans, [
+    { text: '{{viewerName}}\n  ', styles: { color: '#abcdef' } },
+    { text: '$ {{amount}}', styles: {} },
+  ]);
+  assert.equal('textTemplate' in result.settings.elements[0]!.bindings, false);
 });
 
 test('serializeCanvasSettings deduplicates assignments', () => {

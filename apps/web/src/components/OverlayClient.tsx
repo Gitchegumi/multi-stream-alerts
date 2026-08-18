@@ -4,7 +4,6 @@ import type { AlertEvent } from '@multi-stream-alerts/shared';
 import { useEffect, useRef, useState } from 'react';
 import {
   normalizeCanvasSettings,
-  renderCanvasText,
   resolveCanvasElementAsset,
   shouldRenderAlertOnCanvas,
   type CanvasElement,
@@ -13,6 +12,7 @@ import {
 } from '@/lib/canvas-schema';
 import { buildAnimationStyle } from '@/lib/canvas-animation';
 import { CanvasVideo } from '@/components/CanvasVideo';
+import { CanvasRichText } from '@/components/CanvasRichText';
 
 /* `overlay-stage` stays in the markup as a marker class: globals.css uses
    html:has(.overlay-stage) to keep the page background transparent. */
@@ -240,7 +240,12 @@ function CanvasRuntimeElement({
     // instead of slicing glyphs mid-letter when a viewer name pushes the text
     // to an extra line.
     <div className={`${runtimeElementClass} overflow-visible p-[18px]`} style={style}>
-      {renderCanvasText(element.bindings.textTemplate ?? element.name, alert)}
+      <span className="block w-full whitespace-pre-wrap">
+        <CanvasRichText
+          content={element.bindings.richText ?? { spans: [{ text: '', styles: {} }] }}
+          alert={alert}
+        />
+      </span>
     </div>
   );
 }
