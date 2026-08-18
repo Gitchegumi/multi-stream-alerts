@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-web-v0.1.22...alerts-web-v0.2.0) (2026-08-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* **canvas:** canvas textTemplate bindings are replaced by richText spans and existing text content must be re-entered.
+
+### Features
+
+* **canvas:** add inline rich text styling ([#160](https://github.com/Gitchegumi/multi-stream-alerts/issues/160)) ([6e5d250](https://github.com/Gitchegumi/multi-stream-alerts/commit/6e5d250d19f30e77d4cea1d3e06f800e627524fd))
+
 ## [0.1.22](https://github.com/Gitchegumi/multi-stream-alerts/compare/alerts-web-v0.1.21...alerts-web-v0.1.22) (2026-08-17)
 
 
