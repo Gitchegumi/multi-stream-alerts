@@ -11,7 +11,7 @@ permissions:
 jobs:
   scan-pr:
     name: Scan PR dependencies with OSV
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.5.0
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.5.1
     with:
       scan-args: |-
         --lockfile=pnpm-lock.yaml
