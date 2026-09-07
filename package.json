@@ -22,16 +22,16 @@
   "packageManager": "pnpm@9.15.4",
   "pnpm": {
     "overrides": {
-      "postcss": "8.5.26",
+      "postcss": "8.5.28",
       "uuid": "11.1.1",
       "@hono/node-server": ">=1.19.13",
       "express>body-parser": "2.3.0"
     }
   },
   "devDependencies": {
-    "postcss": "8.5.26",
+    "postcss": "8.5.28",
     "husky": "^9.1.0",
-    "lint-staged": "^17.3.0",
+    "lint-staged": "^17.4.1",
     "prettier": "^3.9.6"
   }
 }
