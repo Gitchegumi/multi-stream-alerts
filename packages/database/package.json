@@ -17,14 +17,14 @@
   },
   "dependencies": {
     "@multi-stream-alerts/shared": "workspace:*",
-    "@prisma/adapter-pg": "^7.10.0",
-    "@prisma/client": "^7.10.0",
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
     "ioredis": "^6.0.0",
-    "pg": "^8.23.0"
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
-    "@types/pg": "^8.21.0",
+    "@types/pg": "^8.23.1",
     "prisma": "^7.9.1",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2"
